@@ -7,12 +7,23 @@ Plan: `.claude/plans/2026-10-02-improved-bases.md` (Subagent-Driven). Branch `fe
 - Task 2 (1229906): `test-vault/` Fixtures, `scripts/lib/cli.mjs` (Vault-Guard), vault-link/open/reset, reload, smoke. Vault registriert, Plugin enabled.
 - Task 3 (eca5f80): `scripts/probe.mjs`, Ergebnisse in `SPIKE_FINDINGS.md` „Prüfpunkte v1“. minAppVersion 1.14.4 (getestet 1.14.4). `display()` aus settings.ts entfernt (Lint `no-deprecated-display`).
 
+- Entscheidung P1: Umfang v1 = Tabelle, Panel, Sidebar; Cards/List nativ, unverändert (Spec/Plan angepasst).
+- Phase 1 (Tasks 4–7, Gate-1-Review + Fixes): Commits 40509b9…77e3a44. `pnpm check && pnpm smoke` grün.
+
+## Phase-1-API (für Phase 2)
+- `parseSchema(basePath, raw)`, `SCHEMA_KEY`, `NATIVE_TYPES` in `src/schema/`. `SchemaWriter.update(basePath, mutate)` byte-erhaltend (Kommentare innerhalb geänderter Feldknoten gehen verloren).
+- `BaseQuery.watch(path, cb)`: Ref-Count, Generation, neue Watcher bekommen letztes Ergebnis synchron; Fallback-CLI nach 5 s; Rename/Delete → []. Collector-View-Eintrag per CSS versteckt (Icon `improved-bases-collector`).
+- `SchemaRegistry` (`loaded`, `changed`, dispose-sicher, Sequenznummer pro Pfad) + `Membership` (`resolve(file, field)`, `targetEntries`, Events `changed`/`targets-changed`). Konfliktregel: erste Schema-Base nach basePath gewinnt (Meetings.base vor Mitarbeiter.base → Cora `team: text`), console.warn einmal pro (Datei, Feld).
+- `Membership.ready` = Latch: registry.loaded ∧ alle Schemas gescannt ∧ metadataCache resolved ∧ 300 ms ohne Push. Vorher `resolve` → null.
+- `plugin.query`, `plugin.registry`, `plugin.membership` in `main.ts`; Dispose via `this.register`. Interna nur `src/internals/{detect,cliQuery}.ts`; `hasBasesViewApi` bereit für Task 8/13.
+- Offen (Minor): Remount des Collectors bei reinen Schema-Writes vermeiden (Query-Hash).
+
 ## Prüfpunkte
 - P1 TEILWEISE FAIL: Hülle wirkt in Tabelle, Panel, Sidebar. Cards/List rufen `getTypeInfo` nie (rendern read-only via `Value.renderTo`).
 - P2 PASS. P3: Undo nur im Panel, Tabelle nativ ohne Undo (README). P4: kein Hook für Property-Kontextmenü → nur Befehle. P5 PASS (Selektor in SPIKE_FINDINGS, eigenes Icon via `addIcon`). P6 offen (Mobil).
 
-## Offene Entscheidung (blockiert Phase 1)
-P1: (a) Umfang auf Tabelle+Panel reduzieren, Cards/List nativ; (b) Zusatzweg für Cards/List (Patch Card-Renderer oder DOM-Nachbearbeitung `[data-property="note.x"]`). Danach Spec+Plan anpassen.
+## Nächster Schritt
+Phase 2: Task 8 (opus) → 9 → 10 → Gate 2 (opus).
 
 ## Fakten für Task 8
 - Tabelle baut Zellen nur bei neuer Widget-Identität von `inferred` neu → Hüllen-Cache braucht Generation (bei Schema-/Mitgliedschaftsänderung hochzählen).
