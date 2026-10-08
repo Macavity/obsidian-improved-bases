@@ -1,0 +1,15 @@
+/* Offscreen host for collector views: must stay in the DOM with real size, otherwise Bases never runs the query. */
+.improved-bases-collector-host {
+	position: fixed;
+	top: 0;
+	left: -10000px;
+	width: 400px;
+	height: 300px;
+	overflow: hidden;
+	pointer-events: none;
+}
+
+/* Hide the collector view type from the Bases layout combobox (matched by its own icon). */
+.suggestion-container.combobox .suggestion-item:has(.suggestion-flair svg.improved-bases-collector) {
+	display: none;
+}

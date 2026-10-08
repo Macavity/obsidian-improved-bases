@@ -104,3 +104,21 @@ export function parseYaml(text: string): unknown {
 export function stringifyYaml(value: unknown): string {
 	return stringify(value);
 }
+
+export abstract class BasesView extends Component {
+	app: unknown = {};
+	config: { get(key: string): unknown } = { get: () => undefined };
+	data: { data: Array<{ file: TFile }> } = { data: [] };
+	constructor(_controller?: unknown) {
+		super();
+	}
+	abstract onDataUpdated(): void;
+}
+
+export class MarkdownRenderer {
+	static render(_app: unknown, _md: string, _el: HTMLElement, _sourcePath: string, _component: Component): Promise<void> {
+		return Promise.resolve();
+	}
+}
+
+export function addIcon(_iconId: string, _svgContent: string): void {}
