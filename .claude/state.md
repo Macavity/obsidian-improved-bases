@@ -22,8 +22,17 @@ Plan: `.claude/plans/2026-10-02-improved-bases.md` (Subagent-Driven). Branch `fe
 - P1 TEILWEISE FAIL: Hülle wirkt in Tabelle, Panel, Sidebar. Cards/List rufen `getTypeInfo` nie (rendern read-only via `Value.renderTo`).
 - P2 PASS. P3: Undo nur im Panel, Tabelle nativ ohne Undo (README). P4: kein Hook für Property-Kontextmenü → nur Befehle. P5 PASS (Selektor in SPIKE_FINDINGS, eigenes Icon via `addIcon`). P6 offen (Mobil).
 
+## Phase 2 (Tasks 8–10 + Gate-2-Fixes): Commits 91bbcd8…8cd9900, Gates grün
+- `src/internals/typeInfoPatch.ts`: Cache `Map<expected, Map<inferred, {generation, hull}>>`, globale Generation, `refresh(names)` → `mtm.trigger("changed", name)` (lowercase). Dispatch: relation/select → Plugin-Widget, NativeType → `registeredTypeWidgets`, null → Original. Exceptions → Original. Uninstall via monkey-around + Cache leeren + `changed`. Unsupported: `installTypeInfoPatch` → null, Notice (engl.).
+- Widgets: `src/widgets/{types,values,pickers,RelationWidget,SelectWidget}.ts`. Wurzel `div.improved-bases-<type>[data-improved-bases]`. `draw()` try/catch → Rohtext. `WidgetEnv.overlays` schließt Picker/Menüs beim Uninstall. Klassen `is-mismatch`, `is-foreign`.
+- Relation: `EntryPicker` (FuzzySuggestModal) über `membership.targetEntries(base)`; Rename aktualisiert Frontmatter; Linktext via `fileToLinktext`.
+- Select: `Menu` (nicht nativ) mit Suchfeld + `Create "<text>"`, Enter via `menu.scope` – Interna nur in `src/internals/menu.ts` mit Detection (Fallback: ohne Suchfeld). Farben: `--ib-rgb` je `[data-color]`; violet→purple; lime/brown/grey/black/white fix. `addOptionMutation`/`setColorMutation` via `SchemaWriter` (`Object.hasOwn`, defineProperty). `Membership.resolveWithBase` → `{field, basePath, name}`.
+- BaseQuery: Erst-Scan sofort per CLI, Collector übernimmt beim ersten Push; kein Fallback-Timer mehr. `BaseNotFoundError` → [] ohne CLI. Bereitschaft nach Enable ~0,8 s (vorher ~3,8 s sichtbar; 14–19 s bei verdecktem Fenster nicht reproduziert).
+- tsconfig lib ES2022. Undo nur im Panel (README). Smoke-Hinweise: abgebrochener Lauf hinterlässt Menü → `app:reload`; Obsidian serialisiert offene `.base` um → Smoke vergleicht geparst.
+- Offen (Minor, verschoben): Gate-1 #5 Remount bei reinen Schema-Writes; Gate-2 #7 `knownFieldNames`-Cache, Generation pro Name, selektives `targets-changed`.
+
 ## Nächster Schritt
-Phase 2: Task 8 (opus) → 9 → 10 → Gate 2 (opus).
+Phase 3: Welle 3a Tasks 11+12 parallel (12 registriert sich NICHT in main.ts) → 13 → Gate 3 → Task 14 → Final-Review (opus).
 
 ## Fakten für Task 8
 - Tabelle baut Zellen nur bei neuer Widget-Identität von `inferred` neu → Hüllen-Cache braucht Generation (bei Schema-/Mitgliedschaftsänderung hochzählen).
