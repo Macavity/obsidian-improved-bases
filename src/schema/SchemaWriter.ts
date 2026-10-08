@@ -32,6 +32,14 @@ export function updateSchemaSource(source: string, mutate: (fields: RawFields) =
   return doc.toString();
 }
 
+/** Adds an empty `improved-bases: { fields: {} }` node; no-op if the key exists. */
+export function activateSchemaSource(source: string): string {
+  const doc = parseDocument(source);
+  if (doc.has(SCHEMA_KEY)) return source;
+  doc.setIn([SCHEMA_KEY, "fields"], doc.createNode({}));
+  return doc.toString();
+}
+
 export class SchemaWriter {
   constructor(private readonly app: App) {}
 
@@ -39,5 +47,11 @@ export class SchemaWriter {
     const file = this.app.vault.getAbstractFileByPath(basePath);
     if (!(file instanceof TFile)) throw new Error(`Base not found: ${basePath}`);
     await this.app.vault.process(file, (data) => updateSchemaSource(data, mutate));
+  }
+
+  async activate(basePath: string): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(basePath);
+    if (!(file instanceof TFile)) throw new Error(`Base not found: ${basePath}`);
+    await this.app.vault.process(file, activateSchemaSource);
   }
 }

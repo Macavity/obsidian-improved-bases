@@ -165,6 +165,37 @@ const panelRole = run("Mitarbeiter/Ada Albers.md",
 assert(panelRole.text === "Tester" && panelRole.color === "green", `panel Role pill: ${JSON.stringify(panelRole)}`);
 console.log("SelectWidget ok");
 
+// Commands: activate schema base, configure field via modal, panel shows relation widget.
+const cmdAvailable = (id) => evalJs(`(() => { const c = app.commands.commands['improved-bases:${id}']; return c.checkCallback(true) === true; })()`) === "true";
+const OPEN_ACTIVE = (path) => evalJs(`(async () => { ${OPEN(path)} return 'ok'; })()`);
+OPEN_ACTIVE("Mitarbeiter.base");
+assert(!cmdAvailable("activate-schema-base"), "activate must be hidden on an existing schema base");
+OPEN_ACTIVE("Departments.base");
+assert(cmdAvailable("activate-schema-base"), "activate must be offered on Departments.base");
+assert(!cmdAvailable("configure-field"), "configure must be hidden before activation");
+evalJs("(app.commands.executeCommandById('improved-bases:activate-schema-base'), 'ok')");
+const depSrc = () => evalJs("(async () => await app.vault.read(app.vault.getAbstractFileByPath('Departments.base')))()");
+await waitFor(() => parseYaml(depSrc().replace(/^=> /, ""))?.["improved-bases"]?.fields !== undefined, 5000);
+assert(JSON.stringify(parseYaml(depSrc().replace(/^=> /, ""))["improved-bases"].fields) === "{}", "activate must write an empty fields node");
+await waitFor(() => cmdAvailable("configure-field") && !cmdAvailable("activate-schema-base"), 5000);
+obs("property:set", { path: "Departments/Engineering.md", name: "Lead", value: "[[Ada Albers]]" });
+evalJs("(app.commands.executeCommandById('improved-bases:configure-field'), 'ok')");
+await waitFor(() => evalJs("!!document.querySelector('.improved-bases-configure')") === "true", 5000);
+const saved = evalJs(
+	`(async () => { const m = document.querySelector('.improved-bases-configure'); const sleep = (ms) => new Promise((r) => setTimeout(r, ms)); ` +
+		`const name = m.querySelector('.improved-bases-field-name'); name.value = 'Lead'; name.dispatchEvent(new Event('input', { bubbles: true })); ` +
+		`const type = m.querySelector('.improved-bases-field-type'); type.value = 'relation'; type.dispatchEvent(new Event('change', { bubbles: true })); await sleep(200); ` +
+		`m.querySelector('.improved-bases-field-base').click(); await sleep(500); ` +
+		`[...document.querySelectorAll('.suggestion-item')].find((i) => i.textContent === 'Mitarbeiter.base').click(); await sleep(300); ` +
+		`[...m.querySelectorAll('button')].find((b) => b.textContent === 'Save').click(); await sleep(1500); return 'ok'; })()`,
+);
+assert(saved === "ok", "configure modal drive failed");
+await waitFor(() => parseYaml(depSrc().replace(/^=> /, ""))?.["improved-bases"]?.fields?.Lead?.type === "relation", 5000);
+const lead = parseYaml(depSrc().replace(/^=> /, ""))["improved-bases"].fields.Lead;
+assert(lead.base === "Mitarbeiter.base" && lead.multiple === false, `Lead field: ${JSON.stringify(lead)}`);
+await waitFor(() => run("Departments/Engineering.md", `return JSON.stringify(!!el.querySelector('.metadata-property[data-property-key="Lead" i] [data-improved-bases="relation"]'));`) === true, 10000);
+console.log("Commands ok");
+
 const read = () => obs("property:read", { path: "Mitarbeiter/Ada Albers.md", name: "Role" }).trim();
 const before = "Developer"; // fixture value; the select check above changed it to Tester
 obs("property:set", { path: "Mitarbeiter/Ada Albers.md", name: "Role", value: "Changed" });

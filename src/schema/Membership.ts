@@ -104,6 +104,11 @@ export class Membership extends Events {
 		return found;
 	}
 
+	/** Schema bases (sorted by path) whose query result contains the file. */
+	schemaBasesOf(filePath: string): string[] {
+		return this.registry.schemas().filter((s) => this.members.get(s.basePath)?.has(filePath)).map((s) => s.basePath);
+	}
+
 	targetEntries(basePath: string): TFile[] | null {
 		return this.results.get(basePath) ?? null;
 	}
