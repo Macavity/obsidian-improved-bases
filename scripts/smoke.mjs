@@ -196,6 +196,29 @@ assert(lead.base === "Mitarbeiter.base" && lead.multiple === false, `Lead field:
 await waitFor(() => run("Departments/Engineering.md", `return JSON.stringify(!!el.querySelector('.metadata-property[data-property-key="Lead" i] [data-improved-bases="relation"]'));`) === true, 10000);
 console.log("Commands ok");
 
+// Import option notes: Role gains Manager (existing colors kept), Status becomes a select; option notes untouched.
+OPEN_ACTIVE("Mitarbeiter.base");
+assert(cmdAvailable("import-option-notes"), "import must be offered on a schema base");
+evalJs("(app.commands.executeCommandById('improved-bases:import-option-notes'), 'ok')");
+const mitSrc = () => parseYaml(evalJs("(async () => await app.vault.read(app.vault.getAbstractFileByPath('Mitarbeiter.base')))()").replace(/^=> /, ""));
+await waitFor(() => mitSrc()?.["improved-bases"]?.fields?.Status?.type === "select", 5000);
+const imported = mitSrc()["improved-bases"].fields;
+assert(imported.Role.options.Manager && imported.Role.options.Developer === "blue", `Role after import: ${JSON.stringify(imported.Role)}`);
+assert(Object.keys(imported.Status.options).sort().join() === "Aktiv,Urlaub", `Status options: ${JSON.stringify(imported.Status)}`);
+evalJs("(document.querySelector('.modal-container .modal-close-button')?.click(), 'ok')");
+execSync("git diff --exit-code --quiet test-vault/Optionen", { stdio: "inherit" });
+console.log("Import ok");
+
+// Settings: toggle off removes all widgets, on restores them; settings persist merged.
+OPEN_ACTIVE("Mitarbeiter.base");
+await waitFor(() => cells("Mitarbeiter.base").some((c) => c.plugin), 10000);
+evalJs(`(${PLUGIN}.settings.widgetsEnabled = false, ${PLUGIN}.applyWidgetsEnabled(), 'ok')`);
+await waitFor(() => evalJs(MARKED) === "0", 5000);
+assert(evalJs(`${PLUGIN}.typeInfoPatch === null`) === "true", "patch must be gone when widgets are disabled");
+evalJs(`(${PLUGIN}.settings.widgetsEnabled = true, ${PLUGIN}.applyWidgetsEnabled(), 'ok')`);
+await waitFor(() => cells("Mitarbeiter.base").some((c) => c.plugin), 10000);
+console.log("Settings ok");
+
 const read = () => obs("property:read", { path: "Mitarbeiter/Ada Albers.md", name: "Role" }).trim();
 const before = "Developer"; // fixture value; the select check above changed it to Tester
 obs("property:set", { path: "Mitarbeiter/Ada Albers.md", name: "Role", value: "Changed" });

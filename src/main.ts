@@ -4,12 +4,14 @@ import { BaseQuery, createBaseQuery } from "./query/BaseQuery";
 import { Membership } from "./schema/Membership";
 import { SchemaRegistry } from "./schema/SchemaRegistry";
 import { SchemaWriter } from "./schema/SchemaWriter";
-import { OverlayRegistry } from "./widgets/types";
+import { OverlayRegistry, WidgetEnv } from "./widgets/types";
 import { RelationWidget } from "./widgets/RelationWidget";
 import { SelectWidget } from "./widgets/SelectWidget";
 import { registerActivateSchema } from "./commands/activateSchema";
 import { registerConfigureField } from "./commands/configureField";
-import { DEFAULT_SETTINGS, ImprovedBasesSettings, ImprovedBasesSettingTab } from "./settings";
+import { registerImportOptions } from "./commands/importOptions";
+import { getMetadataTypeManager } from "./internals/detect";
+import { ImprovedBasesSettings, ImprovedBasesSettingTab, mergeSettings } from "./settings";
 
 export default class ImprovedBasesPlugin extends Plugin {
 	settings: ImprovedBasesSettings;
@@ -18,6 +20,9 @@ export default class ImprovedBasesPlugin extends Plugin {
 	membership: Membership;
 	writer: SchemaWriter;
 	typeInfoPatch: TypeInfoPatch | null = null;
+	/** False when Obsidian internals are missing; widgets then stay off, commands keep working. */
+	widgetsSupported = true;
+	private env: WidgetEnv;
 
 	async onload() {
 		await this.loadSettings();
@@ -31,23 +36,37 @@ export default class ImprovedBasesPlugin extends Plugin {
 		});
 		this.writer = new SchemaWriter(this.app);
 		const env = { membership: this.membership, writer: this.writer, app: this.app, overlays: new OverlayRegistry() };
-		this.typeInfoPatch = installTypeInfoPatch(this.app, env, { relation: RelationWidget, select: SelectWidget });
-		if (this.typeInfoPatch) {
-			const patch = this.typeInfoPatch;
-			this.register(() => patch.uninstall());
-		} else {
-			new Notice(`${this.manifest.name}: this Obsidian version is not supported`);
-		}
+		this.env = env;
+		this.widgetsSupported = getMetadataTypeManager(this.app) !== null;
+		if (!this.widgetsSupported) new Notice(`${this.manifest.name}: this Obsidian version is not supported`);
+		this.applyWidgetsEnabled();
+		this.register(() => {
+			this.typeInfoPatch?.uninstall();
+			this.typeInfoPatch = null;
+		});
 		registerActivateSchema(this, this.writer, this.registry);
 		registerConfigureField(this, env, this.registry);
+		registerImportOptions(this, env, () => this.settings.importFolder);
 		this.app.workspace.onLayoutReady(() => void this.registry.load());
 		this.addSettingTab(new ImprovedBasesSettingTab(this.app, this));
+	}
+
+	/** Installs or removes the getTypeInfo patch according to `settings.widgetsEnabled`. */
+	applyWidgetsEnabled() {
+		if (this.settings.widgetsEnabled && this.widgetsSupported) {
+			if (this.typeInfoPatch) return;
+			this.typeInfoPatch = installTypeInfoPatch(this.app, this.env, { relation: RelationWidget, select: SelectWidget });
+			if (!this.typeInfoPatch) this.widgetsSupported = false;
+		} else if (this.typeInfoPatch) {
+			this.typeInfoPatch.uninstall();
+			this.typeInfoPatch = null;
+		}
 	}
 
 	onunload() {}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<ImprovedBasesSettings>);
+		this.settings = mergeSettings(await this.loadData());
 	}
 
 	async saveSettings() {

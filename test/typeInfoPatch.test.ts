@@ -90,9 +90,10 @@ describe("typeInfoPatch", () => {
       offref: (n) => { handlers.delete(n as string); },
     };
     const patch = installTypeInfoPatch(app, env(membership), widgets({}))!;
+    expect(mtm.trigger).toHaveBeenCalledTimes(1); // initial refresh on install
     handlers.get("changed")!(["team"]);
     handlers.get("targets-changed")!("T.base");
-    expect(mtm.trigger).toHaveBeenCalledTimes(2);
+    expect(mtm.trigger).toHaveBeenCalledTimes(3);
     patch.uninstall();
     expect(handlers.size).toBe(0);
     expect(mtm.trigger).toHaveBeenLastCalledWith("changed", "team");

@@ -138,6 +138,9 @@ export function installTypeInfoPatch(app: App, env: WidgetEnv, widgets: PluginWi
 	// Target entries changed: relation widgets need fresh options; known names cover all relation fields.
 	listen(membership.on("targets-changed", () => refresh([...membership.knownFieldNames()])));
 
+	// Re-enabling at runtime: already rendered cells/panels still hold the original widgets.
+	refresh([...membership.knownFieldNames()]);
+
 	return {
 		refresh,
 		uninstall() {
