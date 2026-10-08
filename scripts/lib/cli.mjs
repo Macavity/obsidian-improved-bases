@@ -22,7 +22,7 @@ export function obs(cmd, args = {}) {
 }
 
 export function evalJs(code) {
-	return obs("eval", { code }).trim();
+	return obs("eval", { code }).trim().replace(/^=> /, ""); // eval prints "=> <result>"
 }
 
 export function assert(cond, msg) {

@@ -4,7 +4,7 @@ import { obs, evalJs, assert, ensureVault, waitFor } from "./lib/cli.mjs";
 ensureVault();
 const teams = obs("base:query", { path: "Teams.base", format: "paths" }).trim().split("\n");
 assert(teams.length === 4 && !teams.some((p) => p.includes("Omega")), `Teams.base: ${teams}`);
-assert(evalJs("!!app.plugins.plugins['improved-bases']") === "true", "plugin not loaded");
+await waitFor(() => evalJs("!!app.plugins.plugins['improved-bases']") === "true", 15000);
 
 const read = () => obs("property:read", { path: "Mitarbeiter/Ada Albers.md", name: "Role" }).trim();
 const before = read();
