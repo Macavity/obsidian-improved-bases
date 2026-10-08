@@ -53,3 +53,33 @@ describe("importMutation", () => {
     expect(fields.Role).toEqual({ type: "relation", base: "T.base" });
   });
 });
+
+describe("prototype keys", () => {
+  it("planImport skips unsafe columns and values", () => {
+    const plan = planImport(
+      [
+        { basename: "constructor - A", farbe: "red" },
+        { basename: "__proto__ - A", farbe: "red" },
+        { basename: "Role - __proto__", farbe: "red" },
+        { basename: "Role - constructor", farbe: "red" },
+        { basename: "Role - Ok", farbe: "blue" },
+      ],
+      new Set(["constructor", "__proto__", "role"]),
+      [],
+    );
+    expect(Object.keys(plan.fields)).toEqual(["Role"]);
+    expect(Object.keys(plan.fields.Role ?? {})).toEqual(["Ok"]);
+    expect(plan.skipped).toHaveLength(4);
+    expect(({} as Record<string, unknown>).A).toBeUndefined();
+  });
+
+  it("importMutation ignores inherited members and reports non-select fields", () => {
+    const fields: RawFields = { Role: { type: "text" } };
+    const skipped: string[] = [];
+    importMutation({ Role: { A: "red" }, ["constructor"]: { B: "red" } } as Record<string, Record<string, "red">>, new Set(), (n) => skipped.push(n))(fields);
+    expect(skipped).toEqual(["Role"]);
+    expect(Object.keys(fields)).toEqual(["Role"]);
+    expect(Object.hasOwn(Object.prototype, "B")).toBe(false);
+  });
+});
+

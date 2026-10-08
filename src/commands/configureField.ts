@@ -1,6 +1,7 @@
-import { FuzzySuggestModal, Modal, Notice, Setting, TFile, type App, type Plugin } from "obsidian";
+import { FuzzySuggestModal, type DropdownComponent, Modal, Notice, Setting, TFile, type App, type Plugin } from "obsidian";
 import type { RawFields } from "../schema/SchemaWriter";
 import { COLORS, NATIVE_TYPES, type Color, type FieldSchema } from "../schema/types";
+import { findOwnKey, isUnsafeKey } from "../schema/keys";
 import type { WidgetEnv } from "../widgets/types";
 import type { SchemaRegistry } from "../schema/SchemaRegistry";
 
@@ -14,14 +15,17 @@ export interface FieldDraft {
 
 const TYPES: FieldSchema["type"][] = ["relation", "select", ...NATIVE_TYPES];
 
-/** Pure: the field node written under `improved-bases.fields.<name>`. */
+/** Pure: the field node written under `improved-bases.fields.<name>`; reuses an existing key case-insensitively. */
 export function draftToMutation(draft: FieldDraft): (f: RawFields) => void {
 	return (fields) => {
-		const name = draft.name.trim();
+		const typed = draft.name.trim();
+		if (!typed || isUnsafeKey(typed)) return;
+		const name = findOwnKey(fields, typed) ?? typed;
 		if (draft.type === "relation") {
 			fields[name] = { type: "relation", base: draft.base ?? "", multiple: draft.multiple };
 		} else if (draft.type === "select") {
-			const existing = fields[name]?.type === "select" ? (fields[name].options as Record<string, Color> | undefined) : undefined;
+			const prev = Object.hasOwn(fields, name) ? fields[name] : undefined;
+			const existing = prev?.type === "select" ? (prev.options as Record<string, Color> | undefined) : undefined;
 			fields[name] = { type: "select", multiple: draft.multiple, options: draft.options ?? existing ?? {} };
 		} else {
 			fields[name] = { type: draft.type };
@@ -29,9 +33,18 @@ export function draftToMutation(draft: FieldDraft): (f: RawFields) => void {
 	};
 }
 
-export function validateDraft(draft: FieldDraft, basePaths: string[]): string[] {
+/** `existing`: lowercased field name → current name and type. A different type is a collision. */
+export function validateDraft(
+	draft: FieldDraft,
+	basePaths: string[],
+	existing: ReadonlyMap<string, { name: string; type: string }> = new Map(),
+): string[] {
 	const errors: string[] = [];
-	if (!draft.name.trim()) errors.push("Field name is required");
+	const name = draft.name.trim();
+	if (!name) errors.push("Field name is required");
+	else if (isUnsafeKey(name)) errors.push(`"${name}" is a reserved name`);
+	const clash = existing.get(name.toLowerCase());
+	if (clash && clash.type !== draft.type) errors.push(`Field '${clash.name}' already exists with type ${clash.type}`);
 	if (!TYPES.includes(draft.type)) errors.push("Unknown type");
 	if (draft.type === "relation" && !(draft.base && basePaths.includes(draft.base))) {
 		errors.push("Choose an existing target base");
@@ -45,15 +58,21 @@ export function validateDraft(draft: FieldDraft, basePaths: string[]): string[] 
 }
 
 /** Parses lines `value` or `value: color` (default grey); unknown colors are kept so `validateDraft` reports them. */
-export function parseOptionLines(text: string): Record<string, Color> {
-	const out: Record<string, Color> = {};
+export function parseOptionLines(text: string): { options: Record<string, Color>; errors: string[] } {
+	const options: Record<string, Color> = Object.create(null) as Record<string, Color>;
+	const errors: string[] = [];
 	for (const line of text.split("\n")) {
 		const t = line.trim();
 		const i = t.lastIndexOf(":");
 		const value = (i > 0 ? t.slice(0, i) : t).trim();
-		if (value) out[value] = i > 0 ? (t.slice(i + 1).trim() as Color) : "grey";
+		if (!value) continue;
+		if (isUnsafeKey(value)) {
+			errors.push(`"${value}" is a reserved option name`);
+			continue;
+		}
+		options[value] = i > 0 ? (t.slice(i + 1).trim() as Color) : "grey";
 	}
-	return out;
+	return { options, errors };
 }
 
 class BasePicker extends FuzzySuggestModal<string> {
@@ -77,11 +96,28 @@ export class ConfigureFieldModal extends Modal {
 	private optionsText = "";
 	private body: HTMLElement | null = null;
 	private errorEl: HTMLElement | null = null;
+	private typeDropdown: DropdownComponent | null = null;
+	private prefilled: string | null = null;
+
+	/** Loads type, multiple, base and options of an existing field whose name matches case-insensitively. */
+	private prefill(typed: string): void {
+		const hit = this.existing.get(typed.trim().toLowerCase());
+		if (!hit || this.prefilled === hit.name) return;
+		this.prefilled = hit.name;
+		const { field } = hit;
+		this.draft.type = field.type;
+		this.draft.multiple = field.type === "relation" || field.type === "select" ? field.multiple : false;
+		this.draft.base = field.type === "relation" ? field.base : undefined;
+		this.optionsText = field.type === "select" ? field.options.map((o) => `${o.value}: ${o.color}`).join("\n") : "";
+		this.typeDropdown?.setValue(field.type);
+		this.renderBody();
+	}
 
 	constructor(
 		app: App,
 		private readonly basePath: string,
 		private readonly propertyNames: string[],
+		private readonly existing: ReadonlyMap<string, { name: string; field: FieldSchema }>,
 		private readonly onSubmit: (d: FieldDraft) => void,
 	) {
 		super(app);
@@ -99,13 +135,17 @@ export class ConfigureFieldModal extends Modal {
 		new Setting(contentEl).setName("Field name").addText((t) => {
 			t.inputEl.setAttribute("list", "improved-bases-property-names");
 			t.inputEl.addClass("improved-bases-field-name");
-			t.onChange((v) => (this.draft.name = v));
+			t.onChange((v) => {
+				this.draft.name = v;
+				this.prefill(v);
+			});
 		});
 		const list = contentEl.createEl("datalist", { attr: { id: "improved-bases-property-names" } });
 		for (const n of this.propertyNames) list.createEl("option", { attr: { value: n } });
 		new Setting(contentEl).setName("Type").addDropdown((d) => {
 			d.selectEl.addClass("improved-bases-field-type");
 			for (const t of TYPES) d.addOption(t, t);
+			this.typeDropdown = d;
 			d.setValue(this.draft.type);
 			d.onChange((v) => {
 				this.draft.type = v as FieldSchema["type"];
@@ -153,8 +193,14 @@ export class ConfigureFieldModal extends Modal {
 
 	private submit(): void {
 		const draft: FieldDraft = { ...this.draft, name: this.draft.name.trim() };
-		if (draft.type === "select" && this.optionsText.trim()) draft.options = parseOptionLines(this.optionsText);
-		const errors = validateDraft(draft, this.basePaths());
+		const lineErrors: string[] = [];
+		if (draft.type === "select" && this.optionsText.trim()) {
+			const parsed = parseOptionLines(this.optionsText);
+			draft.options = parsed.options;
+			lineErrors.push(...parsed.errors);
+		}
+		const types = new Map([...this.existing].map(([k, v]) => [k, { name: v.name, type: v.field.type }]));
+		const errors = [...lineErrors, ...validateDraft(draft, this.basePaths(), types)];
 		if (errors.length) {
 			this.errorEl?.setText(errors.join(". "));
 			return;
@@ -191,7 +237,8 @@ export function registerConfigureField(plugin: Plugin, env: WidgetEnv, registry:
 						if (k !== "position") names.add(k);
 					}
 				}
-				new ConfigureFieldModal(plugin.app, basePath, [...names].sort(), (draft) => {
+				const existing = registry.schemas().find((x) => x.basePath === basePath)?.fields ?? new Map();
+				new ConfigureFieldModal(plugin.app, basePath, [...names].sort(), existing, (draft) => {
 					env.writer.update(basePath, draftToMutation(draft)).catch((e: unknown) => {
 						new Notice(`Could not save field: ${e instanceof Error ? e.message : String(e)}`);
 					});

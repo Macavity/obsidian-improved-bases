@@ -1,5 +1,6 @@
 import type { Color, SelectField } from "../schema/types";
 import type { RawFields } from "../schema/SchemaWriter";
+import { isUnsafeKey } from "../schema/keys";
 
 /** string | string[] | null → string[] (non-strings and empty strings are dropped). */
 export function toList(value: unknown): string[] {
@@ -34,6 +35,7 @@ export function colorOf(field: SelectField, value: string): Color {
 }
 
 function optionsOf(fields: RawFields, fieldName: string): Record<string, unknown> | null {
+	if (isUnsafeKey(fieldName) || !Object.hasOwn(fields, fieldName)) return null;
 	const f = fields[fieldName];
 	if (!f) return null;
 	const raw = f.options;

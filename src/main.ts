@@ -38,7 +38,7 @@ export default class ImprovedBasesPlugin extends Plugin {
 		const env = { membership: this.membership, writer: this.writer, app: this.app, overlays: new OverlayRegistry() };
 		this.env = env;
 		this.widgetsSupported = getMetadataTypeManager(this.app) !== null;
-		if (!this.widgetsSupported) new Notice(`${this.manifest.name}: this Obsidian version is not supported`);
+		if (!this.widgetsSupported) this.notifyUnsupported();
 		this.applyWidgetsEnabled();
 		this.register(() => {
 			this.typeInfoPatch?.uninstall();
@@ -51,12 +51,24 @@ export default class ImprovedBasesPlugin extends Plugin {
 		this.addSettingTab(new ImprovedBasesSettingTab(this.app, this));
 	}
 
+	private notified = false;
+
+	private notifyUnsupported() {
+		if (this.notified) return;
+		this.notified = true;
+		new Notice(`${this.manifest.name}: this Obsidian version is not supported`);
+	}
+
 	/** Installs or removes the getTypeInfo patch according to `settings.widgetsEnabled`. */
 	applyWidgetsEnabled() {
 		if (this.settings.widgetsEnabled && this.widgetsSupported) {
 			if (this.typeInfoPatch) return;
 			this.typeInfoPatch = installTypeInfoPatch(this.app, this.env, { relation: RelationWidget, select: SelectWidget });
-			if (!this.typeInfoPatch) this.widgetsSupported = false;
+			if (!this.typeInfoPatch) {
+				// Settings controls read `widgetsSupported` on the next render; an open tab is not re-rendered.
+				this.widgetsSupported = false;
+				this.notifyUnsupported();
+			}
 		} else if (this.typeInfoPatch) {
 			this.typeInfoPatch.uninstall();
 			this.typeInfoPatch = null;
