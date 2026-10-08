@@ -1,0 +1,15 @@
+filters:
+  and:
+    - file.inFolder("Verwaist")
+improved-bases:
+  fields:
+    Team:
+      type: relation
+      base: Nirgendwo/Gibt es nicht.base
+      multiple: true
+views:
+  - type: table
+    name: Tabelle
+    order:
+      - file.name
+      - Team

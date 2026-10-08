@@ -22,7 +22,14 @@ pnpm build    # production build
 pnpm lint
 ```
 
-To test in a vault, link the repo into `<vault>/.obsidian/plugins/improved-bases/` (a symlink, not a Finder alias) and enable the plugin.
+Test vault (`test-vault/`, versioned fixtures; requires the [Obsidian CLI](https://obsidian.md/help/cli)):
+
+```bash
+pnpm vault:link   # symlink plugin into test-vault/.obsidian/plugins/improved-bases
+pnpm vault:open   # one-time: confirm the dialog in Obsidian, enable community plugins
+pnpm dev          # watch build, then `pnpm reload` after changes
+pnpm smoke        # reset vault, build, reload, run CLI checks
+```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 

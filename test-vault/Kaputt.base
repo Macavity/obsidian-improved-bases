@@ -1,0 +1,15 @@
+filters:
+  and:
+    - file.inFolder("Kaputt")
+improved-bases:
+  fields:
+    - Team
+    Role:
+      type: dropdown
+      multiple: "yes"
+views:
+  - type: table
+    name: Tabelle
+    order:
+      - file.name
+      - Team

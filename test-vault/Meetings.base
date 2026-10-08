@@ -1,0 +1,15 @@
+filters:
+  or:
+    - file.inFolder("Meetings")
+    - file.name == "Cora Conrad"
+improved-bases:
+  fields:
+    Team:
+      type: text
+views:
+  - type: table
+    name: Tabelle
+    order:
+      - file.name
+      - Team
+      - Datum

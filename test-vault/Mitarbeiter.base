@@ -1,0 +1,29 @@
+filters:
+  and:
+    - file.inFolder("Mitarbeiter")
+formulas:
+  Role_pill: 'if(Role, html("<span class=\"pill\">" + Role + "</span>"))'
+  Status_pill: 'if(Status, html("<span class=\"pill\">" + Status + "</span>"))'
+improved-bases:
+  fields:
+    Team:
+      type: relation
+      base: Teams.base
+      multiple: true
+    Role:
+      type: select
+      multiple: false
+      options:
+        Developer: blue
+        Designer: pink
+        "Product Owner": orange
+views:
+  - type: table
+    name: Tabelle
+    order:
+      - file.name
+      - Team
+      - Role
+      - Status
+      - formula.Role_pill
+      - formula.Status_pill

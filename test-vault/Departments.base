@@ -1,0 +1,8 @@
+filters:
+  and:
+    - file.inFolder("Departments")
+views:
+  - type: table
+    name: Tabelle
+    order:
+      - file.name

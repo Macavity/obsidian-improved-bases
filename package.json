@@ -14,7 +14,12 @@
 		"check": "pnpm typecheck && pnpm lint && pnpm test",
 		"lint": "node scripts/lint-wrapper.mjs",
 		"lint:fix": "node scripts/lint-wrapper.mjs --fix",
-		"version": "node version-bump.mjs && git add manifest.json versions.json"
+		"version": "node version-bump.mjs && git add manifest.json versions.json",
+		"vault:link": "node scripts/vault-link.mjs",
+		"vault:open": "node scripts/vault-open.mjs",
+		"vault:reset": "node scripts/vault-reset.mjs",
+		"reload": "node scripts/reload.mjs",
+		"smoke": "pnpm vault:reset && pnpm build && pnpm reload && node scripts/smoke.mjs"
 	},
 	"author": "Alexander Pape",
 	"license": "MIT",

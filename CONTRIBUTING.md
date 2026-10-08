@@ -25,7 +25,18 @@ pnpm lint:fix # auto-fix where possible
 
 Build artifacts (`main.js`, `manifest.json`, `styles.css`) are produced at the repo root.
 
-To test against a real vault, point the build output at `<vault>/.obsidian/plugins/improved-bases/` (symlink the three files, or use a tool like [hot-reload](https://github.com/pjeby/hot-reload)).
+## Testing
+
+- Unit: `pnpm test` (vitest + happy-dom, `obsidian` mocked in `test/__mocks__/obsidian.ts`). `pnpm check` = typecheck + lint + test.
+- Integration: `pnpm smoke` runs against the versioned vault `test-vault/`, never against a working vault. All CLI calls go through `scripts/lib/cli.mjs`, which always passes `vault="test-vault"` and aborts unless that vault is registered at `<repo>/test-vault`.
+
+Test vault setup (once):
+
+1. `pnpm vault:link` creates the symlink `test-vault/.obsidian/plugins/improved-bases` -> repo root (a symlink, not a Finder alias; `--copy` copies the three files instead).
+2. `pnpm vault:open`, confirm "Open folder as vault" in Obsidian, turn off Restricted mode and make sure `improved-bases` is enabled.
+3. `pnpm dev` in one terminal; `pnpm reload` after each rebuild.
+
+`pnpm vault:reset` restores `test-vault/` to `HEAD` and removes untracked files (the symlink and `workspace*.json` are gitignored and stay). Change fixtures only in a commit.
 
 ## Pull requests
 
