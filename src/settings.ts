@@ -23,13 +23,4 @@ export class ImprovedBasesSettingTab extends PluginSettingTab {
 	getSettingDefinitions(): SettingDefinitionItem[] {
 		return [];
 	}
-
-	/**
-	 * Fallback for Obsidian versions before 1.13, which do not call
-	 * getSettingDefinitions(). Keep it in sync with the definitions above, or
-	 * drop it once minAppVersion is 1.13.0 or later.
-	 */
-	display(): void {
-		this.containerEl.empty();
-	}
 }

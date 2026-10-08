@@ -157,3 +157,25 @@ Abhängigkeiten von undokumentierten Interna:
 5. Wechselwirkung mit globalen Property-Typen (`types.json`): welcher Typ für Relation-Felder, damit das native Panel nichts verändert (`text` vs. `list`)?
 6. Ersatz des „File properties“-Sidebar-Panels und des Mobile-Properties-Dialogs.
 7. Undo (Cmd+Z) nach `processFrontMatter` aus der View heraus. Nicht getestet.
+
+---
+
+## Prüfpunkte v1
+
+Getestet am 2026-10-08 mit Obsidian 1.14.4 (Installer 1.12.7), macOS, Test-Vault `test-vault`. Reproduzierbar mit `node scripts/probe.mjs`: Die Probe installiert eine Hülle um `metadataTypeManager.getTypeInfo` in-memory (für jede Datei: `team` → Listen-Widget, `role` → Text-Widget, `expected === inferred`, `validate` immer wahr), legt `_probe.base` (Ansichten Tabelle/Cards/List) an, entfernt alles wieder und ruft `pnpm vault:reset` auf.
+
+| # | Ergebnis | Beleg |
+|---|---|---|
+| P1 | **FAIL** (teilweise) | `render()` der Hülle wird erreicht in Tabelle, Properties-Panel (Live Preview und Reading) und Sidebar „File properties“. **Cards und List rufen `getTypeInfo` gar nicht auf**: Sie rendern read-only über `Value.renderTo` (`.bases-rendered-value`, `data-property-type` kommt aus dem Wert-Typ). |
+| P2 | PASS | `types.json` sagt `team: text`; `ctx.onChange(["[[Team Alpha]]","[[Team Beta]]"])` aus dem Panel schreibt eine YAML-Liste, keine Warnung (`.metadata-property-warning-icon` nicht sichtbar; ohne Hülle bei Ada sichtbar), nach erneutem Öffnen byte-gleich. Umgekehrt (in-memory `role` als Liste zugewiesen, Hülle schreibt String) ebenfalls ohne Warnung. |
+| P3 | FAIL (Grenze) | Panel: Undo funktioniert. Das Panel schreibt über den Editor, `Cmd+Z` im Editor stellt den Wert wieder her, auch auf der Platte. Tabelle: **kein Undo**, weder per `Cmd+Z` noch per `editor:undo`. Die Tabelle schreibt über `view.updateProperty` (nativer Weg, nativ also ebenso ohne Undo). |
+| P4 | FAIL → **kein Hook** | `showPropertyMenu` (Kontextmenü am Property-Namen bzw. -Icon) baut ein `Menu` ohne `workspace.trigger`. Am nächsten liegt `markdown-properties-menu` (`menu, file`, Kontextmenü des ganzen Properties-Blocks), das ist aber nicht in `obsidian.d.ts`. v1 bleibt bei Befehlen. |
+| P5 | PASS | Der View-Typ erscheint nur in der Layout-Auswahl (Combobox) der View-Konfiguration. Selektor: `.suggestion-container.combobox .suggestion-item:has(.suggestion-flair svg.<icon-klasse>) { display: none }`. Im Test mit `lucide-eye-off` verschwand der Eintrag, die übrigen (Tabelle, Galerie, Liste, Kanban) blieben. Für das Plugin ein eigenes Icon per `addIcon` registrieren, damit die Klasse eindeutig ist. |
+| P6 | offen | Collector auf echtem iOS/Android-Gerät: manuell, blockiert nur das Release (Task 14). |
+
+### Weitere Erkenntnisse für Task 8
+
+- **Tabelle baut Zellen nur bei neuer Widget-Identität neu.** Der Zell-Renderer (`createRenderer` → Klasse mit `bases-metadata-value`) rendert erneut nur, wenn `getTypeInfo(name, value).inferred !== this.inferredType` oder sich der Wert ändert. Ein `trigger("changed")` mit gleicher Hüllen-Identität bewirkt in der Tabelle **nichts**. Mit neuen Hüllen-Objekten (Cache geleert) bauen alle Zellen neu. Panel und Sidebar rendern bei `changed` dagegen immer neu. Konsequenz: Der Cache der Hüllen braucht eine Generation, die bei Schema- oder Mitgliedschaftsänderung hochzählt. Sonst greift der Wechsel nativ → Plugin nach dem ersten Scan in der Tabelle nicht.
+- Die Tabelle nutzt nur `.inferred`, das Panel `expected`/`inferred` und `validate` für die Warnung.
+- `getTypeInfo` bekommt den Namen in der Tabelle kleingeschrieben (`team`), im Panel in Originalschreibung (`Team`). `ctx` hat die Felder `app, blur, key, hoverSource, onChange, sourcePath`. In der Tabelle ist `hoverSource` `"bases"`.
+- Weitere Aufrufer von `getTypeInfo` (Filter-Editor, Gruppierung, Spalten-Icons, Typ-Menüs) lesen nur `.type`/`.icon` der Hülle. Die Hülle muss `type`, `icon` und `name` des Original-Widgets übernehmen.
