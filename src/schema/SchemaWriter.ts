@@ -1,9 +1,8 @@
 import { parseDocument } from "yaml";
 import type { App } from "obsidian";
 import { TFile } from "obsidian";
+import { SCHEMA_KEY } from "./types";
 
-// TODO: import from ./types once Task 4 lands.
-const SCHEMA_KEY = "improved-bases";
 
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
 
