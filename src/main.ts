@@ -5,6 +5,7 @@ import { Membership } from "./schema/Membership";
 import { SchemaRegistry } from "./schema/SchemaRegistry";
 import { SchemaWriter } from "./schema/SchemaWriter";
 import type { FieldSchema } from "./schema/types";
+import { RelationWidget } from "./widgets/RelationWidget";
 import type { WidgetHandle } from "./widgets/types";
 import { DEFAULT_SETTINGS, ImprovedBasesSettings, ImprovedBasesSettingTab } from "./settings";
 
@@ -28,7 +29,7 @@ export default class ImprovedBasesPlugin extends Plugin {
 		});
 		this.writer = new SchemaWriter(this.app);
 		const env = { membership: this.membership, writer: this.writer, app: this.app };
-		this.typeInfoPatch = installTypeInfoPatch(this.app, env, { relation: placeholderWidget, select: placeholderWidget });
+		this.typeInfoPatch = installTypeInfoPatch(this.app, env, { relation: RelationWidget, select: placeholderWidget });
 		if (this.typeInfoPatch) {
 			const patch = this.typeInfoPatch;
 			this.register(() => patch.uninstall());
@@ -50,7 +51,7 @@ export default class ImprovedBasesPlugin extends Plugin {
 	}
 }
 
-/** Placeholder until the relation/select widgets exist: marks the cell and shows the raw value. */
+/** Placeholder until the select widget exists: marks the cell and shows the raw value. */
 function placeholderWidget(el: HTMLElement, value: unknown, _ctx: unknown, field: FieldSchema): WidgetHandle {
 	const text = JSON.stringify(value ?? "");
 	el.createSpan({ text, attr: { "data-improved-bases": field.type } });

@@ -13,3 +13,32 @@
 .suggestion-container.combobox .suggestion-item:has(.suggestion-flair svg.improved-bases-collector) {
 	display: none;
 }
+
+/* Relation widget */
+.improved-bases-relation {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--size-2-2);
+}
+.improved-bases-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--size-2-1);
+	padding: 0 var(--size-2-3);
+	border-radius: var(--radius-s);
+	background-color: var(--background-modifier-hover);
+}
+.improved-bases-chip.is-foreign {
+	outline: 1px dashed var(--text-warning);
+}
+.improved-bases-relation.is-mismatch {
+	opacity: 0.8;
+	font-style: italic;
+}
+.improved-bases-chip-remove,
+.improved-bases-add {
+	height: auto;
+	padding: 0 var(--size-2-2);
+	line-height: 1.4;
+}

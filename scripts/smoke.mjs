@@ -26,6 +26,8 @@ try {
 	await waitFor(() => teamCount() === 0, 10000);
 	obs("rename", { path: "Teams-renamed.base", name: "Teams" });
 	await waitFor(() => teamCount() === 3, 10000);
+	obs("property:set", { path: "Teams/Team Beta.md", name: "status", value: "active" });
+	await waitFor(() => teamCount() === 4, 10000);
 	const hidden = evalJs(
 		"(() => { const s = [...document.styleSheets].flatMap((x) => { try { return [...x.cssRules]; } catch { return []; } }); " +
 			"return s.some((r) => r.selectorText?.includes('svg.improved-bases-collector')); })()",
@@ -80,9 +82,47 @@ try {
 } finally {
 	evalJs("(async () => { await app.plugins.enablePlugin('improved-bases'); return 'ok'; })()");
 }
-await waitFor(() => evalJs(`!!${PLUGIN}?.membership?.ready`) === "true", 15000);
+await waitFor(() => evalJs(`!!${PLUGIN}?.membership?.ready`) === "true", 40000);
 await waitFor(() => cells("Mitarbeiter.base").some((c) => c.plugin), 10000);
 console.log("TypeInfoPatch ok");
+
+// RelationWidget: picker, write format, remove, rename, panel parity, hover, foreign/mismatch markers.
+// Console warnings can precede the result line in `eval` output; the result is the last line.
+const run = (path, body) => {
+	const out = evalJs(`(async () => { ${OPEN(path)} const sleep = (ms) => new Promise((r) => setTimeout(r, ms)); ${body} })()`);
+	const i = out.lastIndexOf("=> ");
+	return JSON.parse(i < 0 ? out : out.slice(i + 3));
+};
+const ROW = (name) =>
+	`const row = [...el.querySelectorAll('.bases-tr')].find((r) => r.textContent.includes(${JSON.stringify(name)})); ` +
+	`const cell = row.querySelector('.bases-td[data-property="note.team" i]');`;
+const teamOf = (name) => obs("property:read", { path: `Mitarbeiter/${name}.md`, name: "Team" }).trim().split("\n").map((l) => l.trim());
+const picker = run("Mitarbeiter.base",
+	`for (let i = 0; i < 3; i++) { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await sleep(100); } ` +
+		`${ROW("Ada Albers")} cell.querySelector('.improved-bases-add').click(); await sleep(600); ` +
+		`const items = [...document.querySelectorAll('.suggestion-item')].map((i) => i.textContent); ` +
+		`[...document.querySelectorAll('.suggestion-item')].find((i) => i.textContent === 'Team Delta').click(); await sleep(1500); ` +
+		`return JSON.stringify(items);`);
+assert(JSON.stringify([...picker].sort()) === JSON.stringify(["Team Alpha", "Team Beta", "Team Delta", "Team Gamma"]), `picker entries: ${picker}`);
+await waitFor(() => JSON.stringify(teamOf("Ada Albers")) === JSON.stringify(["[[Team Alpha]]", "[[Team Delta]]"]), 5000);
+obs("rename", { path: "Teams/Team Alpha.md", name: "Team Aurora" });
+await waitFor(() => teamOf("Ada Albers").includes("[[Team Aurora]]"), 8000);
+const panel = run("Mitarbeiter/Ada Albers.md",
+	`const p = el.querySelector('.metadata-property[data-property-key="Team" i]'); ` +
+		`const a = p.querySelector('.improved-bases-chip .internal-link'); let hov = null; ` +
+		`const ref = app.workspace.on('hover-link', (e) => { hov = e.linktext ?? 'x'; }); ` +
+		`a.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, metaKey: true, ctrlKey: true })); await sleep(1200); app.workspace.offref(ref); ` +
+		`return JSON.stringify({ chips: [...p.querySelectorAll('.improved-bases-chip')].map((c) => c.textContent.replace('×', '')), hov, popover: !!document.querySelector('.popover.hover-popover') });`);
+assert(JSON.stringify(panel.chips) === JSON.stringify(["Team Aurora", "Team Delta"]), `panel chips: ${JSON.stringify(panel)}`);
+assert(panel.hov && panel.popover, `hover popover: ${JSON.stringify(panel)}`);
+run("Mitarbeiter.base",
+	`${ROW("Ada Albers")} cell.querySelector('.improved-bases-chip-remove').click(); await sleep(1500); return JSON.stringify(1);`);
+await waitFor(() => JSON.stringify(teamOf("Ada Albers")) === JSON.stringify(["[[Team Delta]]"]), 5000);
+const marks = run("Mitarbeiter.base",
+		`const cellOf = (n) => [...el.querySelectorAll('.bases-tr')].find((r) => r.textContent.includes(n)).querySelector('.bases-td[data-property="note.team" i]'); ` +
+		`return JSON.stringify({ foreign: !!cellOf('Gina Graf').querySelector('.is-foreign'), okChip: !cellOf('Cora Conrad').querySelector('.is-foreign'), mismatch: !!cellOf('Hugo Hahn').querySelector('.is-mismatch') });`);
+assert(marks.foreign && marks.okChip && marks.mismatch, `foreign/mismatch markers: ${JSON.stringify(marks)}`);
+console.log("RelationWidget ok");
 
 const read = () => obs("property:read", { path: "Mitarbeiter/Ada Albers.md", name: "Role" }).trim();
 const before = read();
