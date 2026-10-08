@@ -77,17 +77,22 @@ export class Membership extends Events {
 	}
 
 	resolve(filePath: string, propName: string): FieldSchema | null {
+		return this.resolveWithBase(filePath, propName)?.field ?? null;
+	}
+
+	/** Like `resolve`, plus the winning schema base and the field's spelling in the schema. */
+	resolveWithBase(filePath: string, propName: string): { field: FieldSchema; basePath: string; name: string } | null {
 		if (!this.latched) return null;
 		const key = propName.toLowerCase();
 		let winner: BaseSchema | null = null;
-		let field: FieldSchema | null = null;
+		let found: { field: FieldSchema; basePath: string; name: string } | null = null;
 		for (const schema of this.registry.schemas()) {
 			if (!this.members.get(schema.basePath)?.has(filePath)) continue;
 			const f = schema.fields.get(key);
 			if (!f) continue;
 			if (!winner) {
 				winner = schema;
-				field = f.field;
+				found = { field: f.field, basePath: schema.basePath, name: f.name };
 			} else {
 				const id = `${filePath}\0${key}`;
 				if (!this.warned.has(id)) {
@@ -96,7 +101,7 @@ export class Membership extends Events {
 				}
 			}
 		}
-		return field;
+		return found;
 	}
 
 	schemaBaseOf(filePath: string): BaseSchema | null {

@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process";
+import { parse as parseYaml } from "yaml";
 import { obs, evalJs, assert, ensureVault, waitFor } from "./lib/cli.mjs";
 
 ensureVault();
@@ -124,10 +125,48 @@ const marks = run("Mitarbeiter.base",
 assert(marks.foreign && marks.okChip && marks.mismatch, `foreign/mismatch markers: ${JSON.stringify(marks)}`);
 console.log("RelationWidget ok");
 
+const sortKeys = (v) => Array.isArray(v) ? v.map(sortKeys) : v && typeof v === "object" ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortKeys(v[k])])) : v;
+// SelectWidget: schema colors, create option, recolor, base diff limited to the schema block, unknown value grey.
+const ESC = "for (let i = 0; i < 3; i++) { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await sleep(100); } ";
+const RROW = (name) =>
+	`const row = [...el.querySelectorAll('.bases-tr')].find((r) => r.textContent.includes(${JSON.stringify(name)})); ` +
+	`const rcell = row.querySelector('.bases-td[data-property="note.role" i]');`;
+const colors = run("Mitarbeiter.base",
+	`const c = (n) => [...el.querySelectorAll('.bases-tr')].find((r) => r.textContent.includes(n)).querySelector('.bases-td[data-property="note.role" i] .improved-bases-pill')?.dataset.color ?? null; ` +
+		`return JSON.stringify({ ada: c('Ada Albers'), ben: c('Ben Brandt'), wizard: c('Hugo Hahn') ?? c('Gina Graf') });`);
+assert(colors.ada === "blue" && colors.ben === "pink", `select colors: ${JSON.stringify(colors)}`);
+const unknown = run("Mitarbeiter.base",
+	`const out = [...el.querySelectorAll('.bases-td[data-property="note.role" i] .improved-bases-pill')].filter((p) => p.textContent.includes('Wizard') || p.textContent.includes('Manager')).map((p) => p.dataset.color); return JSON.stringify(out);`);
+assert(unknown.length === 2 && unknown.every((c) => c === "grey"), `unknown options must be grey: ${JSON.stringify(unknown)}`);
+const created = run("Mitarbeiter.base",
+	`${ESC} ${RROW("Ada Albers")} rcell.querySelector('.improved-bases-add').click(); await sleep(600); ` +
+		`const input = document.querySelector('.improved-bases-menu-search input'); const items = [...document.querySelectorAll('.menu-item.improved-bases-menu-item')].map((i) => i.textContent); ` +
+		`input.value = 'Tester'; input.dispatchEvent(new Event('input')); input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await sleep(2000); ` +
+		`return JSON.stringify({ items, pill: rcell.querySelector('.improved-bases-pill')?.dataset.color });`);
+assert(created.items.includes("Developer") && created.items.includes("Product Owner"), `option menu: ${JSON.stringify(created)}`);
+await waitFor(() => obs("property:read", { path: "Mitarbeiter/Ada Albers.md", name: "Role" }).trim() === "Tester", 5000);
+const baseSrc = () => evalJs("(async () => await app.vault.read(app.vault.getAbstractFileByPath('Mitarbeiter.base')))()");
+await waitFor(() => /Tester: grey/.test(baseSrc()), 5000);
+run("Mitarbeiter.base",
+	`${ESC} ${RROW("Ada Albers")} rcell.querySelector('.improved-bases-pill').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 50, clientY: 50 })); await sleep(600); ` +
+		`[...document.querySelectorAll('.menu-item.improved-bases-menu-item')].find((i) => i.textContent === 'Green').click(); await sleep(1500); return JSON.stringify(1);`);
+await waitFor(() => /Tester: green/.test(baseSrc()), 5000);
+// Obsidian re-serializes an open .base itself, so compare parsed content: only the Role options may differ from git.
+const headBase = parseYaml(execSync("git show HEAD:test-vault/Mitarbeiter.base", { encoding: "utf8" }));
+const nowBase = parseYaml(baseSrc().replace(/^=> /, ""));
+const roleOptions = (doc) => doc["improved-bases"].fields.Role.options;
+assert(roleOptions(nowBase).Tester === "green", "Tester option missing");
+delete roleOptions(nowBase).Tester;
+assert(JSON.stringify(headBase) === JSON.stringify(nowBase) || JSON.stringify(sortKeys(headBase)) === JSON.stringify(sortKeys(nowBase)), "Mitarbeiter.base changed outside the Tester option");
+const panelRole = run("Mitarbeiter/Ada Albers.md",
+	`const p = el.querySelector('.metadata-property[data-property-key="Role" i]'); const pill = p.querySelector('.improved-bases-pill'); return JSON.stringify({ text: pill?.textContent.replace('×', ''), color: pill?.dataset.color });`);
+assert(panelRole.text === "Tester" && panelRole.color === "green", `panel Role pill: ${JSON.stringify(panelRole)}`);
+console.log("SelectWidget ok");
+
 const read = () => obs("property:read", { path: "Mitarbeiter/Ada Albers.md", name: "Role" }).trim();
-const before = read();
+const before = "Developer"; // fixture value; the select check above changed it to Tester
 obs("property:set", { path: "Mitarbeiter/Ada Albers.md", name: "Role", value: "Changed" });
-assert(read() === "Changed", "property:set had no effect");
+await waitFor(() => read() === "Changed", 5000);
 execSync("pnpm vault:reset", { stdio: "inherit" });
 await waitFor(() => read() === before, 10000);
 console.log("smoke ok");

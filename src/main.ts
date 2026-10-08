@@ -4,9 +4,8 @@ import { BaseQuery, createBaseQuery } from "./query/BaseQuery";
 import { Membership } from "./schema/Membership";
 import { SchemaRegistry } from "./schema/SchemaRegistry";
 import { SchemaWriter } from "./schema/SchemaWriter";
-import type { FieldSchema } from "./schema/types";
 import { RelationWidget } from "./widgets/RelationWidget";
-import type { WidgetHandle } from "./widgets/types";
+import { SelectWidget } from "./widgets/SelectWidget";
 import { DEFAULT_SETTINGS, ImprovedBasesSettings, ImprovedBasesSettingTab } from "./settings";
 
 export default class ImprovedBasesPlugin extends Plugin {
@@ -29,7 +28,7 @@ export default class ImprovedBasesPlugin extends Plugin {
 		});
 		this.writer = new SchemaWriter(this.app);
 		const env = { membership: this.membership, writer: this.writer, app: this.app };
-		this.typeInfoPatch = installTypeInfoPatch(this.app, env, { relation: RelationWidget, select: placeholderWidget });
+		this.typeInfoPatch = installTypeInfoPatch(this.app, env, { relation: RelationWidget, select: SelectWidget });
 		if (this.typeInfoPatch) {
 			const patch = this.typeInfoPatch;
 			this.register(() => patch.uninstall());
@@ -49,11 +48,4 @@ export default class ImprovedBasesPlugin extends Plugin {
 	async saveSettings() {
 		await this.saveData(this.settings);
 	}
-}
-
-/** Placeholder until the select widget exists: marks the cell and shows the raw value. */
-function placeholderWidget(el: HTMLElement, value: unknown, _ctx: unknown, field: FieldSchema): WidgetHandle {
-	const text = JSON.stringify(value ?? "");
-	el.createSpan({ text, attr: { "data-improved-bases": field.type } });
-	return { type: field.type, focus() {} };
 }
