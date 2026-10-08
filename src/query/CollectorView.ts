@@ -1,6 +1,13 @@
 import { BasesView, Component, MarkdownRenderer, Plugin, QueryController, TFile, addIcon, parseYaml, stringifyYaml } from "obsidian";
 import type { MountCollector } from "./BaseQuery";
 
+export class BaseNotFoundError extends Error {
+	constructor(basePath: string) {
+		super(`Base not found: ${basePath}`);
+		this.name = "BaseNotFoundError";
+	}
+}
+
 export const COLLECTOR_VIEW = "improved-bases-collector";
 /** Own icon id: styles.css hides the view-selector entry by this icon's class. */
 export const COLLECTOR_ICON = "improved-bases-collector";
@@ -45,7 +52,7 @@ export function registerCollector(plugin: Plugin): MountCollector {
 	return async (basePath, push) => {
 		await new Promise<void>((resolve) => app.workspace.onLayoutReady(resolve));
 		const file = app.vault.getFileByPath(basePath);
-		if (!file) throw new Error(`Base not found: ${basePath}`);
+		if (!file) throw new BaseNotFoundError(basePath);
 		const parsed: unknown = parseYaml(await app.vault.cachedRead(file)) ?? {};
 		if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
 			throw new Error(`Base is not a YAML mapping: ${basePath}`);

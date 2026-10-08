@@ -1,6 +1,6 @@
 import { App, EventRef, Plugin, TAbstractFile, TFile } from "obsidian";
 import { cliQuery, cliQueryAvailable } from "../internals/cliQuery";
-import { COLLECTOR_VIEW, registerCollector } from "./CollectorView";
+import { BaseNotFoundError, COLLECTOR_VIEW, registerCollector } from "./CollectorView";
 
 export { COLLECTOR_VIEW };
 
@@ -17,11 +17,8 @@ export interface BaseQueryDeps {
 	mount?: MountCollector;
 	/** CLI fallback; undefined = internal base:query handler when available, null = no fallback. */
 	cli?: CliRunner | null;
-	/** Delay before falling back to the CLI when the collector delivered nothing. */
-	fallbackMs?: number;
 }
 
-const FALLBACK_MS = 5000;
 const CLI_DEBOUNCE_MS = 200;
 
 type Listener = (files: TFile[]) => void;
@@ -34,7 +31,6 @@ interface Entry {
 	gen: number;
 	mounted: boolean;
 	unmount: (() => void) | null;
-	fallbackTimer: number | null;
 	mode: "collector" | "cli";
 	cliTimer: number | null;
 }
@@ -46,7 +42,6 @@ function samePaths(a: TFile[] | null, b: TFile[]): boolean {
 export function createBaseQuery(plugin: Plugin, deps: BaseQueryDeps = {}): BaseQuery {
 	const app = (plugin as { app?: App }).app;
 	const mount = deps.mount ?? registerCollector(plugin);
-	const fallbackMs = deps.fallbackMs ?? FALLBACK_MS;
 	const entries = new Map<string, Entry>();
 	const refs: Array<{ off: () => void }> = [];
 
@@ -68,9 +63,8 @@ export function createBaseQuery(plugin: Plugin, deps: BaseQueryDeps = {}): BaseQ
 	};
 
 	const clearTimers = (e: Entry) => {
-		if (e.fallbackTimer !== null) window.clearTimeout(e.fallbackTimer);
 		if (e.cliTimer !== null) window.clearTimeout(e.cliTimer);
-		e.fallbackTimer = e.cliTimer = null;
+		e.cliTimer = null;
 	};
 
 	const runCli = (e: Entry) => {
@@ -108,16 +102,15 @@ export function createBaseQuery(plugin: Plugin, deps: BaseQueryDeps = {}): BaseQ
 		unmountEntry(e);
 		const gen = e.gen;
 		e.mounted = true;
-		e.fallbackTimer = window.setTimeout(() => {
-			e.fallbackTimer = null;
-			if (gen !== e.gen || !cliRunner()) return;
+		// First scan starts right away via CLI (the collector can stall in hidden windows); the first collector push takes over.
+		if (cliRunner()) {
 			e.mode = "cli";
 			runCli(e);
-		}, fallbackMs);
+		}
 		mount(e.path, (files) => {
 			if (gen !== e.gen) return;
-			if (e.fallbackTimer !== null) window.clearTimeout(e.fallbackTimer);
-			e.fallbackTimer = null;
+			if (e.cliTimer !== null) window.clearTimeout(e.cliTimer);
+			e.cliTimer = null;
 			e.mode = "collector";
 			emit(e, files);
 		}).then(
@@ -129,7 +122,13 @@ export function createBaseQuery(plugin: Plugin, deps: BaseQueryDeps = {}): BaseQ
 				if (gen !== e.gen) return;
 				console.warn(`Improved Bases: collector failed for ${e.path}`, err);
 				e.mounted = false;
-				emit(e, []);
+				// A missing base stays empty until `create` remounts it; other failures keep refreshing via CLI.
+				if (err instanceof BaseNotFoundError) {
+					e.gen++;
+					clearTimers(e);
+					e.mode = "collector";
+					emit(e, []);
+				} else if (e.mode !== "cli") emit(e, []);
 			},
 		);
 	};
@@ -174,7 +173,7 @@ export function createBaseQuery(plugin: Plugin, deps: BaseQueryDeps = {}): BaseQ
 			let e = entries.get(basePath);
 			const fresh = !e;
 			if (!e) {
-				e = { path: basePath, listeners: new Set(), last: null, gen: 0, mounted: false, unmount: null, fallbackTimer: null, mode: "collector", cliTimer: null };
+				e = { path: basePath, listeners: new Set(), last: null, gen: 0, mounted: false, unmount: null, mode: "collector", cliTimer: null };
 				entries.set(basePath, e);
 			}
 			const entry = e;

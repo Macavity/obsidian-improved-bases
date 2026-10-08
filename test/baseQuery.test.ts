@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import type { Plugin, TFile } from "obsidian";
 import { createBaseQuery } from "../src/query/BaseQuery";
+import { BaseNotFoundError } from "../src/query/CollectorView";
 
 const plugin = {} as Plugin;
 const file = (path: string) => ({ path }) as TFile;
@@ -67,32 +68,64 @@ describe("BaseQuery", () => {
 		expect(cb).toHaveBeenCalledWith([]);
 	});
 
-	it("falls back to the CLI query when the collector stays silent", async () => {
-		vi.useFakeTimers();
+	it("starts the first scan via CLI immediately", async () => {
 		const m = fakeMount();
 		const cli = vi.fn(() => Promise.resolve([file("cli")]));
-		const q = createBaseQuery(plugin, { mount: m.mount, cli, fallbackMs: 5000 });
+		const q = createBaseQuery(plugin, { mount: m.mount, cli });
 		const cb = vi.fn();
 		q.watch("T.base", cb);
-		await vi.advanceTimersByTimeAsync(4999);
-		expect(cli).not.toHaveBeenCalled();
-		await vi.advanceTimersByTimeAsync(1);
 		expect(cli).toHaveBeenCalledWith("T.base");
+		await Promise.resolve(); await Promise.resolve();
 		expect(cb).toHaveBeenCalledWith([{ path: "cli" }]);
 		q.dispose();
 		expect(m.unmounts).toEqual(["T.base"]);
 	});
 
-	it("does not fall back when the collector delivered", async () => {
+	it("collector push wins over a slower CLI result and stops CLI mode", async () => {
 		vi.useFakeTimers();
+		let resolveCli!: (f: TFile[]) => void;
+		const cli = vi.fn(() => new Promise<TFile[]>((r) => (resolveCli = r)));
 		const m = fakeMount();
-		const cli = vi.fn(() => Promise.resolve([] as TFile[]));
-		const q = createBaseQuery(plugin, { mount: m.mount, cli, fallbackMs: 5000 });
-		q.watch("T.base", vi.fn());
+		const q = createBaseQuery(plugin, { mount: m.mount, cli });
+		const cb = vi.fn();
+		q.watch("T.base", cb);
 		await vi.advanceTimersByTimeAsync(0);
-		m.pushes.get("T.base")!([]);
+		m.pushes.get("T.base")!([file("collector")]);
+		resolveCli([file("cli")]);
+		await vi.advanceTimersByTimeAsync(0);
+		expect(cb).toHaveBeenCalledTimes(1);
+		expect(cb).toHaveBeenCalledWith([{ path: "collector" }]);
+		expect(cli).toHaveBeenCalledTimes(1);
+	});
+
+	it("does not use the CLI when none is available", async () => {
+		const m = fakeMount();
+		const q = createBaseQuery(plugin, { mount: m.mount, cli: null });
+		const cb = vi.fn();
+		q.watch("T.base", cb);
+		await Promise.resolve();
+		m.pushes.get("T.base")!([file("x")]);
+		expect(cb).toHaveBeenCalledWith([{ path: "x" }]);
+	});
+
+	it("missing base: empty, no CLI mode, drops the in-flight CLI result", async () => {
+		vi.useFakeTimers();
+		const handlers = new Map<string, () => void>();
+		const src = { on: (n: string, cb: () => void) => (handlers.set(n, cb), { n }), offref: () => {} };
+		const p = { app: { vault: src, metadataCache: src } } as unknown as Plugin;
+		let resolveCli!: (f: TFile[]) => void;
+		const cli = vi.fn(() => new Promise<TFile[]>((r) => (resolveCli = r)));
+		vi.spyOn(console, "warn").mockImplementation(() => {});
+		const q = createBaseQuery(p, { mount: () => Promise.reject(new BaseNotFoundError("Missing.base")), cli });
+		const cb = vi.fn();
+		q.watch("Missing.base", cb);
+		await vi.advanceTimersByTimeAsync(0);
+		expect(cb).toHaveBeenCalledWith([]);
+		resolveCli([file("ghost")]);
+		handlers.get("changed")!();
 		await vi.advanceTimersByTimeAsync(10000);
-		expect(cli).not.toHaveBeenCalled();
+		expect(cb).toHaveBeenCalledTimes(1);
+		expect(cli).toHaveBeenCalledTimes(1);
 	});
 
 	it("keeps notifying other listeners when one throws", async () => {
@@ -125,9 +158,9 @@ describe("BaseQuery", () => {
 		const p = { app: { vault: src, metadataCache: src } } as unknown as Plugin;
 		const cli = vi.fn(() => Promise.resolve([file("cli")]));
 		vi.spyOn(console, "warn").mockImplementation(() => {});
-		const q = createBaseQuery(p, { mount: () => Promise.reject(new Error("x")), cli, fallbackMs: 1000 });
+		const q = createBaseQuery(p, { mount: () => Promise.reject(new Error("x")), cli });
 		q.watch("T.base", vi.fn());
-		await vi.advanceTimersByTimeAsync(1000);
+		await vi.advanceTimersByTimeAsync(0);
 		expect(cli).toHaveBeenCalledTimes(1);
 		handlers.get("changed")!();
 		await vi.advanceTimersByTimeAsync(300);

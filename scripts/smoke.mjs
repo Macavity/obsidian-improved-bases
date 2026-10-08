@@ -10,7 +10,7 @@ await waitFor(() => evalJs("!!app.plugins.plugins['improved-bases']") === "true"
 // BaseQuery: collector-backed watch on Teams.base, live updates, rename → [] → refilled.
 const SMOKE = "window.__ibSmoke";
 const hostCount = () => Number(evalJs("document.querySelectorAll('.improved-bases-collector-host').length"));
-await waitFor(() => evalJs("app.plugins.plugins['improved-bases'].membership.ready") === "true", 15000);
+await waitFor(() => evalJs("app.plugins.plugins['improved-bases'].membership.ready") === "true", 10000);
 const hostsBefore = hostCount();
 evalJs(
 	`(() => { const q = app.plugins.plugins['improved-bases'].query; ${SMOKE}?.off?.(); ` +
@@ -18,7 +18,7 @@ evalJs(
 );
 const teamCount = () => Number(evalJs(`${SMOKE}.files === null ? -1 : ${SMOKE}.files.length`));
 try {
-	// < 5 s: result must come from the collector, not from the CLI fallback.
+	// Initial result (CLI first scan, then collector) must arrive quickly.
 	await waitFor(() => teamCount() === 4, 4500);
 	assert(evalJs(`${SMOKE}.files.some((p) => p.includes('Omega'))`) === "false", "BaseQuery: Omega must be filtered");
 	obs("property:set", { path: "Teams/Team Beta.md", name: "status", value: "archived" });
@@ -42,7 +42,7 @@ assert(hostCount() === hostsBefore, "collector host leaked after unwatch");
 
 // SchemaRegistry + Membership.
 const PLUGIN = "app.plugins.plugins['improved-bases']";
-await waitFor(() => evalJs(`${PLUGIN}.membership.ready`) === "true", 15000);
+await waitFor(() => evalJs(`${PLUGIN}.membership.ready`) === "true", 10000);
 const resolveType = (p, f) => evalJs(`${PLUGIN}.membership.resolve(${JSON.stringify(p)}, ${JSON.stringify(f)})?.type ?? null`);
 assert(resolveType("Mitarbeiter/Ada Albers.md", "team") === "relation", "resolve Ada/team");
 assert(resolveType("Meetings/Weekly Alpha.md", "Team") === "text", "resolve Meeting/Team");
@@ -83,7 +83,9 @@ try {
 } finally {
 	evalJs("(async () => { await app.plugins.enablePlugin('improved-bases'); return 'ok'; })()");
 }
-await waitFor(() => evalJs(`!!${PLUGIN}?.membership?.ready`) === "true", 40000);
+const enabledAt = Date.now();
+await waitFor(() => evalJs(`!!${PLUGIN}?.membership?.ready`) === "true", 10000);
+console.log(`membership.ready after enable: ${Date.now() - enabledAt} ms`);
 await waitFor(() => cells("Mitarbeiter.base").some((c) => c.plugin), 10000);
 console.log("TypeInfoPatch ok");
 

@@ -144,6 +144,7 @@ export function installTypeInfoPatch(app: App, env: WidgetEnv, widgets: PluginWi
 			if (!active) return;
 			const names = [...membership.knownFieldNames()];
 			active = false;
+			env.overlays.closeAll();
 			for (const ref of refs) membership.offref(ref);
 			refs.length = 0;
 			uninstallPatch();

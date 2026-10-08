@@ -71,10 +71,20 @@ export const SelectWidget: PluginWidget<SelectField> = (el, value, ctx, field, e
 				else options.push({ value: picked, color });
 				draw();
 			});
-		});
+		}, env.overlays);
 	};
 
 	const draw = (): void => {
+		try {
+			render();
+		} catch (e) {
+			console.error("Improved Bases: select widget failed to render", e);
+			root.empty();
+			root.setText(values.join(", "));
+		}
+	};
+
+	const render = (): void => {
 		root.empty();
 		for (const [index, picked] of values.entries()) {
 			const pill = root.createSpan({
@@ -107,7 +117,7 @@ export const SelectWidget: PluginWidget<SelectField> = (el, value, ctx, field, e
 		add.addEventListener("click", (evt) => {
 			evt.preventDefault();
 			evt.stopPropagation();
-			openOptionMenu(evt, local, values, choose, create);
+			openOptionMenu(evt, local, values, choose, create, env.overlays);
 		});
 	};
 

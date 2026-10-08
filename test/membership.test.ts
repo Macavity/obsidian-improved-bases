@@ -88,8 +88,25 @@ describe("Membership", () => {
 		expect(m.resolve("x.md", "team")?.type).toBe("relation");
 		m.resolve("x.md", "team");
 		expect(warn).toHaveBeenCalledTimes(1);
-		expect(m.schemaBaseOf("x.md")?.basePath).toBe("A-People.base");
+		expect(m.resolveWithBase("x.md", "TEAM")).toMatchObject({ basePath: "A-People.base", name: "Team" });
 		warn.mockRestore();
+	});
+	it("resolveWithBase reports the winning base and the schema spelling", () => {
+		const sch = (path: string, name: string) => {
+			const r = parseSchema(path, { "improved-bases": { fields: { [name]: { type: "text" } } } }).schema;
+			if (!r) throw new Error("invalid fixture");
+			return r;
+		};
+		const { m, push } = setup([sch("Meetings.base", "TEAM"), sch("Mitarbeiter.base", "team")]);
+		vi.spyOn(console, "warn").mockImplementation(() => {});
+		expect(m.resolveWithBase("Mitarbeiter/Cora Conrad.md", "team")).toBeNull();
+		push("Meetings.base", ["Mitarbeiter/Cora Conrad.md"]);
+		push("Mitarbeiter.base", ["Mitarbeiter/Cora Conrad.md"]);
+		settle();
+		const r = m.resolveWithBase("Mitarbeiter/Cora Conrad.md", "Team");
+		expect(r?.basePath).toBe("Meetings.base");
+		expect(r?.name).toBe("TEAM");
+		expect(m.resolveWithBase("other.md", "team")).toBeNull();
 	});
 	it("emits changed with affected field names", () => {
 		const { m, push } = setup();

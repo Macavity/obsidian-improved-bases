@@ -34,10 +34,20 @@ export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, fiel
 			} else {
 				commit([link]);
 			}
-		}, emptyText).open();
+		}, emptyText, env.overlays).open();
 	};
 
 	const draw = (): void => {
+		try {
+			render();
+		} catch (e) {
+			console.error("Improved Bases: relation widget failed to render", e);
+			root.empty();
+			root.setText(links.join(", "));
+		}
+	};
+
+	const render = (): void => {
 		root.empty();
 		const entries = membership.targetEntries(field.base);
 		const inTarget = entries ? new Set(entries.map((f) => f.path)) : null;

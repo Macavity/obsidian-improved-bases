@@ -43,11 +43,16 @@ function optionsOf(fields: RawFields, fieldName: string): Record<string, unknown
 	return created;
 }
 
+/** Own-property write; a plain assignment to `__proto__` would change the prototype instead. */
+function setOption(options: Record<string, unknown>, value: string, color: string): void {
+	Object.defineProperty(options, value, { value: color, writable: true, enumerable: true, configurable: true });
+}
+
 /** Adds an option with color grey; an existing option is kept as is. */
 export function addOptionMutation(fieldName: string, value: string): (f: RawFields) => void {
 	return (fields) => {
 		const options = optionsOf(fields, fieldName);
-		if (options && !(value in options)) options[value] = "grey";
+		if (options && !Object.hasOwn(options, value)) setOption(options, value, "grey");
 	};
 }
 
@@ -55,6 +60,6 @@ export function addOptionMutation(fieldName: string, value: string): (f: RawFiel
 export function setColorMutation(fieldName: string, value: string, color: Color): (f: RawFields) => void {
 	return (fields) => {
 		const options = optionsOf(fields, fieldName);
-		if (options) options[value] = color;
+		if (options) setOption(options, value, color);
 	};
 }

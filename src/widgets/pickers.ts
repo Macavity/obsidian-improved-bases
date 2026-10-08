@@ -1,15 +1,21 @@
-import { FuzzySuggestModal, Menu, type Scope, type App, type MenuItem, type TFile } from "obsidian";
+import { FuzzySuggestModal, Menu, type App, type MenuItem, type TFile } from "obsidian";
+import { itemDom, menuInternals } from "../internals/menu";
 import { COLORS, type Color, type SelectField } from "../schema/types";
+import type { OverlayRegistry } from "./types";
 
 /** Picks one entry of a target base. */
 export class EntryPicker extends FuzzySuggestModal<TFile> {
+	private readonly unregister: (() => void) | null;
+
 	constructor(
 		app: App,
 		private readonly entries: TFile[] | null,
 		private readonly onPick: (file: TFile) => void,
 		emptyText?: string,
+		overlays?: OverlayRegistry,
 	) {
 		super(app);
+		this.unregister = overlays?.add(() => this.close()) ?? null;
 		this.setPlaceholder("Select an entry");
 		if (emptyText) this.emptyStateText = emptyText;
 	}
@@ -25,6 +31,11 @@ export class EntryPicker extends FuzzySuggestModal<TFile> {
 	onChooseItem(file: TFile): void {
 		this.onPick(file);
 	}
+
+	onClose(): void {
+		super.onClose();
+		this.unregister?.();
+	}
 }
 
 const COLOR_LABELS: Record<Color, string> = {
@@ -34,11 +45,16 @@ const COLOR_LABELS: Record<Color, string> = {
 
 function colorItem(item: MenuItem, title: string, color: Color): void {
 	item.setTitle(title);
-	const dom = (item as MenuItem & { dom?: HTMLElement }).dom;
+	const dom = itemDom(item);
 	if (dom) {
 		dom.addClass("improved-bases-menu-item");
 		dom.setAttribute("data-color", color);
 	}
+}
+
+function track(menu: Menu, overlays: OverlayRegistry): void {
+	const off = overlays.add(() => menu.hide());
+	menu.onHide(off);
 }
 
 /** DOM menu (not native) listing the options as colored entries, with a search/create input on top. */
@@ -48,22 +64,26 @@ export function openOptionMenu(
 	current: string[],
 	onPick: (value: string) => void,
 	onCreate: (value: string) => void,
+	overlays: OverlayRegistry,
 ): void {
 	const menu = new Menu();
 	menu.setUseNativeMenu(false);
-	const rows: { value: string; dom: HTMLElement | undefined }[] = [];
+	const rows: { value: string; dom: HTMLElement | null }[] = [];
 	for (const option of field.options) {
 		menu.addItem((item) => {
 			colorItem(item, option.value, option.color);
 			item.setChecked(current.includes(option.value));
 			item.onClick(() => onPick(option.value));
-			rows.push({ value: option.value, dom: (item as MenuItem & { dom?: HTMLElement }).dom });
+			rows.push({ value: option.value, dom: itemDom(item) });
 		});
 	}
+	track(menu, overlays);
 	menu.showAtMouseEvent(evt);
 
-	const menuDom = (menu as Menu & { dom?: HTMLElement }).dom;
-	if (!menuDom) return;
+	// Without the menu internals the options stay reachable by click, just without search/create.
+	const internals = menuInternals(menu);
+	if (!internals) return;
+	const menuDom = internals.dom;
 	const wrap = createDiv({ cls: "improved-bases-menu-search" });
 	const input = wrap.createEl("input", { attr: { type: "text", placeholder: "Search or create", "aria-label": "Search or create" } });
 	menuDom.prepend(wrap);
@@ -86,16 +106,7 @@ export function openOptionMenu(
 		if (pick !== undefined) onPick(pick);
 		else onCreate(q);
 	};
-	// The menu's own scope swallows Enter before the input sees it: register ours on that scope and move it to the front.
-	const scope = (menu as Menu & { scope?: Scope & { keys?: unknown[] } }).scope;
-	if (scope) {
-		const enter = scope.register([], "Enter", () => {
-			submit();
-			return false;
-		});
-		const keys = scope.keys;
-		if (keys && keys[keys.length - 1] === enter) keys.unshift(keys.pop());
-	}
+	internals.onEnter(submit);
 	hint.addEventListener("click", (e) => {
 		e.stopPropagation();
 		const q = input.value.trim();
@@ -106,9 +117,10 @@ export function openOptionMenu(
 }
 
 /** DOM menu with the color palette. */
-export function openColorMenu(evt: MouseEvent, onPick: (c: Color) => void): void {
+export function openColorMenu(evt: MouseEvent, onPick: (c: Color) => void, overlays: OverlayRegistry): void {
 	const menu = new Menu();
 	menu.setUseNativeMenu(false);
+	track(menu, overlays);
 	for (const color of COLORS) {
 		menu.addItem((item) => {
 			colorItem(item, COLOR_LABELS[color], color);

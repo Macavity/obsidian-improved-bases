@@ -28,4 +28,15 @@ describe("select values", () => {
     addOptionMutation("Role", "Dev")(f);
     expect((f.Role?.options as Record<string, string>).Dev).toBe("blue");
   });
+	it("treats prototype names as ordinary options", () => {
+		for (const name of ["constructor", "__proto__", "toString"]) {
+			const fields: RawFields = { Status: { options: {} } };
+			addOptionMutation("Status", name)(fields);
+			const opts = fields.Status?.options as Record<string, unknown>;
+			expect(Object.hasOwn(opts, name)).toBe(true);
+			expect(opts[name]).toBe("grey");
+			setColorMutation("Status", name, "red")(fields);
+			expect(opts[name]).toBe("red");
+		}
+	});
 });

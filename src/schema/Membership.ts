@@ -104,10 +104,6 @@ export class Membership extends Events {
 		return found;
 	}
 
-	schemaBaseOf(filePath: string): BaseSchema | null {
-		return this.registry.schemas().find((s) => this.members.get(s.basePath)?.has(filePath)) ?? null;
-	}
-
 	targetEntries(basePath: string): TFile[] | null {
 		return this.results.get(basePath) ?? null;
 	}
