@@ -6,7 +6,7 @@ import globals from "globals";
 
 export default defineConfig([
   {
-    ignores: ["main.js", "node_modules/**", "dist/**", "*.js", "scripts/**", ".ref/**", "spike/**"]
+    ignores: ["main.js", "node_modules/**", "dist/**", "*.js", "vitest.config.ts", "scripts/**", ".ref/**", "spike/**"]
   },
   // obsidianmd recommended rules require type info, so only apply to TS files
   ...obsidianmd.configs.recommended.map((config) =>
@@ -78,5 +78,12 @@ export default defineConfig([
       "obsidianmd/rule-custom-message": "off",
       "no-console": "off"
     }
+  },
+  {
+    // Tests run in Node/happy-dom, not in the plugin sandbox: obsidianmd rules off.
+    files: ["test/**/*.ts"],
+    rules: Object.fromEntries(
+      Object.keys(obsidianmd.rules).map((name) => [`obsidianmd/${name}`, "off"]),
+    ),
   },
 ]);

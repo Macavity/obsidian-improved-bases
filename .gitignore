@@ -27,3 +27,9 @@ data.json
 # Local plans and specs (not versioned)
 .claude/plans/
 .claude/specs/
+
+# test vault
+test-vault/.obsidian/plugins/
+test-vault/.obsidian/workspace*.json
+test-vault/.obsidian/cache
+test-vault/.trash/
