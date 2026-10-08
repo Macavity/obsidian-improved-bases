@@ -113,7 +113,7 @@ if (hasErrors) {
 	DISALLOWED_RULES.forEach(rule => {
 		console.error(`  - ${rule}`);
 	});
-	console.error('\nSee .agent/skills/obsidian-ref/references/obsidian-bot-requirements.md for how to fix these issues.\n');
+	console.error('\nSee .claude/skills/obsidian-ops/references/scorecard-compliance.md for how to fix these issues.\n');
 	process.exit(1);
 } else {
 	// Only print success if we actually checked files

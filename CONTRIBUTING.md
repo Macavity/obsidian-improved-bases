@@ -25,7 +25,7 @@ pnpm lint:fix # auto-fix where possible
 
 Build artifacts (`main.js`, `manifest.json`, `styles.css`) are produced at the repo root.
 
-To test against a real vault, point the build output at `<vault>/.obsidian/plugins/<plugin-id>/` (symlink the three files, or use a tool like [hot-reload](https://github.com/pjeby/hot-reload)).
+To test against a real vault, point the build output at `<vault>/.obsidian/plugins/improved-bases/` (symlink the three files, or use a tool like [hot-reload](https://github.com/pjeby/hot-reload)).
 
 ## Pull requests
 
