@@ -8,6 +8,9 @@ await waitFor(() => evalJs("!!app.plugins.plugins['improved-bases']") === "true"
 
 // BaseQuery: collector-backed watch on Teams.base, live updates, rename → [] → refilled.
 const SMOKE = "window.__ibSmoke";
+const hostCount = () => Number(evalJs("document.querySelectorAll('.improved-bases-collector-host').length"));
+await waitFor(() => evalJs("app.plugins.plugins['improved-bases'].membership.ready") === "true", 15000);
+const hostsBefore = hostCount();
 evalJs(
 	`(() => { const q = app.plugins.plugins['improved-bases'].query; ${SMOKE}?.off?.(); ` +
 		`${SMOKE} = { files: null }; ${SMOKE}.off = q.watch('Teams.base', (f) => (${SMOKE}.files = f.map((x) => x.path))); return 'ok'; })()`,
@@ -32,7 +35,23 @@ try {
 } finally {
 	evalJs(`(() => { ${SMOKE}?.off?.(); delete ${SMOKE}; return 'ok'; })()`);
 }
-assert(evalJs("document.querySelectorAll('.improved-bases-collector-host').length") === "0", "collector host leaked after unwatch");
+assert(hostCount() === hostsBefore, "collector host leaked after unwatch");
+
+// SchemaRegistry + Membership.
+const PLUGIN = "app.plugins.plugins['improved-bases']";
+await waitFor(() => evalJs(`${PLUGIN}.membership.ready`) === "true", 15000);
+const resolveType = (p, f) => evalJs(`${PLUGIN}.membership.resolve(${JSON.stringify(p)}, ${JSON.stringify(f)})?.type ?? null`);
+assert(resolveType("Mitarbeiter/Ada Albers.md", "team") === "relation", "resolve Ada/team");
+assert(resolveType("Meetings/Weekly Alpha.md", "Team") === "text", "resolve Meeting/Team");
+assert(resolveType("Notizen/Lose Notiz.md", "Team") === "null", "resolve Lose Notiz/Team");
+await waitFor(() => resolveType("Mitarbeiter/Cora Conrad.md", "team") === "text", 10000); // conflict: Meetings.base < Mitarbeiter.base, first by path wins
+assert(evalJs(`${PLUGIN}.registry.errors().has('Kaputt.base')`) === "true", "Kaputt.base must be reported");
+evalJs(
+	"(async () => { const f = app.vault.getAbstractFileByPath('Kaputt.base'); " +
+		"await app.vault.modify(f, 'improved-bases: 5\\nviews: []\\n'); return 'ok'; })()",
+);
+await waitFor(() => evalJs("[...document.querySelectorAll('.notice')].filter((n) => n.textContent.includes('Kaputt.base')).length") === "1", 5000);
+console.log("Registry/Membership ok");
 
 const read = () => obs("property:read", { path: "Mitarbeiter/Ada Albers.md", name: "Role" }).trim();
 const before = read();
