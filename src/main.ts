@@ -15,7 +15,7 @@ export default class ImprovedBasesPlugin extends Plugin {
 		this.query = createBaseQuery(this);
 		this.register(() => this.query.dispose());
 		this.registry = new SchemaRegistry(this.app);
-		this.membership = new Membership(this.registry, this.query);
+		this.membership = new Membership(this.registry, this.query, { cache: this.app.metadataCache });
 		this.register(() => {
 			this.membership.dispose();
 			this.registry.dispose();

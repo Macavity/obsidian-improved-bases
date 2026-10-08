@@ -44,7 +44,7 @@ const resolveType = (p, f) => evalJs(`${PLUGIN}.membership.resolve(${JSON.string
 assert(resolveType("Mitarbeiter/Ada Albers.md", "team") === "relation", "resolve Ada/team");
 assert(resolveType("Meetings/Weekly Alpha.md", "Team") === "text", "resolve Meeting/Team");
 assert(resolveType("Notizen/Lose Notiz.md", "Team") === "null", "resolve Lose Notiz/Team");
-await waitFor(() => resolveType("Mitarbeiter/Cora Conrad.md", "team") === "text", 10000); // conflict: Meetings.base < Mitarbeiter.base, first by path wins
+await waitFor(() => resolveType("Mitarbeiter/Cora Conrad.md", "team") === "text", 1500); // conflict: Meetings.base < Mitarbeiter.base, first by path wins
 assert(evalJs(`${PLUGIN}.registry.errors().has('Kaputt.base')`) === "true", "Kaputt.base must be reported");
 evalJs(
 	"(async () => { const f = app.vault.getAbstractFileByPath('Kaputt.base'); " +

@@ -1,10 +1,19 @@
 import { Events } from "obsidian";
-import type { TFile } from "obsidian";
+import type { EventRef, MetadataCache, TFile } from "obsidian";
 import type { BaseQuery } from "../query/BaseQuery";
 import type { SchemaRegistry } from "./SchemaRegistry";
 import type { BaseSchema, FieldSchema } from "./types";
 
 const sig = (s: BaseSchema): string => JSON.stringify([...s.fields]);
+
+const QUIET_MS = 300;
+
+export interface MembershipDeps {
+	/** Obsidian's metadata cache; the latch waits until it has resolved. Omitted = treated as resolved. */
+	cache?: Pick<MetadataCache, "on" | "offref" | "resolvedLinks">;
+	/** Quiet period without new pushes before results count as final. */
+	quietMs?: number;
+}
 
 /**
  * File -> schema base mapping. Membership = the file is in the query result of a schema base.
@@ -18,16 +27,53 @@ export class Membership extends Events {
 	private oldSchemas = new Map<string, BaseSchema>();
 	private warned = new Set<string>();
 	private latched = false;
+	private resolved: boolean;
+	private quietTimer: number | null = null;
+	private cacheRef: EventRef | null = null;
+	private readonly quietMs: number;
 	private readonly onRegistry = () => this.sync();
 
-	constructor(private readonly registry: SchemaRegistry, private readonly query: BaseQuery) {
+	constructor(
+		private readonly registry: SchemaRegistry,
+		private readonly query: BaseQuery,
+		private readonly deps: MembershipDeps = {},
+	) {
 		super();
+		this.quietMs = deps.quietMs ?? QUIET_MS;
+		const { cache } = deps;
+		this.resolved = !cache || Object.keys(cache.resolvedLinks).length > 0;
+		if (cache) {
+			this.cacheRef = cache.on("resolved", () => {
+				this.resolved = true;
+				this.armQuiet();
+			});
+		}
 		this.registry.on("changed", this.onRegistry);
 		this.sync();
 	}
 
+	/**
+	 * True once results are final: registry loaded, every schema base scanned, metadata resolved,
+	 * and no new push for the quiet period. `resolve` returns null before that.
+	 */
 	get ready(): boolean {
-		return this.registry.schemas().every((s) => this.results.has(s.basePath));
+		return this.latched;
+	}
+
+	private get scanned(): boolean {
+		const schemas = this.registry.schemas();
+		return this.registry.loaded && schemas.length > 0 && schemas.every((s) => this.results.has(s.basePath));
+	}
+
+	private armQuiet(): void {
+		if (this.latched) return;
+		if (this.quietTimer !== null) window.clearTimeout(this.quietTimer);
+		this.quietTimer = window.setTimeout(() => {
+			this.quietTimer = null;
+			if (this.latched || !this.resolved || !this.scanned) return;
+			this.latched = true;
+			this.emit(this.knownFieldNames());
+		}, this.quietMs);
 	}
 
 	resolve(filePath: string, propName: string): FieldSchema | null {
@@ -69,6 +115,10 @@ export class Membership extends Events {
 
 	dispose(): void {
 		this.registry.off("changed", this.onRegistry);
+		if (this.cacheRef) this.deps.cache?.offref(this.cacheRef);
+		this.cacheRef = null;
+		if (this.quietTimer !== null) window.clearTimeout(this.quietTimer);
+		this.quietTimer = null;
 		for (const stop of this.watches.values()) stop();
 		this.watches.clear();
 	}
@@ -116,14 +166,18 @@ export class Membership extends Events {
 		this.members.set(path, new Set(files.map((f) => f.path)));
 		const schema = this.registry.schemas().find((s) => s.basePath === path);
 		this.checkReady(schema ? schema.fields.keys() : []);
+		if (this.latched && this.isRelationTarget(path)) this.trigger("targets-changed", path);
+	}
+
+	private isRelationTarget(path: string): boolean {
+		for (const s of this.registry.schemas()) {
+			for (const { field } of s.fields.values()) if (field.type === "relation" && field.base === path) return true;
+		}
+		return false;
 	}
 
 	private checkReady(affected: Iterable<string>): void {
-		if (!this.latched && this.ready && this.registry.schemas().length > 0) {
-			this.latched = true;
-			this.emit(this.knownFieldNames());
-			return;
-		}
 		if (this.latched) this.emit(affected);
+		else this.armQuiet();
 	}
 }

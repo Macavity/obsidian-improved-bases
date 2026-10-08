@@ -94,4 +94,43 @@ describe("BaseQuery", () => {
 		await vi.advanceTimersByTimeAsync(10000);
 		expect(cli).not.toHaveBeenCalled();
 	});
+
+	it("keeps notifying other listeners when one throws", async () => {
+		const m = fakeMount();
+		const q = createBaseQuery(plugin, { mount: m.mount });
+		const err = vi.spyOn(console, "error").mockImplementation(() => {});
+		const bad = vi.fn(() => {
+			throw new Error("boom");
+		});
+		const good = vi.fn();
+		q.watch("T.base", bad);
+		q.watch("T.base", good);
+		await Promise.resolve();
+		m.pushes.get("T.base")!([file("x")]);
+		expect(good).toHaveBeenCalledWith([file("x")]);
+		expect(err).toHaveBeenCalled();
+		err.mockRestore();
+	});
+
+	it("keeps refreshing via CLI after a mount failure", async () => {
+		vi.useFakeTimers();
+		const handlers = new Map<string, () => void>();
+		const src = {
+			on: (name: string, cb: () => void) => {
+				handlers.set(name, cb);
+				return { name };
+			},
+			offref: () => {},
+		};
+		const p = { app: { vault: src, metadataCache: src } } as unknown as Plugin;
+		const cli = vi.fn(() => Promise.resolve([file("cli")]));
+		vi.spyOn(console, "warn").mockImplementation(() => {});
+		const q = createBaseQuery(p, { mount: () => Promise.reject(new Error("x")), cli, fallbackMs: 1000 });
+		q.watch("T.base", vi.fn());
+		await vi.advanceTimersByTimeAsync(1000);
+		expect(cli).toHaveBeenCalledTimes(1);
+		handlers.get("changed")!();
+		await vi.advanceTimersByTimeAsync(300);
+		expect(cli).toHaveBeenCalledTimes(2);
+	});
 });

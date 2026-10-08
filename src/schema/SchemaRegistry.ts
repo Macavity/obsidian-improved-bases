@@ -10,12 +10,23 @@ export class SchemaRegistry extends Events {
 	private byPath = new Map<string, BaseSchema>();
 	private errs = new Map<string, string[]>();
 	private refs: Array<{ off: () => void }> = [];
+	private seqs = new Map<string, number>();
+	private disposed = false;
+	private started = false;
+	private done = false;
 
 	constructor(private readonly app: App) {
 		super();
 	}
 
+	/** True once the initial scan of all `.base` files finished. */
+	get loaded(): boolean {
+		return this.done;
+	}
+
 	async load(): Promise<void> {
+		if (this.disposed || this.started) return;
+		this.started = true;
 		const { vault } = this.app;
 		const on = (ref: EventRef) => this.refs.push({ off: () => vault.offref(ref) });
 		const isBase = (f: TAbstractFile): f is TFile => f instanceof TFile && f.extension === "base";
@@ -29,10 +40,13 @@ export class SchemaRegistry extends Events {
 		}));
 		const bases = vault.getFiles().filter((f) => f.extension === "base");
 		await Promise.all(bases.map((f) => this.refresh(f.path, true)));
+		if (this.disposed) return;
+		this.done = true;
 		this.trigger("changed");
 	}
 
 	dispose(): void {
+		this.disposed = true;
 		for (const r of this.refs.splice(0)) r.off();
 	}
 
@@ -45,6 +59,8 @@ export class SchemaRegistry extends Events {
 	}
 
 	private async refresh(path: string, silent = false): Promise<void> {
+		const seq = (this.seqs.get(path) ?? 0) + 1;
+		this.seqs.set(path, seq);
 		const file = this.app.vault.getAbstractFileByPath(path);
 		let schema: BaseSchema | null = null;
 		let errors: string[] = [];
@@ -56,6 +72,7 @@ export class SchemaRegistry extends Events {
 				errors = [`invalid YAML: ${err instanceof Error ? err.message : String(err)}`];
 			}
 		}
+		if (this.seqs.get(path) !== seq) return;
 		const prevSchema = this.byPath.get(path);
 		const prevErr = this.errs.get(path)?.join("\n");
 		if (schema) this.byPath.set(path, schema);

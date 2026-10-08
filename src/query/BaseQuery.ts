@@ -58,7 +58,13 @@ export function createBaseQuery(plugin: Plugin, deps: BaseQueryDeps = {}): BaseQ
 	const emit = (e: Entry, files: TFile[]) => {
 		if (samePaths(e.last, files)) return;
 		e.last = files;
-		for (const cb of [...e.listeners]) cb(files);
+		for (const cb of [...e.listeners]) {
+			try {
+				cb(files);
+			} catch (err) {
+				console.error(`Improved Bases: listener for ${e.path} failed`, err);
+			}
+		}
 	};
 
 	const clearTimers = (e: Entry) => {
@@ -137,7 +143,7 @@ export function createBaseQuery(plugin: Plugin, deps: BaseQueryDeps = {}): BaseQ
 		const { vault, metadataCache } = app;
 		const on = (ref: EventRef, source: { offref(ref: EventRef): void }) => refs.push({ off: () => source.offref(ref) });
 		const cliRefresh = () => {
-			for (const e of entries.values()) if (e.mode === "cli" && e.mounted) scheduleCli(e);
+			for (const e of entries.values()) if (e.mode === "cli") scheduleCli(e);
 		};
 		on(vault.on("modify", (f: TAbstractFile) => {
 			const e = entries.get(f.path);
