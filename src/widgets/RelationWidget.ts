@@ -1,4 +1,4 @@
-import { LinkValue, Notice, type TFile } from "obsidian";
+import { LinkValue, Notice, TFile } from "obsidian";
 import type { RelationField } from "../schema/types";
 import { EntryPicker } from "./pickers";
 import type { PluginWidget } from "./types";
@@ -24,7 +24,8 @@ export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, fiel
 	};
 
 	const openPicker = (): void => {
-		const entries = membership.targetEntries(field.base);
+		const missing = !(app.vault.getAbstractFileByPath(field.base) instanceof TFile);
+		const entries = missing ? null : membership.targetEntries(field.base);
 		const emptyText = entries === null ? `Target base not found: ${field.base}` : "No entries";
 		if (entries === null) new Notice(emptyText);
 		new EntryPicker(app, entries, (file: TFile) => {

@@ -8,8 +8,20 @@ export const VAULT = "test-vault";
 export const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const VAULT_PATH = join(REPO, "test-vault");
 
+export const CLI_TIMEOUT_MS = 30000;
+
 function run(args) {
-	return execFileSync("obsidian", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+	try {
+		return execFileSync("obsidian", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: CLI_TIMEOUT_MS, killSignal: "SIGKILL" });
+	} catch (e) {
+		if (e && (e.code === "ETIMEDOUT" || e.killed)) {
+			throw new Error(
+				`obsidian ${args.slice(1, 2).join(" ")} timed out after ${CLI_TIMEOUT_MS / 1000}s. ` +
+					"Obsidian is probably hung or its window is hidden: run `obsidian vault=\"test-vault\" reload`, then `pnpm vault:reset`.",
+			);
+		}
+		throw e;
+	}
 }
 
 /** Runs `obsidian vault="test-vault" <cmd> key=value ...`. Throws if the output starts with "Error:". */

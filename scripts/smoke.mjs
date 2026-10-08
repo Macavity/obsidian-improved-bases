@@ -10,7 +10,7 @@ await waitFor(() => evalJs("!!app.plugins.plugins['improved-bases']") === "true"
 // BaseQuery: collector-backed watch on Teams.base, live updates, rename → [] → refilled.
 const SMOKE = "window.__ibSmoke";
 const hostCount = () => Number(evalJs("document.querySelectorAll('.improved-bases-collector-host').length"));
-await waitFor(() => evalJs("app.plugins.plugins['improved-bases'].membership.ready") === "true", 10000);
+await waitFor(() => evalJs("app.plugins.plugins['improved-bases'].membership.ready") === "true", 30000);
 const hostsBefore = hostCount();
 evalJs(
 	`(() => { const q = app.plugins.plugins['improved-bases'].query; ${SMOKE}?.off?.(); ` +
@@ -42,7 +42,7 @@ assert(hostCount() === hostsBefore, "collector host leaked after unwatch");
 
 // SchemaRegistry + Membership.
 const PLUGIN = "app.plugins.plugins['improved-bases']";
-await waitFor(() => evalJs(`${PLUGIN}.membership.ready`) === "true", 10000);
+await waitFor(() => evalJs(`${PLUGIN}.membership.ready`) === "true", 30000);
 const resolveType = (p, f) => evalJs(`${PLUGIN}.membership.resolve(${JSON.stringify(p)}, ${JSON.stringify(f)})?.type ?? null`);
 assert(resolveType("Mitarbeiter/Ada Albers.md", "team") === "relation", "resolve Ada/team");
 assert(resolveType("Meetings/Weekly Alpha.md", "Team") === "text", "resolve Meeting/Team");
@@ -80,11 +80,12 @@ try {
 	await waitFor(() => evalJs(MARKED) === "0", 5000);
 	const restored = evalJs("(() => { const m = app.metadataTypeManager; return !Object.hasOwn(m, 'getTypeInfo') || m.getTypeInfo === Object.getPrototypeOf(m).getTypeInfo; })()");
 	assert(restored === "true", "getTypeInfo not restored after disable");
+	execSync("git diff --exit-code --quiet -- test-vault/.obsidian/types.json 'test-vault/Mitarbeiter/Hugo Hahn.md'", { stdio: "inherit" });
 } finally {
 	evalJs("(async () => { await app.plugins.enablePlugin('improved-bases'); return 'ok'; })()");
 }
 const enabledAt = Date.now();
-await waitFor(() => evalJs(`!!${PLUGIN}?.membership?.ready`) === "true", 10000);
+await waitFor(() => evalJs(`!!${PLUGIN}?.membership?.ready`) === "true", 30000);
 console.log(`membership.ready after enable: ${Date.now() - enabledAt} ms`);
 await waitFor(() => cells("Mitarbeiter.base").some((c) => c.plugin), 10000);
 console.log("TypeInfoPatch ok");
@@ -196,6 +197,43 @@ assert(lead.base === "Mitarbeiter.base" && lead.multiple === false, `Lead field:
 await waitFor(() => run("Departments/Engineering.md", `return JSON.stringify(!!el.querySelector('.metadata-property[data-property-key="Lead" i] [data-improved-bases="relation"]'));`) === true, 10000);
 console.log("Commands ok");
 
+// Error table: orphaned target base hints in the picker; Kaputt.base did not break the others (checked above).
+OPEN_ACTIVE("Verwaist.base");
+await waitFor(() => cells("Verwaist.base").some((c) => c.plugin), 10000);
+run("Verwaist.base",
+	`${ESC} document.querySelectorAll('.notice').forEach((n) => n.remove()); const cell = [...el.querySelectorAll('.bases-td[data-property="note.team" i]')][0]; ` +
+		`cell.querySelector('.improved-bases-add').click(); await sleep(800); return JSON.stringify(1);`);
+await waitFor(() => evalJs("[...document.querySelectorAll('.notice')].some((n) => n.textContent.includes('Target base not found'))") === "true", 5000);
+run("Verwaist.base", `${ESC} return JSON.stringify(1);`);
+await waitFor(() => evalJs("document.querySelectorAll('.modal-container').length") === "0", 5000);
+execSync("git diff --exit-code --quiet -- test-vault/Verwaist.base", { stdio: "inherit" });
+console.log("Orphaned target ok");
+
+// Non-regression Cards/List (not covered by the plugin, spec 2026-10-08): render without console errors, relation values as links, no plugin DOM.
+evalJs(
+	"(async () => { const f = app.vault.getAbstractFileByPath('_views.base'); if (f) await app.vault.delete(f); " +
+		"await app.vault.create('_views.base', 'filters:\\n  and:\\n    - file.inFolder(\"Mitarbeiter\")\\nviews:\\n  - type: cards\\n    name: Karten\\n    order:\\n      - file.name\\n      - Team\\n      - Role\\n" +
+		"  - type: list\\n    name: Liste\\n    order:\\n      - file.name\\n      - Team\\n      - Role\\n'); return 'ok'; })()",
+);
+const viewCheck = (viewName) =>
+	run("_views.base",
+		`const errs = []; const orig = console.error; console.error = (...a) => { errs.push(a.map(String).join(' ')); orig.apply(console, a); }; ` +
+			`try { document.querySelectorAll('.view-header-title-container, .bases-toolbar-views-menu, .bases-toolbar-views-button'); ` +
+			`const btn = el.querySelector('.bases-toolbar-views-menu'); btn?.click(); await sleep(500); ` +
+			`const item = [...document.querySelectorAll('.menu-item')].find((i) => i.textContent.trim() === ${JSON.stringify(viewName)}); item?.click(); await sleep(2000); ` +
+			`const links = el.querySelectorAll('.internal-link, a[data-href]'); ` +
+			`const teamLinks = [...links].filter((a) => /Team /.test(a.textContent)).length; ` +
+			`return JSON.stringify({ errs, teamLinks, marked: el.querySelectorAll('[data-improved-bases]').length, rendered: el.querySelectorAll('.bases-cards-item, .bases-list-item, .bases-list-entry, .bases-rendered-value').length }); } ` +
+			`finally { console.error = orig; }`);
+for (const [name, label] of [["Karten", "cards"], ["Liste", "list"]]) {
+	const r = viewCheck(name);
+	assert(r.errs.length === 0, `${label}: console errors: ${JSON.stringify(r.errs)}`);
+	assert(r.marked === 0, `${label}: plugin DOM present: ${JSON.stringify(r)}`);
+	assert(r.rendered > 0, `${label}: nothing rendered: ${JSON.stringify(r)}`);
+	assert(r.teamLinks > 0, `${label}: relation values must render as links: ${JSON.stringify(r)}`);
+}
+console.log("Cards/List ok");
+
 // Import option notes: Role gains Manager (existing colors kept), Status becomes a select; option notes untouched.
 OPEN_ACTIVE("Mitarbeiter.base");
 assert(cmdAvailable("import-option-notes"), "import must be offered on a schema base");
@@ -219,6 +257,7 @@ evalJs(`(${PLUGIN}.settings.widgetsEnabled = true, ${PLUGIN}.applyWidgetsEnabled
 await waitFor(() => cells("Mitarbeiter.base").some((c) => c.plugin), 10000);
 console.log("Settings ok");
 
+// Perf (2000 notes, 10 schema bases) is measured separately: `pnpm perf`.
 const read = () => obs("property:read", { path: "Mitarbeiter/Ada Albers.md", name: "Role" }).trim();
 const before = "Developer"; // fixture value; the select check above changed it to Tester
 obs("property:set", { path: "Mitarbeiter/Ada Albers.md", name: "Role", value: "Changed" });

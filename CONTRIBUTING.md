@@ -36,6 +36,8 @@ Test vault setup (once):
 2. `pnpm vault:open`, confirm "Open folder as vault" in Obsidian, turn off Restricted mode and make sure `improved-bases` is enabled.
 3. `pnpm dev` in one terminal; `pnpm reload` after each rebuild.
 
+`pnpm perf` generates 2000 notes and 10 schema bases in `test-vault/_perf/`, prints `membership.ready` and table render times and resets the vault; it fails if `ready` exceeds 3 s. CLI calls time out after 30 s; if Obsidian hangs (e.g. hidden window), run `obsidian vault="test-vault" reload` and `pnpm vault:reset`.
+
 `pnpm vault:reset` restores `test-vault/` to `HEAD` and removes untracked files (the symlink and `workspace*.json` are gitignored and stay). Change fixtures only in a commit.
 
 ## Pull requests

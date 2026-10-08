@@ -179,3 +179,16 @@ Getestet am 2026-10-08 mit Obsidian 1.14.4 (Installer 1.12.7), macOS, Test-Vault
 - Die Tabelle nutzt nur `.inferred`, das Panel `expected`/`inferred` und `validate` für die Warnung.
 - `getTypeInfo` bekommt den Namen in der Tabelle kleingeschrieben (`team`), im Panel in Originalschreibung (`Team`). `ctx` hat die Felder `app, blur, key, hoverSource, onChange, sourcePath`. In der Tabelle ist `hoverSource` `"bases"`.
 - Weitere Aufrufer von `getTypeInfo` (Filter-Editor, Gruppierung, Spalten-Icons, Typ-Menüs) lesen nur `.type`/`.icon` der Hülle. Die Hülle muss `type`, `icon` und `name` des Original-Widgets übernehmen.
+
+### Performance (Task 14)
+
+`pnpm perf` (`scripts/perf.mjs`): legt in der Test-Vault `_perf/` mit 2000 Notizen (je Team-Relation + Role) und 10 Schema-Bases an (je 200 Notizen, Relation auf `Teams.base`, Select), deaktiviert/aktiviert das Plugin und misst die Zeit bis `membership.ready` sowie bis zum ersten Plugin-Widget in `_perf/Perf-0.base`. Danach `vault:reset`.
+
+| Messung (2026-10-08, Obsidian 1.14.4, macOS, Fenster nicht im Vordergrund) | Wert |
+|---|---|
+| `membership.ready` nach Enable (2000 Notizen, 10 Schema-Bases + 4 Fixture-Bases) | 44346 ms |
+| Tabelle `Perf-0.base` bis erstes Plugin-Widget | 18014 ms |
+
+Abbruchkriterium (`ready` > 3 s) überschritten. Zum Vergleich: Fixture-Vault (28 Notizen) ca. 0,8 s. Ursache nicht untersucht (Verdacht: je Schema-Base ein CLI-Erstscan plus Collector-View über alle 2000 Dateien, Neuscans bei jedem `metadataCache.changed`). Nutzer vor dem Release informieren.
+
+Hinweis zum Skript: Dateien werden per `app.vault.create` aus Obsidian heraus angelegt; per Dateisystem geschriebene Dateien wurden bei verdecktem Fenster nicht zuverlässig indexiert.
