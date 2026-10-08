@@ -31,8 +31,16 @@ Plan: `.claude/plans/2026-10-02-improved-bases.md` (Subagent-Driven). Branch `fe
 - tsconfig lib ES2022. Undo nur im Panel (README). Smoke-Hinweise: abgebrochener Lauf hinterlässt Menü → `app:reload`; Obsidian serialisiert offene `.base` um → Smoke vergleicht geparst.
 - Offen (Minor, verschoben): Gate-1 #5 Remount bei reinen Schema-Writes; Gate-2 #7 `knownFieldNames`-Cache, Generation pro Name, selektives `targets-changed`.
 
+## Phase 3 (Tasks 11–13 + Gate-3-Fixes): Commits c117010…d075eac, Gates grün
+- Befehle: `improved-bases:activate-schema-base` („Activate as schema base“, `canActivate`: .base, registry.loaded, nicht in schemas/errors), `improved-bases:configure-field` (.base in schemas oder .md-Mitglied nach Latch; Modal `ConfigureFieldModal`, vorbefüllt bei vorhandenem Namen; Kollision mit anderem Typ = Fehler), `import-option-notes` („Import option notes“, Ordner aus Settings; `planImport`/`importMutation` pur).
+- `SchemaWriter.activate` / `activateSchemaSource` schreibt `improved-bases: {fields: {}}` byte-erhaltend. `Membership.schemaBasesOf(filePath)`.
+- Settings `{widgetsEnabled: true, importFolder: "Optionen"}`, `mergeSettings` pur, nur `getSettingDefinitions()`. Toggle → `applyWidgetsEnabled()` (uninstall/neu install). `widgetsSupported` false → Notice einmal pro Load, Toggle disabled, Befehle bleiben. `installTypeInfoPatch` endet mit `refresh(knownFieldNames)`.
+- `src/schema/keys.ts`: `isUnsafeKey` (`__proto__`/`constructor`/`prototype`), `findOwnKey` case-insensitiv. Unsafe-Keys an allen Schema-Grenzen abgelehnt.
+- Import: Farbe nur exakte COLORS sonst grey+skipped; erste Notiz gewinnt; `multiple` aus Mitglieds-Frontmatter; obsolete `<Spalte>_pill`-Formeln gemeldet, nicht geändert.
+- Offen: leerer Import-Ordner (`normalizePath("")` = "/"); Settings-Tab wird bei Laufzeit-Unsupported nicht neu gerendert; Smoke `evalJs` ohne Timeout (hängt bei verdecktem Fenster → `app:reload`).
+
 ## Nächster Schritt
-Phase 3: Welle 3a Tasks 11+12 parallel (12 registriert sich NICHT in main.ts) → 13 → Gate 3 → Task 14 → Final-Review (opus).
+Task 14 (Smoke-Erweiterung inkl. Cards/List-Nicht-Regression, README, Perf; pausiert für Mobil-Test P6) → Final-Review (opus) → finishing-a-development-branch.
 
 ## Fakten für Task 8
 - Tabelle baut Zellen nur bei neuer Widget-Identität von `inferred` neu → Hüllen-Cache braucht Generation (bei Schema-/Mitgliedschaftsänderung hochzählen).
