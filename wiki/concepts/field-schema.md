@@ -1,0 +1,38 @@
+---
+title: Field schema
+description: "The validated definition of one property inside a schema base: relation, select, or a native type pass-through."
+type: concept
+tags:
+  - wiki
+  - concept
+---
+# Field schema
+
+## Definition
+
+A **field schema** (`FieldSchema` in [types.ts](../../src/schema/types.ts)) describes one property of a [schema base](./schema-base.md). Three shapes:
+
+| Shape | Keys | Storage |
+|---|---|---|
+| `RelationField` | `type: relation`, `base` (vault-relative `.base` path), `multiple` | `"[[X]]"` or a list of wikilinks |
+| `SelectField` | `type: select`, `multiple`, `options` (value → one of 13 `COLORS`, map order = display order) | `Value` or a list of values |
+| `NativeField` | `type` in `text`, `list`, `number`, `checkbox`, `date`, `datetime` | native |
+
+Field names are matched case-insensitively (the map key is lowercased, the original spelling is kept for writes). Reserved names (`__proto__`, `constructor`, `prototype`) and duplicates are rejected.
+
+## Why it matters
+
+It is the contract between the three sides of the plugin: the parser guarantees the shape, the widgets render from it, and the writer mutations produce it. `multiple` decides the storage shape, which is why widgets flag a [value mismatch](./value-mismatch.md) when the existing property does not fit. A native type in a schema forces that native widget for members regardless of `types.json` (`NATIVE_WIDGET` map in [typeInfoPatch.ts](../../src/internals/typeInfoPatch.ts)).
+
+## Where it lives
+
+- Types and `COLORS`/`NATIVE_TYPES` constants: [types.ts](../../src/schema/types.ts).
+- Validation: `parseField()` in [parse.ts](../../src/schema/parse.ts) (`isValidBasePath()` for relation targets).
+- Creation: `draftToMutation()` in [configureField.ts](../../src/commands/configureField.ts), `importMutation()` in [importOptions.ts](../../src/commands/importOptions.ts), option mutations in [values.ts](../../src/widgets/values.ts).
+- Consumption: `RelationWidget` / `SelectWidget` ([Widgets](../modules/widgets.md)).
+
+## Related
+
+- [Schema base](./schema-base.md)
+- [Value mismatch](./value-mismatch.md)
+- [Add a field type](../guides/add-a-field-type.md)

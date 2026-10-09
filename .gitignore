@@ -34,3 +34,6 @@ test-vault/.obsidian/workspace*.json
 test-vault/.obsidian/cache
 test-vault/.trash/
 .claude/state.md
+
+# OpenKnowledge working data
+.ok/
