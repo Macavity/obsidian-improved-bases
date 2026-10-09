@@ -10,7 +10,7 @@ tags:
 
 ## Summary
 
-Improved Bases cannot be built on the public API alone: Obsidian exposes no way to register a property widget per base, and no public query API for Bases. The plugin therefore touches four undocumented surfaces. Every access goes through a detection function in [detect.ts](../../src/internals/detect.ts) or [menu.ts](../../src/internals/menu.ts) that returns `null` when the shape is unexpected, and every caller has a native fallback. The user-visible contract (one notice, widgets off, commands keep working, data never converted) is stated in the [README](../../README.md#unsupported-obsidian-versions).
+Improved Bases cannot be built on the public API alone: Obsidian exposes no way to register a property widget per base, and no public query API for Bases. The plugin therefore touches five undocumented surfaces. Every access goes through a detection function in [detect.ts](../../src/internals/detect.ts) or [menu.ts](../../src/internals/menu.ts) that returns `null` when the shape is unexpected, and every caller has a native fallback. The user-visible contract (one notice, widgets off, commands keep working, data never converted) is stated in the [README](../../README.md#unsupported-obsidian-versions).
 
 ## Diagram
 
@@ -33,6 +33,7 @@ flowchart TD
 | `app.cli.handlers.get("base:query")` | `getCliHandler()` in [detect.ts](../../src/internals/detect.ts), returns `null` off desktop | `cliQuery()` in [cliQuery.ts](../../src/internals/cliQuery.ts) via `createBaseQuery` | `BaseQuery` runs collector-only; first scan waits for the collector push. |
 | `QueryController.runQuery` only runs once the view container `isShown()` | not detected; relied on by `registerCollector()` in [CollectorView.ts](../../src/query/CollectorView.ts) | [Collector view](../concepts/collector-view.md) | Host is a real offscreen `div` in `document.body` (`styles.css` positions it); a hidden window can stall it, which is why the CLI runs first. |
 | `Menu.dom`, `Menu.scope.register/keys`, `MenuItem.dom` | `menuInternals()`, `itemDom()` in [menu.ts](../../src/internals/menu.ts) | `openOptionMenu()`, `colorItem()` in [pickers.ts](../../src/widgets/pickers.ts) | Options remain clickable; no search/create input, no colored rows. |
+| Bases toolbar DOM (`.bases-toolbar`), leaf `view.containerEl` / `view.file`, `.internal-embed[src]` | not detected; `resolveBasePath()` in [toolbar.ts](../../src/internals/toolbar.ts) returns `null` for unknown shapes | `installSchemaButton()` in [toolbar.ts](../../src/internals/toolbar.ts), registered by `registerSchemaSettings()` in [schemaSettings.ts](../../src/commands/schemaSettings.ts) | No button appears or the click shows a `Notice`; the command and the file menu item still open the dialog. |
 
 All patching uses `monkey-around` (`around(mtm, { getTypeInfo })`) so the wrapper composes with other plugins and can be removed cleanly; `uninstall()` restores the original, clears the hull cache, closes open overlays and re-triggers `changed` for every known field so Obsidian rebuilds native widgets.
 

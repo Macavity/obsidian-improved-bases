@@ -2,7 +2,7 @@
 title: Improved Bases — Overview
 description: "Home page and navigation hub for the Improved Bases codebase wiki: what the plugin is, how it is layered, and where every page lives."
 profile: internal/standard
-source_commit: f31ff83
+source_commit: 24a4ba9
 tags:
   - wiki
   - overview
@@ -26,7 +26,7 @@ flowchart TD
   Patch --> Widgets[RelationWidget / SelectWidget]
   Widgets -->|onChange| Props[(note properties)]
   Widgets -->|options, colors| Writer[SchemaWriter]
-  Commands[Commands<br/>activate / configure / import] --> Writer
+  Commands[Schema settings dialog] --> Writer
   Writer --> Base
   Obsidian[Obsidian: table, properties panel, sidebar] -->|getTypeInfo| Patch
 ```
@@ -45,9 +45,9 @@ Read the diagram top-down: [`SchemaRegistry`](./modules/schema.md) finds every `
 - [Plugin core](./modules/plugin-core.md) — `main.ts` lifecycle and `settings.ts`.
 - [Schema](./modules/schema.md) — types, parser, registry, writer, key safety.
 - [Query](./modules/query.md) — `BaseQuery` watch abstraction and the hidden collector view.
-- [Internals](./modules/internals.md) — feature detection, the `getTypeInfo` patch, CLI query, menu internals.
+- [Internals](./modules/internals.md) — feature detection, the `getTypeInfo` patch, CLI query, menu internals, the Bases toolbar button.
 - [Widgets](./modules/widgets.md) — relation and select widgets, pickers, value helpers.
-- [Commands](./modules/commands.md) — activate schema base, configure field, import option notes.
+- [Commands](./modules/commands.md) — schema settings dialog and the command, menu item and toolbar button that open it.
 - [Tooling](./modules/tooling.md) — build, lint, unit tests, test vault, smoke and perf scripts.
 
 ### Flows

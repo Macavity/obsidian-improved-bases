@@ -1,6 +1,6 @@
 ---
 title: Commands
-description: "src/commands: the three palette commands that mutate a schema base through SchemaWriter."
+description: "src/commands: the schema settings dialog, its draft model and the command, menu item and toolbar button that open it."
 type: module
 tags:
   - wiki
@@ -10,32 +10,36 @@ tags:
 
 ## Summary
 
-`src/commands/` registers the three commands listed in the [README](../../README.md#commands). Each is a `checkCallback` command whose availability depends on the active file, and each writes exclusively through `SchemaWriter.update()` / `activate()` using a pure mutation function that is unit-tested on its own.
+`src/commands/` implements the schema settings dialog and everything that opens it: one palette command, one `file-menu` item and a toolbar button (see the [README](../../README.md#schema-settings)). The dialog edits a pure draft model; saving writes all fields through `SchemaWriter` in one mutation and then migrates renamed property keys in the member notes.
 
 ## Responsibilities
 
-- **Activate as schema base** ([activateSchema.ts](../../src/commands/activateSchema.ts), id `activate-schema-base`): available on an active `.base` that the loaded registry neither lists as a schema nor as an error (`canActivate()`). Writes an empty `improved-bases: { fields: {} }` via `writer.activate()`.
-- **Configure field** ([configureField.ts](../../src/commands/configureField.ts), id `configure-field`): available on an active schema `.base`, or on a Markdown note that is a member of at least one schema base (after `membership.ready`). `candidateBases()` (pure) lists the applicable bases; with several, a `BasePicker` ([pickers.ts](../../src/widgets/pickers.ts)) asks which one, then `ConfigureFieldModal` opens with a datalist of property names collected from the members' frontmatter, prefills an existing field case-insensitively, validates with `validateDraft()` (reserved names, type collisions, target base must exist, colors), parses `value: color` lines with `parseOptionLines()`, and writes `draftToMutation(draft)`. `buildDraft()` (pure) assembles the draft: an emptied options textarea clears the options of an existing select. Colors are checked with the shared `isColor()`.
-- **Import option notes** ([importOptions.ts](../../src/commands/importOptions.ts), id `import-option-notes`): available on any active `.base`; at run time requires the base to be a schema base (membership must know its members). Reads notes directly inside the configured import folder named `<Column> - <Value>`, takes the color from the `Farbe` property, and `planImport()` builds select options only for columns that exist as member properties. `importMutation()` adds missing options, never recolors existing ones, never converts non-select fields; new fields become `multiple` when any member stores that property as a list. A `ResultModal` lists written fields, skipped notes and formulas named `<field>_pill` that are now obsolete.
+- **Registration** ([schemaSettings.ts](../../src/commands/schemaSettings.ts)): `registerSchemaSettings(plugin, env, registry)` adds the `checkCallback` command `open-schema-settings` ("Open schema settings", available on an active `.base`), a `file-menu` item "Schema settings" for `.base` files from the sources `tab-header`, `more-options` and `file-explorer-context-menu`, and installs the toolbar button through `installSchemaButton()` ([Internals](./internals.md)). Open failures show a `Notice`.
+- **Opening** (`openSchemaSettings()`): collects property names from the members' frontmatter (datalist suggestions), the other `.base` paths as relation targets, and the modal state from `schemaState()` (fields of the registered schema, the parse errors of an invalid base, or an empty list).
+- **Dialog** ([SchemaSettingsModal.ts](../../src/commands/SchemaSettingsModal.ts)): `SchemaSettingsModal` shows one expandable row per field with name, type, `multiple`, target base (via `BasePicker`) and select options with colors (via `openColorMenu`). Rows are validated with `validateDrafts()` before Save; a rename is refused while `canRename` (membership ready) is false. For a base with an invalid schema it shows the parse error and a "Reset schema" button with a confirm step.
+- **Draft model** ([schemaDraft.ts](../../src/commands/schemaDraft.ts), pure): `FieldDraft` / `OptionDraft`, `fieldsToDrafts()`, `validateDrafts()` (empty or reserved names, case-insensitive duplicates, relation needs an existing base, option values and colors), `draftsToMutation(drafts, originalNames)` (drops removed or renamed fields, writes all drafts in order), `renames()` (changed names including case-only), `renameKey()` (moves one frontmatter key; `renamed`, `missing` or `conflict`).
+- **Save** (`onSave` in `openSchemaSettings()`): activates a base without schema via `writer.activate()`, writes `draftsToMutation()` with `writer.update()`, then `migrateRenames()` renames the keys in all member notes sequentially through `fileManager.processFrontMatter`, skipping notes that already have both keys. `renameSummary()` builds the counts shown in the final `Notice`.
+- **Reset**: `onReset` calls `writer.reset()` which replaces the whole `improved-bases` value with an empty schema ([Schema](./schema.md)).
 
 ## Public API / entry points
 
-- `registerActivateSchema(plugin, writer, registry)`, `canActivate(registry, path)`
-- `registerConfigureField(plugin, env, registry)`, `ConfigureFieldModal`, `draftToMutation()`, `validateDraft()`, `parseOptionLines()`, `FieldDraft`
-- `registerImportOptions(plugin, env, getFolder)`, `planImport()`, `importMutation()`, `OptionNote`, `ImportPlan`
+- `registerSchemaSettings(plugin, env, registry)`, `openSchemaSettings()`, `schemaState()`, `migrateRenames()`, `renameSummary()`
+- `SchemaSettingsModal`, `SchemaSettingsInput`
+- `fieldsToDrafts()`, `validateDrafts()`, `draftsToMutation()`, `renames()`, `renameKey()`, `TYPES`, `FieldDraft`, `OptionDraft`
 
 ## Key files
 
-- [activateSchema.ts](../../src/commands/activateSchema.ts)
-- [configureField.ts](../../src/commands/configureField.ts)
-- [importOptions.ts](../../src/commands/importOptions.ts)
-- Tests: `test/activateSchema.test.ts`, `test/configureField.test.ts`, `test/importOptions.test.ts` (see [Tooling](./tooling.md))
+- [schemaSettings.ts](../../src/commands/schemaSettings.ts)
+- [SchemaSettingsModal.ts](../../src/commands/SchemaSettingsModal.ts)
+- [schemaDraft.ts](../../src/commands/schemaDraft.ts)
+- Tests: `test/schemaDraft.test.ts`, `test/schemaSettings.test.ts`, `test/toolbar.test.ts` (see [Tooling](./tooling.md))
 
 ## Dependencies
 
-- [Schema](./schema.md): `SchemaWriter`, `SchemaRegistry`, `RawFields`, `COLORS`, `NATIVE_TYPES`, `findOwnKey`, `isUnsafeKey`.
-- [Membership](../concepts/membership.md) via `WidgetEnv` for `targetEntries()`, `schemaBasesOf()`, `ready`.
-- `obsidian`: `Modal`, `Setting`, `FuzzySuggestModal`, `Notice`, `normalizePath`, `parseYaml`.
+- [Schema](./schema.md): `SchemaWriter`, `SchemaRegistry`, `RawFields`, `NATIVE_TYPES`, `isColor`, `findOwnKey`, `isUnsafeKey`, `setOption`.
+- [Membership](../concepts/membership.md) via `WidgetEnv` for `targetEntries()` and `ready`.
+- `obsidian`: `Modal`, `Setting`, `Notice`, `setIcon`, `fileManager.processFrontMatter`, the `file-menu` workspace event.
+- [Widgets](./widgets.md): `BasePicker`, `openColorMenu`, `OverlayRegistry`.
 
 ## Participates in
 
@@ -45,4 +49,5 @@ tags:
 
 - [Schema base](../concepts/schema-base.md)
 - [Field schema](../concepts/field-schema.md)
-- [Plugin core](./plugin-core.md) (registration and the `importFolder` setting)
+- [Plugin core](./plugin-core.md) (registration)
+- [Internals](./internals.md) (toolbar button)

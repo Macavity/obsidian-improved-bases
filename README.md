@@ -31,7 +31,7 @@ Limits:
 
 ## Schema format
 
-Add an `improved-bases:` key to a `.base` file, or run the command "Activate as schema base" and then "Configure field".
+Add an `improved-bases:` key to a `.base` file, or edit it with the schema settings dialog (see [Schema settings](#schema-settings)).
 
 ```yaml
 improved-bases:
@@ -61,12 +61,25 @@ views: ...
 
 Values that do not fit the schema (a link outside the target base, a list where `multiple: false`) are kept, shown with a marker, and only rewritten into the schema format when you edit them.
 
+## Schema settings
+
+A dialog edits all fields of a base without touching YAML. Open it via:
+
+- the **Schema** button in the Bases toolbar, also inside embedded bases,
+- **Schema settings** in the tab menu, the more-options menu or the file explorer context menu of a `.base` file,
+- the command "Open schema settings".
+
+The dialog edits field name, type, `multiple`, the target base of a relation, and the options of a select with their colors. Save writes all fields at once; a base without a schema becomes a schema base on first save.
+
+Renaming a field also renames that property in all notes of the base (notes are processed one by one). A note that already has both keys is skipped. A notice reports how many notes were renamed, skipped or failed. A rename is refused while the base members are still unknown (right after startup).
+
+If the `improved-bases:` section of a base is invalid, the dialog shows the parse error and offers "Reset schema" (with a confirmation step), which replaces the section with an empty schema.
+
 ## Commands
 
 | Command | ID | Available |
 |---|---|---|
-| Activate as schema base | `improved-bases:activate-schema-base` | on a `.base` file without schema |
-| Configure field | `improved-bases:configure-field` | on a schema base, or on a note that belongs to one |
+| Open schema settings | `improved-bases:open-schema-settings` | on an active `.base` file |
 
 ## Settings
 

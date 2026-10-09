@@ -21,3 +21,10 @@ Append-only audit trail. Add one dated entry per generation or refresh run, reco
 - source_commit: f31ff83 (was 92843cd)
 - Coverage: shape-based hull `validate` and cache key, relation picker without target base, `BasePicker` and multi-base Configure field, exact-match Enter, rename refresh, settings merge, shared helpers, `baseFence`.
 - Pages: [Hull widget](./concepts/hull-widget.md), [Membership](./concepts/membership.md), [Widget render](./flows/widget-render.md), [Internals](./modules/internals.md), [Widgets](./modules/widgets.md), [Commands](./modules/commands.md), [Schema](./modules/schema.md), [Query](./modules/query.md), [Plugin core](./modules/plugin-core.md), [Overview](./OVERVIEW.md)
+
+## 2026-10-09: refresh
+
+- Profile: internal/standard
+- source_commit: 24a4ba9 (was f31ff83)
+- Coverage: schema settings dialog replaces "Activate as schema base", "Configure field" and "Import option notes" (`importFolder` setting and `Optionen` fixtures removed); draft model, rename migration, `SchemaWriter.reset()`, Bases toolbar button, smoke section and test setup.
+- Pages: [Commands](./modules/commands.md), [Internals](./modules/internals.md), [Schema](./modules/schema.md), [Plugin core](./modules/plugin-core.md), [Tooling](./modules/tooling.md), [Schema edit](./flows/schema-edit.md), [Plugin load and ready](./flows/plugin-load-and-ready.md), [Field schema](./concepts/field-schema.md), [Schema base](./concepts/schema-base.md), [Membership](./concepts/membership.md), [Widgets](./modules/widgets.md), [Layers](./architecture/layers.md), [Obsidian internals](./architecture/obsidian-internals.md), [Add a field type](./guides/add-a-field-type.md), [Overview](./OVERVIEW.md)
