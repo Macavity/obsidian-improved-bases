@@ -10,48 +10,48 @@ export type RawFields = Record<string, Record<string, unknown>>;
 
 /** Edits only `improved-bases.fields`; everything else is preserved byte-for-byte. */
 export function updateSchemaSource(source: string, mutate: (fields: RawFields) => void): string {
-  const doc = parseDocument(source);
-  const current = doc.getIn([SCHEMA_KEY, "fields"]);
-  const before = (current && typeof (current as { toJSON?: unknown }).toJSON === "function"
-    ? (current as { toJSON: () => unknown }).toJSON()
-    : {}) as RawFields;
-  const after = structuredClone(before);
-  mutate(after);
+	const doc = parseDocument(source);
+	const current = doc.getIn([SCHEMA_KEY, "fields"]);
+	const before = (current && typeof (current as { toJSON?: unknown }).toJSON === "function"
+		? (current as { toJSON: () => unknown }).toJSON()
+		: {}) as RawFields;
+	const after = structuredClone(before);
+	mutate(after);
 
-  if (same(before, after)) return source;
+	if (same(before, after)) return source;
 
-  if (!doc.getIn([SCHEMA_KEY, "fields"])) {
-    doc.setIn([SCHEMA_KEY, "fields"], doc.createNode({}));
-  }
-  for (const name of Object.keys(before)) {
-    if (!Object.hasOwn(after, name)) doc.deleteIn([SCHEMA_KEY, "fields", name]);
-  }
-  for (const [name, value] of Object.entries(after)) {
-    if (!same(before[name], value)) doc.setIn([SCHEMA_KEY, "fields", name], value);
-  }
-  return doc.toString();
+	if (!doc.getIn([SCHEMA_KEY, "fields"])) {
+		doc.setIn([SCHEMA_KEY, "fields"], doc.createNode({}));
+	}
+	for (const name of Object.keys(before)) {
+		if (!Object.hasOwn(after, name)) doc.deleteIn([SCHEMA_KEY, "fields", name]);
+	}
+	for (const [name, value] of Object.entries(after)) {
+		if (!same(before[name], value)) doc.setIn([SCHEMA_KEY, "fields", name], value);
+	}
+	return doc.toString();
 }
 
 /** Adds an empty `improved-bases: { fields: {} }` node; no-op if the key exists. */
 export function activateSchemaSource(source: string): string {
-  const doc = parseDocument(source);
-  if (doc.has(SCHEMA_KEY)) return source;
-  doc.setIn([SCHEMA_KEY, "fields"], doc.createNode({}));
-  return doc.toString();
+	const doc = parseDocument(source);
+	if (doc.has(SCHEMA_KEY)) return source;
+	doc.setIn([SCHEMA_KEY, "fields"], doc.createNode({}));
+	return doc.toString();
 }
 
 export class SchemaWriter {
-  constructor(private readonly app: App) {}
+	constructor(private readonly app: App) {}
 
-  async update(basePath: string, mutate: (fields: RawFields) => void): Promise<void> {
-    const file = this.app.vault.getAbstractFileByPath(basePath);
-    if (!(file instanceof TFile)) throw new Error(`Base not found: ${basePath}`);
-    await this.app.vault.process(file, (data) => updateSchemaSource(data, mutate));
-  }
+	async update(basePath: string, mutate: (fields: RawFields) => void): Promise<void> {
+		const file = this.app.vault.getAbstractFileByPath(basePath);
+		if (!(file instanceof TFile)) throw new Error(`Base not found: ${basePath}`);
+		await this.app.vault.process(file, (data) => updateSchemaSource(data, mutate));
+	}
 
-  async activate(basePath: string): Promise<void> {
-    const file = this.app.vault.getAbstractFileByPath(basePath);
-    if (!(file instanceof TFile)) throw new Error(`Base not found: ${basePath}`);
-    await this.app.vault.process(file, activateSchemaSource);
-  }
+	async activate(basePath: string): Promise<void> {
+		const file = this.app.vault.getAbstractFileByPath(basePath);
+		if (!(file instanceof TFile)) throw new Error(`Base not found: ${basePath}`);
+		await this.app.vault.process(file, activateSchemaSource);
+	}
 }

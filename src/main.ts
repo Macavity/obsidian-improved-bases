@@ -23,6 +23,7 @@ export default class ImprovedBasesPlugin extends Plugin {
 	/** False when Obsidian internals are missing; widgets then stay off, commands keep working. */
 	widgetsSupported = true;
 	private env: WidgetEnv;
+	private notified = false;
 
 	async onload() {
 		await this.loadSettings();
@@ -51,8 +52,6 @@ export default class ImprovedBasesPlugin extends Plugin {
 		this.addSettingTab(new ImprovedBasesSettingTab(this.app, this));
 	}
 
-	private notified = false;
-
 	private notifyUnsupported() {
 		if (this.notified) return;
 		this.notified = true;
@@ -74,8 +73,6 @@ export default class ImprovedBasesPlugin extends Plugin {
 			this.typeInfoPatch = null;
 		}
 	}
-
-	onunload() {}
 
 	async loadSettings() {
 		this.settings = mergeSettings(await this.loadData());
