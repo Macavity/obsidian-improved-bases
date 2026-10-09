@@ -56,12 +56,18 @@ export async function waitFor(fn, timeoutMs = 10000, intervalMs = 250) {
 	throw new Error(`waitFor timed out after ${timeoutMs}ms (last: ${last instanceof Error ? last.message : last})`);
 }
 
-/** Aborts unless exactly one registered vault is named "test-vault" and it points to <repo>/test-vault. */
-export function ensureVault() {
-	const rows = run(["vaults", "verbose"])
+/** Registered vaults as [{ name, path }], via `obsidian vaults verbose`. */
+export function listVaults() {
+	return run(["vaults", "verbose"])
 		.split("\n")
 		.map((l) => l.split("\t"))
-		.filter((c) => c.length >= 2);
+		.filter((c) => c.length >= 2)
+		.map(([name, path]) => ({ name, path }));
+}
+
+/** Aborts unless exactly one registered vault is named "test-vault" and it points to <repo>/test-vault. */
+export function ensureVault() {
+	const rows = listVaults().map(({ name, path }) => [name, path]);
 	const hits = rows.filter(([name]) => name === VAULT);
 	const hint = "Run `pnpm vault:link`, then `pnpm vault:open` and confirm the dialog in Obsidian.";
 	if (hits.length === 0) throw new Error(`Vault "${VAULT}" is not registered. ${hint}`);

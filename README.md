@@ -108,6 +108,13 @@ pnpm smoke        # reset vault, build, reload, run CLI checks
 pnpm perf         # 2000 notes + 10 schema bases, prints timings
 ```
 
+To try the plugin in one of your own vaults, link it by the name Obsidian shows for the vault (`pnpm vault:link --list` prints them), then enable it under Settings → Community plugins:
+
+```bash
+pnpm build
+pnpm vault:link "My Vault"
+```
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ## Credits
