@@ -110,3 +110,13 @@
 	font-size: var(--font-ui-smaller);
 	margin-top: var(--size-4-2);
 }
+
+.improved-bases-toolbar-item {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--size-2-2);
+}
+.improved-bases-toolbar-item .svg-icon {
+	width: var(--icon-s);
+	height: var(--icon-s);
+}

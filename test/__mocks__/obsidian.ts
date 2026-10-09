@@ -122,3 +122,7 @@ export class MarkdownRenderer {
 }
 
 export function addIcon(_iconId: string, _svgContent: string): void {}
+
+export function setIcon(el: HTMLElement, iconId: string): void {
+	el.setAttribute("data-icon", iconId);
+}
