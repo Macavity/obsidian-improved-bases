@@ -9,7 +9,6 @@ import { RelationWidget } from "./widgets/RelationWidget";
 import { SelectWidget } from "./widgets/SelectWidget";
 import { registerActivateSchema } from "./commands/activateSchema";
 import { registerConfigureField } from "./commands/configureField";
-import { registerImportOptions } from "./commands/importOptions";
 import { getMetadataTypeManager } from "./internals/detect";
 import { ImprovedBasesSettings, ImprovedBasesSettingTab, mergeSettings } from "./settings";
 
@@ -47,7 +46,6 @@ export default class ImprovedBasesPlugin extends Plugin {
 		});
 		registerActivateSchema(this, this.writer, this.registry);
 		registerConfigureField(this, env, this.registry);
-		registerImportOptions(this, env, () => this.settings.importFolder);
 		this.app.workspace.onLayoutReady(() => void this.registry.load());
 		this.addSettingTab(new ImprovedBasesSettingTab(this.app, this));
 	}

@@ -5,8 +5,11 @@ import { mergeSettings, DEFAULT_SETTINGS, ImprovedBasesSettingTab } from "../src
 describe("settings", () => {
   it("merges defensively", () => {
     expect(mergeSettings(null)).toEqual(DEFAULT_SETTINGS);
-    expect(mergeSettings({ widgetsEnabled: "no", importFolder: 3, junk: 1 })).toEqual(DEFAULT_SETTINGS);
-    expect(mergeSettings({ widgetsEnabled: false, importFolder: "Opt" })).toEqual({ widgetsEnabled: false, importFolder: "Opt" });
+    expect(mergeSettings({ widgetsEnabled: "no", junk: 1 })).toEqual(DEFAULT_SETTINGS);
+    expect(mergeSettings({ widgetsEnabled: false })).toEqual({ widgetsEnabled: false });
+  });
+  it("ignores the removed importFolder key", () => {
+    expect(mergeSettings({ importFolder: "Optionen", widgetsEnabled: false })).toEqual({ widgetsEnabled: false });
   });
   it("setControlValue merges instead of storing unchecked values", async () => {
     const plugin = {
@@ -15,8 +18,6 @@ describe("settings", () => {
       applyWidgetsEnabled: vi.fn(),
     };
     const tab = new ImprovedBasesSettingTab({} as App, plugin as never);
-    await tab.setControlValue("importFolder", 5);
-    expect(plugin.settings).toEqual(DEFAULT_SETTINGS);
     await tab.setControlValue("junk", 1);
     expect(plugin.settings).toEqual(DEFAULT_SETTINGS);
     await tab.setControlValue("widgetsEnabled", false);

@@ -235,19 +235,6 @@ for (const [name, label] of [["Karten", "cards"], ["Liste", "list"]]) {
 }
 console.log("Cards/List ok");
 
-// Import option notes: Role gains Manager (existing colors kept), Status becomes a select; option notes untouched.
-OPEN_ACTIVE("Mitarbeiter.base");
-assert(cmdAvailable("import-option-notes"), "import must be offered on a schema base");
-evalJs("(app.commands.executeCommandById('improved-bases:import-option-notes'), 'ok')");
-const mitSrc = () => parseYaml(evalJs("(async () => await app.vault.read(app.vault.getAbstractFileByPath('Mitarbeiter.base')))()").replace(/^=> /, ""));
-await waitFor(() => mitSrc()?.["improved-bases"]?.fields?.Status?.type === "select", 5000);
-const imported = mitSrc()["improved-bases"].fields;
-assert(imported.Role.options.Manager && imported.Role.options.Developer === "blue", `Role after import: ${JSON.stringify(imported.Role)}`);
-assert(Object.keys(imported.Status.options).sort().join() === "Aktiv,Urlaub", `Status options: ${JSON.stringify(imported.Status)}`);
-evalJs("(document.querySelector('.modal-container .modal-close-button')?.click(), 'ok')");
-execSync("git diff --exit-code --quiet test-vault/Optionen", { stdio: "inherit" });
-console.log("Import ok");
-
 // Settings: toggle off removes all widgets, on restores them; settings persist merged.
 OPEN_ACTIVE("Mitarbeiter.base");
 await waitFor(() => cells("Mitarbeiter.base").some((c) => c.plugin), 10000);

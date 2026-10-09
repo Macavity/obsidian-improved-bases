@@ -67,14 +67,10 @@ Values that do not fit the schema (a link outside the target base, a list where 
 |---|---|---|
 | Activate as schema base | `improved-bases:activate-schema-base` | on a `.base` file without schema |
 | Configure field | `improved-bases:configure-field` | on a schema base, or on a note that belongs to one |
-| Import option notes | `improved-bases:import-option-notes` | on a schema base |
-
-**Import option notes** reads notes from the import folder (setting, default `Optionen`) named `<Column> - <Value>.md`, e.g. `Role - Developer.md`. The `Farbe` property of the note sets the color (one of the colors above, otherwise grey). The column becomes a select field with these options; the first note wins on duplicates. Existing option colors are kept; note files are never changed.
 
 ## Settings
 
 - **Enable widgets:** turns the plugin widgets on or off without disabling the plugin. Off means everything renders natively.
-- **Import folder:** folder with the option notes (default `Optionen`).
 
 ## Unsupported Obsidian versions
 

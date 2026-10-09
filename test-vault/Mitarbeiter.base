@@ -1,9 +1,6 @@
 filters:
   and:
     - file.inFolder("Mitarbeiter")
-formulas:
-  Role_pill: 'if(Role, html("<span class=\"pill\">" + Role + "</span>"))'
-  Status_pill: 'if(Status, html("<span class=\"pill\">" + Status + "</span>"))'
 improved-bases:
   fields:
     Team:
@@ -25,5 +22,3 @@ views:
       - Team
       - Role
       - Status
-      - formula.Role_pill
-      - formula.Status_pill
