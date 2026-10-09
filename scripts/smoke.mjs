@@ -167,36 +167,121 @@ const panelRole = run("Mitarbeiter/Ada Albers.md",
 assert(panelRole.text === "Tester" && panelRole.color === "green", `panel Role pill: ${JSON.stringify(panelRole)}`);
 console.log("SelectWidget ok");
 
-// Commands: activate schema base, configure field via modal, panel shows relation widget.
+// Schema settings: toolbar button (leaf + embed), command, add a relation field, rename with migration.
 const cmdAvailable = (id) => evalJs(`(() => { const c = app.commands.commands['improved-bases:${id}']; return c.checkCallback(true) === true; })()`) === "true";
 const OPEN_ACTIVE = (path) => evalJs(`(async () => { ${OPEN(path)} return 'ok'; })()`);
+// Runs `body` against the current DOM without reopening a file; `el` is the active leaf's container.
+const page = (body) => {
+	const out = evalJs(
+		"(async () => { const sleep = (ms) => new Promise((r) => setTimeout(r, ms)); " +
+			`const el = app.workspace.getMostRecentLeaf().view.containerEl; ${body} })()`,
+	);
+	const i = out.lastIndexOf("=> ");
+	return JSON.parse(i < 0 ? out : out.slice(i + 3));
+};
+const MODALS = "document.querySelectorAll('.modal-container').length";
+const closeModals = async () => {
+	page(`${ESC} return JSON.stringify(1);`);
+	await waitFor(() => evalJs(MODALS) === "0", 5000);
+};
+const SCHEMA = "document.querySelector('.modal .improved-bases-schema')";
+const openSchemaFromToolbar = async (scope) => {
+	await waitFor(() => page(`return JSON.stringify(el.querySelectorAll('${scope} .improved-bases-toolbar-item').length);`) === 1, 10000);
+	page(`el.querySelector('${scope} .improved-bases-toolbar-item').click(); return JSON.stringify(1);`);
+	await waitFor(() => evalJs(`!!${SCHEMA}`) === "true", 5000);
+};
+const rowNames = () =>
+	page(`return JSON.stringify([...${SCHEMA}.querySelectorAll('.improved-bases-field-row .improved-bases-field-summary-text')].map((t) => t.textContent.split(' · ')[0]));`);
+const editorOf = (name) =>
+	`const row = [...${SCHEMA}.querySelectorAll('.improved-bases-field-row')].find((r) => r.querySelector('.improved-bases-field-name')?.value === ${JSON.stringify(name)});`;
+const setFieldName = (from, to) =>
+	page(`${editorOf(from)} const i = row.querySelector('.improved-bases-field-name'); i.value = ${JSON.stringify(to)}; i.dispatchEvent(new Event('input', { bubbles: true })); return JSON.stringify(1);`);
+const saveSchema = async () => {
+	page(`${SCHEMA}.querySelector('.improved-bases-save').click(); return JSON.stringify(1);`);
+	await waitFor(() => evalJs(MODALS) === "0", 10000);
+};
+const readYaml = (path) => parseYaml(evalJs(`(async () => await app.vault.read(app.vault.getAbstractFileByPath(${JSON.stringify(path)})))()`));
+const readProp = (path, name) => {
+	try {
+		return obs("property:read", { path, name }).trim();
+	} catch {
+		return ""; // missing property
+	}
+};
+const clearNotices = () => evalJs("(document.querySelectorAll('.notice').forEach((n) => n.remove()), 'ok')");
+const noticeWith = (text) => evalJs(`[...document.querySelectorAll('.notice')].some((n) => n.textContent.includes(${JSON.stringify(text)}))`) === "true";
+await closeModals();
+
+// 1. Toolbar button in a base leaf opens the dialog with the existing fields.
 OPEN_ACTIVE("Mitarbeiter.base");
-assert(!cmdAvailable("activate-schema-base"), "activate must be hidden on an existing schema base");
-OPEN_ACTIVE("Departments.base");
-assert(cmdAvailable("activate-schema-base"), "activate must be offered on Departments.base");
-assert(!cmdAvailable("configure-field"), "configure must be hidden before activation");
-evalJs("(app.commands.executeCommandById('improved-bases:activate-schema-base'), 'ok')");
-const depSrc = () => evalJs("(async () => await app.vault.read(app.vault.getAbstractFileByPath('Departments.base')))()");
-await waitFor(() => parseYaml(depSrc().replace(/^=> /, ""))?.["improved-bases"]?.fields !== undefined, 5000);
-assert(JSON.stringify(parseYaml(depSrc().replace(/^=> /, ""))["improved-bases"].fields) === "{}", "activate must write an empty fields node");
-await waitFor(() => cmdAvailable("configure-field") && !cmdAvailable("activate-schema-base"), 5000);
-obs("property:set", { path: "Departments/Engineering.md", name: "Lead", value: "[[Ada Albers]]" });
-evalJs("(app.commands.executeCommandById('improved-bases:configure-field'), 'ok')");
-await waitFor(() => evalJs("!!document.querySelector('.improved-bases-configure')") === "true", 5000);
-const saved = evalJs(
-	`(async () => { const m = document.querySelector('.improved-bases-configure'); const sleep = (ms) => new Promise((r) => setTimeout(r, ms)); ` +
-		`const name = m.querySelector('.improved-bases-field-name'); name.value = 'Lead'; name.dispatchEvent(new Event('input', { bubbles: true })); ` +
-		`const type = m.querySelector('.improved-bases-field-type'); type.value = 'relation'; type.dispatchEvent(new Event('change', { bubbles: true })); await sleep(200); ` +
-		`m.querySelector('.improved-bases-field-base').click(); await sleep(500); ` +
-		`[...document.querySelectorAll('.suggestion-item')].find((i) => i.textContent === 'Mitarbeiter.base').click(); await sleep(300); ` +
-		`[...m.querySelectorAll('button')].find((b) => b.textContent === 'Save').click(); await sleep(1500); return 'ok'; })()`,
+await openSchemaFromToolbar("");
+const leafRows = rowNames();
+assert(JSON.stringify(leafRows) === JSON.stringify(["Team", "Role"]), `Mitarbeiter.base rows: ${JSON.stringify(leafRows)}`);
+await closeModals();
+
+// 2. Toolbar button inside an embedded base (reading mode) resolves the embedded file.
+evalJs(
+	"(async () => { const leaf = app.workspace.getLeaf(false); " +
+		"await leaf.openFile(app.vault.getAbstractFileByPath('Notizen/Embed.md'), { state: { mode: 'preview' } }); " +
+		"app.workspace.setActiveLeaf(leaf, { focus: true }); return 'ok'; })()",
 );
-assert(saved === "ok", "configure modal drive failed");
-await waitFor(() => parseYaml(depSrc().replace(/^=> /, ""))?.["improved-bases"]?.fields?.Lead?.type === "relation", 5000);
-const lead = parseYaml(depSrc().replace(/^=> /, ""))["improved-bases"].fields.Lead;
-assert(lead.base === "Mitarbeiter.base" && lead.multiple === false, `Lead field: ${JSON.stringify(lead)}`);
+const EMBED = ".markdown-preview-view .bases-embed";
+await waitFor(() => page(`return JSON.stringify(!!el.querySelector('${EMBED} .bases-toolbar'));`) === true, 10000);
+await openSchemaFromToolbar(EMBED);
+const embedTitle = evalJs("document.querySelector('.modal .modal-title')?.textContent ?? ''");
+assert(embedTitle.includes("Mitarbeiter"), `embed modal title: ${embedTitle}`);
+await closeModals();
+
+// 3. Departments.base has no schema: command opens an empty dialog, Save activates and writes a relation field.
+OPEN_ACTIVE("Departments.base");
+assert(cmdAvailable("open-schema-settings"), "open-schema-settings must be offered on Departments.base");
+const oldIds = page("return JSON.stringify(['activate-schema-base', 'configure-field'].filter((id) => 'improved-bases:' + id in app.commands.commands));");
+assert(oldIds.length === 0, `old commands still registered: ${oldIds}`);
+assert(readYaml("Departments.base")["improved-bases"] === undefined, "Departments.base must start without schema");
+obs("property:set", { path: "Departments/Engineering.md", name: "Lead", value: "[[Ada Albers]]" });
+evalJs("(app.commands.executeCommandById('improved-bases:open-schema-settings'), 'ok')");
+await waitFor(() => evalJs(`!!${SCHEMA}`) === "true", 5000);
+assert(rowNames().length === 0, "Departments.base dialog must start empty");
+page(`${SCHEMA}.querySelector('.improved-bases-add-field').click(); return JSON.stringify(1);`);
+await waitFor(() => page(`return JSON.stringify(!!${SCHEMA}.querySelector('.improved-bases-field-editor .improved-bases-field-name'));`) === true, 5000);
+setFieldName("", "Lead");
+page(`${editorOf("Lead")} const t = row.querySelector('.improved-bases-field-type'); t.value = 'relation'; t.dispatchEvent(new Event('change', { bubbles: true })); return JSON.stringify(1);`);
+await waitFor(() => page(`${editorOf("Lead")} return JSON.stringify(!!row.querySelector('.improved-bases-field-base'));`) === true, 5000);
+page(`${editorOf("Lead")} row.querySelector('.improved-bases-field-base').click(); return JSON.stringify(1);`);
+await waitFor(() => evalJs("[...document.querySelectorAll('.suggestion-item')].some((i) => i.textContent === 'Mitarbeiter.base')") === "true", 5000);
+evalJs("([...document.querySelectorAll('.suggestion-item')].find((i) => i.textContent === 'Mitarbeiter.base').click(), 'ok')");
+await waitFor(() => page(`${editorOf("Lead")} return JSON.stringify(row.querySelector('.improved-bases-field-base').textContent);`) === "Mitarbeiter.base", 5000);
+await saveSchema();
+await waitFor(() => readYaml("Departments.base")?.["improved-bases"]?.fields?.Lead?.type === "relation", 5000);
+const depFields = readYaml("Departments.base")["improved-bases"].fields;
+assert(JSON.stringify(Object.keys(depFields)) === JSON.stringify(["Lead"]), `Departments fields: ${JSON.stringify(depFields)}`);
+assert(depFields.Lead.base === "Mitarbeiter.base" && depFields.Lead.multiple === false, `Lead field: ${JSON.stringify(depFields.Lead)}`);
 await waitFor(() => run("Departments/Engineering.md", `return JSON.stringify(!!el.querySelector('.metadata-property[data-property-key="Lead" i] [data-improved-bases="relation"]'));`) === true, 10000);
-console.log("Commands ok");
+
+// 4. Renaming a field migrates the member notes and keeps the options; then rename back.
+const ADA = "Mitarbeiter/Ada Albers.md";
+const roleValue = readProp(ADA, "Role");
+assert(roleValue !== "", "Ada must have a Role before the rename");
+const fieldsOf = () => readYaml("Mitarbeiter.base")["improved-bases"].fields;
+const roleOpts = fieldsOf().Role.options;
+const renameField = async (from, to) => {
+	clearNotices();
+	OPEN_ACTIVE("Mitarbeiter.base");
+	await openSchemaFromToolbar("");
+	page(`const row = [...${SCHEMA}.querySelectorAll('.improved-bases-field-row')].find((r) => r.querySelector('.improved-bases-field-summary-text').textContent.split(' · ')[0] === ${JSON.stringify(from)}); ` +
+		"row.querySelector('.improved-bases-field-summary').click(); return JSON.stringify(1);");
+	await waitFor(() => page(`${editorOf(from)} return JSON.stringify(!!row);`) === true, 5000);
+	setFieldName(from, to);
+	await saveSchema();
+	await waitFor(() => readProp(ADA, to) === roleValue && readProp(ADA, from) === "", 10000);
+	await waitFor(() => noticeWith(`Renamed ${from} → ${to} in`), 5000);
+	const fields = fieldsOf();
+	assert(fields[from] === undefined, `${from} must be gone from the schema: ${JSON.stringify(fields)}`);
+	assert(JSON.stringify(fields[to]?.options) === JSON.stringify(roleOpts), `${to} options: ${JSON.stringify(fields[to])}`);
+};
+await renameField("Role", "Rolle");
+await renameField("Rolle", "Role");
+console.log("Schema settings ok");
 
 // Error table: orphaned target base hints in the picker; Kaputt.base did not break the others (checked above).
 OPEN_ACTIVE("Verwaist.base");
