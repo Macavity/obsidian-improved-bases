@@ -184,11 +184,13 @@ Getestet am 2026-10-08 mit Obsidian 1.14.4 (Installer 1.12.7), macOS, Test-Vault
 
 `pnpm perf` (`scripts/perf.mjs`): legt in der Test-Vault `_perf/` mit 2000 Notizen (je Team-Relation + Role) und 10 Schema-Bases an (je 200 Notizen, Relation auf `Teams.base`, Select), deaktiviert/aktiviert das Plugin und misst die Zeit bis `membership.ready` sowie bis zum ersten Plugin-Widget in `_perf/Perf-0.base`. Danach `vault:reset`.
 
-| Messung (2026-10-08, Obsidian 1.14.4, macOS, Fenster nicht im Vordergrund) | Wert |
-|---|---|
-| `membership.ready` nach Enable (2000 Notizen, 10 Schema-Bases + 4 Fixture-Bases) | 44346 ms |
-| Tabelle `Perf-0.base` bis erstes Plugin-Widget | 18014 ms |
+| Messung (2026-10-08, Obsidian 1.14.4, macOS, 2000 Notizen, 10 Schema-Bases + 4 Fixture-Bases) | `ready` | Tabelle `Perf-0.base` bis erstes Plugin-Widget |
+|---|---|---|
+| Fenster verdeckt (`visibilityState` hidden) | 44346 ms | 18014 ms |
+| Fenster sichtbar (`visibilityState` visible) | 370 ms | 113 ms |
 
-Abbruchkriterium (`ready` > 3 s) überschritten. Zum Vergleich: Fixture-Vault (28 Notizen) ca. 0,8 s. Ursache nicht untersucht (Verdacht: je Schema-Base ein CLI-Erstscan plus Collector-View über alle 2000 Dateien, Neuscans bei jedem `metadataCache.changed`). Nutzer vor dem Release informieren.
+Fazit: Limit 3 s eingehalten bei sichtbarem Fenster; Hintergrund-Throttling verlangsamt Collector-Rendering massiv (Chromium drosselt verdeckte Fenster). Die frühere Überschreitung ist damit erklärt, kein Plugin-Problem. Zum Vergleich: Fixture-Vault (28 Notizen) ca. 0,8 s.
+
+Bekannte Grenze: Nach Plugin-Enable im Hintergrund kann die Bereitschaft Sekunden dauern (bis das Fenster sichtbar wird).
 
 Hinweis zum Skript: Dateien werden per `app.vault.create` aus Obsidian heraus angelegt; per Dateisystem geschriebene Dateien wurden bei verdecktem Fenster nicht zuverlässig indexiert.

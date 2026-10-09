@@ -27,6 +27,7 @@ Limits:
 - At startup the table briefly shows native widgets before the plugin widgets replace them.
 - If a note belongs to several schema bases that define the same field, the first base by path wins and a warning is logged to the console.
 - Designed for a low double-digit number of schema bases (see Performance below).
+- With the window in the background, the plugin may take seconds to become ready after being enabled (Obsidian throttles hidden windows).
 
 ## Schema format
 
@@ -83,7 +84,7 @@ On disable or unload the patch is removed completely and all views are native ag
 
 ## Performance
 
-Measured with `pnpm perf` (2000 notes, 10 schema bases): see `SPIKE_FINDINGS.md`, section "Performance".
+Measured with `pnpm perf` (2000 notes, 10 schema bases): ready in 370 ms, first table render in 113 ms with a visible window. A hidden window is throttled and can be orders of magnitude slower. Details in `SPIKE_FINDINGS.md`, section "Performance".
 
 ## Development
 
