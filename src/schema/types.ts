@@ -1,5 +1,6 @@
 export const COLORS = ["red", "orange", "yellow", "green", "lime", "cyan", "blue", "violet", "pink", "brown", "grey", "black", "white"] as const;
 export type Color = typeof COLORS[number];
+export const isColor = (v: unknown): v is Color => typeof v === "string" && (COLORS as readonly string[]).includes(v);
 export type NativeType = "text" | "list" | "number" | "checkbox" | "date" | "datetime";
 export interface RelationField { type: "relation"; base: string; multiple: boolean }
 export interface SelectOption { value: string; color: Color }

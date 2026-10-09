@@ -1,8 +1,8 @@
-import { COLORS, NATIVE_TYPES, SCHEMA_KEY } from "./types";
+import { isColor, NATIVE_TYPES, SCHEMA_KEY } from "./types";
 import { isUnsafeKey } from "./keys";
-import type { BaseSchema, Color, FieldSchema, NativeType, SelectOption } from "./types";
+import type { BaseSchema, FieldSchema, NativeType, SelectOption } from "./types";
 
-function isRecord(v: unknown): v is Record<string, unknown> {
+export function isRecord(v: unknown): v is Record<string, unknown> {
 	return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
@@ -38,11 +38,11 @@ function parseField(name: string, raw: unknown, errors: string[]): FieldSchema |
 		}
 		const options: SelectOption[] = [];
 		for (const [value, color] of Object.entries(opts)) {
-			if (typeof color !== "string" || !(COLORS as readonly string[]).includes(color)) {
+			if (!isColor(color)) {
 				errors.push(`field "${name}": unknown color for option "${value}"`);
 				return null;
 			}
-			options.push({ value, color: color as Color });
+			options.push({ value, color });
 		}
 		return { type: "select", multiple, options };
 	}

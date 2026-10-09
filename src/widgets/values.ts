@@ -1,6 +1,7 @@
 import type { Color, SelectField } from "../schema/types";
 import type { RawFields } from "../schema/SchemaWriter";
-import { isUnsafeKey } from "../schema/keys";
+import { isUnsafeKey, setOption } from "../schema/keys";
+import { isRecord } from "../schema/parse";
 
 /** string | string[] | null → string[] (non-strings and empty strings are dropped). */
 export function toList(value: unknown): string[] {
@@ -39,15 +40,10 @@ function optionsOf(fields: RawFields, fieldName: string): Record<string, unknown
 	const f = fields[fieldName];
 	if (!f) return null;
 	const raw = f.options;
-	if (raw && typeof raw === "object" && !Array.isArray(raw)) return raw as Record<string, unknown>;
+	if (isRecord(raw)) return raw;
 	const created: Record<string, unknown> = {};
 	f.options = created;
 	return created;
-}
-
-/** Own-property write; a plain assignment to `__proto__` would change the prototype instead. */
-function setOption(options: Record<string, unknown>, value: string, color: string): void {
-	Object.defineProperty(options, value, { value: color, writable: true, enumerable: true, configurable: true });
 }
 
 /** Adds an option with color grey; an existing option is kept as is. */

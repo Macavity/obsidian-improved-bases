@@ -11,3 +11,8 @@ export function findOwnKey(obj: object, name: string): string | undefined {
 	const lower = name.toLowerCase();
 	return Object.keys(obj).find((k) => k.toLowerCase() === lower);
 }
+
+/** Own-property write; a plain assignment to `__proto__` would change the prototype instead. */
+export function setOption(options: Record<string, unknown>, value: string, color: string): void {
+	Object.defineProperty(options, value, { value: color, writable: true, enumerable: true, configurable: true });
+}

@@ -1,6 +1,6 @@
 import { type DropdownComponent, Modal, Notice, Setting, TFile, type App, type Plugin } from "obsidian";
 import type { RawFields } from "../schema/SchemaWriter";
-import { COLORS, NATIVE_TYPES, type Color, type FieldSchema } from "../schema/types";
+import { COLORS, isColor, NATIVE_TYPES, type Color, type FieldSchema } from "../schema/types";
 import { findOwnKey, isUnsafeKey } from "../schema/keys";
 import { BasePicker } from "../widgets/pickers";
 import type { WidgetEnv } from "../widgets/types";
@@ -52,7 +52,7 @@ export function validateDraft(
 	}
 	if (draft.type === "select") {
 		for (const [value, color] of Object.entries(draft.options ?? {})) {
-			if (!(COLORS as readonly string[]).includes(color)) errors.push(`Unknown color for "${value}"`);
+			if (!isColor(color)) errors.push(`Unknown color for "${value}"`);
 		}
 	}
 	return errors;

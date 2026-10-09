@@ -43,15 +43,17 @@ export function activateSchemaSource(source: string): string {
 export class SchemaWriter {
 	constructor(private readonly app: App) {}
 
-	async update(basePath: string, mutate: (fields: RawFields) => void): Promise<void> {
+	private fileOf(basePath: string): TFile {
 		const file = this.app.vault.getAbstractFileByPath(basePath);
 		if (!(file instanceof TFile)) throw new Error(`Base not found: ${basePath}`);
-		await this.app.vault.process(file, (data) => updateSchemaSource(data, mutate));
+		return file;
+	}
+
+	async update(basePath: string, mutate: (fields: RawFields) => void): Promise<void> {
+		await this.app.vault.process(this.fileOf(basePath), (data) => updateSchemaSource(data, mutate));
 	}
 
 	async activate(basePath: string): Promise<void> {
-		const file = this.app.vault.getAbstractFileByPath(basePath);
-		if (!(file instanceof TFile)) throw new Error(`Base not found: ${basePath}`);
-		await this.app.vault.process(file, activateSchemaSource);
+		await this.app.vault.process(this.fileOf(basePath), activateSchemaSource);
 	}
 }

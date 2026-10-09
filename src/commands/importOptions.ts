@@ -1,19 +1,16 @@
 import { Modal, normalizePath, Notice, parseYaml, TFile } from "obsidian";
 import type { Plugin } from "obsidian";
 import type { RawFields } from "../schema/SchemaWriter";
-import { COLORS } from "../schema/types";
+import { isColor } from "../schema/types";
 import type { Color } from "../schema/types";
-import { findOwnKey, isUnsafeKey } from "../schema/keys";
+import { findOwnKey, isUnsafeKey, setOption } from "../schema/keys";
+import { isRecord } from "../schema/parse";
 import type { WidgetEnv } from "../widgets/types";
 
 export interface OptionNote { basename: string; farbe: unknown }
 export interface ImportPlan { fields: Record<string, Record<string, Color>>; skipped: string[]; obsoleteFormulas: string[] }
 
 const SEPARATOR = " - ";
-
-function validColor(v: unknown): v is Color {
-	return typeof v === "string" && (COLORS as readonly string[]).includes(v);
-}
 
 /** Pure: maps `<column> - <value>` notes to select options of columns present in the members. */
 export function planImport(notes: OptionNote[], memberProps: Set<string>, formulaNames: string[]): ImportPlan {
@@ -41,7 +38,7 @@ export function planImport(notes: OptionNote[], memberProps: Set<string>, formul
 		const options = fields[name] as Record<string, Color>;
 		if (Object.hasOwn(options, value)) continue;
 		let color: Color = "grey";
-		if (validColor(note.farbe)) color = note.farbe;
+		if (isColor(note.farbe)) color = note.farbe;
 		else skipped.push(`${note.basename}: missing or unknown color, using grey`);
 		options[value] = color;
 	}
@@ -74,11 +71,11 @@ export function importMutation(
 				continue;
 			}
 			const raw = field.options;
-			const target: Record<string, unknown> = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
+			const target: Record<string, unknown> = isRecord(raw) ? raw : {};
 			field.options = target;
 			for (const [value, color] of Object.entries(options)) {
 				if (isUnsafeKey(value) || Object.hasOwn(target, value)) continue;
-				Object.defineProperty(target, value, { value: color, writable: true, enumerable: true, configurable: true });
+				setOption(target, value, color);
 			}
 		}
 	};
