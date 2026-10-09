@@ -31,7 +31,7 @@ sequenceDiagram
   alt not a schema field anywhere
     G-->>O: original info (native)
   else known field
-    G->>G: hullFor(info) (cached per expected x inferred x generation)
+    G->>G: hullFor(info) (cached per expected x inferred x name x generation)
     G-->>O: { expected: hull, inferred: hull }
     O->>H: render(el, value, ctx)
     H->>M: resolve(ctx.sourcePath, ctx.key)
@@ -49,7 +49,7 @@ sequenceDiagram
 ## Steps
 
 1. The wrapper installed by `installTypeInfoPatch()` in [typeInfoPatch.ts](../../src/internals/typeInfoPatch.ts) calls the original `getTypeInfo`, then checks `membership.knownFieldNames()` (lowercased union of all schema field names). Unknown names pass through untouched.
-2. `hullFor(info)` returns a cached hull keyed on the original `expected`/`inferred` pair and the current `generation`. The hull copies `type`, `icon`, `name` from `expected`, has `validate: () => true`, and a `render` closure.
+2. `hullFor(info, name)` returns a cached hull keyed on the original `expected`/`inferred` pair, the lowercase field name and the current `generation`. The hull copies `type`, `icon`, `name` from `expected`, has a shape-based `validate` (via `membership.shapesFor(name)`, falling back to the original `validate`), and a `render` closure.
 3. Obsidian renders. The hull calls `membership.resolve(ctx.sourcePath, ctx.key)`. `ctx.key` is lowercase from the table and original-case from the panel; `resolve` lowercases, and for files in several schema bases picks the first by path with a one-time console warning.
 4. Dispatch: `relation` → `RelationWidget`, `select` → `SelectWidget` ([Widgets](../modules/widgets.md)); a native schema type → the native widget mapped in `NATIVE_WIDGET` (`list` → `multitext`), overriding `types.json` for members; `null` → `original(info, value)`, which is the untouched `expected` when it validates the value, else `inferred`.
 5. The widget draws into `el`, registers overlays it opens, and commits edits with `ctx.onChange(...)` in the schema's storage shape (string or list per `multiple`, see [Value mismatch](../concepts/value-mismatch.md)). Obsidian writes the property; the plugin never touches note files directly.
@@ -59,7 +59,7 @@ sequenceDiagram
 
 - Patch inactive (`active = false` after uninstall): wrapper returns original info; hulls already handed out render native.
 - `getTypeInfo` returns info without `expected`/`inferred`: passed through unchanged.
-- Relation target base missing: chips still render (via `LinkValue`), the picker shows a `Notice` and an empty list.
+- Relation target base missing: chips still render (via `LinkValue`), the picker is not opened, only a `Notice` ("Target base not found") is shown.
 
 ## Related
 

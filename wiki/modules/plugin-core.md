@@ -18,7 +18,7 @@ tags:
 - Decide `widgetsSupported` via `getMetadataTypeManager()` and show one `Notice` per load when unsupported (`notifyUnsupported()` is idempotent via `notified`).
 - `applyWidgetsEnabled()`: install or uninstall the [getTypeInfo patch](../concepts/hull-widget.md) according to `settings.widgetsEnabled && widgetsSupported`. Called on load and from the settings toggle.
 - Register the three commands and the settings tab; start the registry scan on `workspace.onLayoutReady`.
-- Persist settings via `loadData()` / `saveData()`; `mergeSettings()` is a defensive merge that ignores unknown keys and wrongly typed values.
+- Persist settings via `loadData()` / `saveData()`; `mergeSettings()` is a defensive merge that ignores unknown keys and wrongly typed values; the settings tab also writes through it (`setControlValue()`).
 
 ## Public API / entry points
 
