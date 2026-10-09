@@ -119,6 +119,18 @@ export class Membership extends Events {
 		return out;
 	}
 
+	/** Value shapes any schema allows for the field (lowercase name). */
+	shapesFor(name: string): Set<"list" | "scalar" | "native"> {
+		const out = new Set<"list" | "scalar" | "native">();
+		for (const s of this.registry.schemas()) {
+			const f = s.fields.get(name)?.field;
+			if (!f) continue;
+			if (f.type === "relation" || f.type === "select") out.add(f.multiple ? "list" : "scalar");
+			else out.add("native");
+		}
+		return out;
+	}
+
 	dispose(): void {
 		this.registry.off("changed", this.onRegistry);
 		if (this.cacheRef) this.deps.cache?.offref(this.cacheRef);

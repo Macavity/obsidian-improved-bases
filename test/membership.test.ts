@@ -13,6 +13,12 @@ const settle = () => vi.advanceTimersByTime(300);
 
 const file = (path: string) => ({ path }) as TFile;
 
+const s0 = (path: string, fields: Record<string, unknown>): BaseSchema => {
+	const r = parseSchema(path, { "improved-bases": { fields } }).schema;
+	if (!r) throw new Error("invalid fixture");
+	return r;
+};
+
 function setup(initial?: BaseSchema[], opts: { cache?: boolean; loaded?: boolean } = {}) {
 	let loaded = opts.loaded ?? true;
 	const cacheHandlers = new Set<() => void>();
@@ -68,6 +74,16 @@ function setup(initial?: BaseSchema[], opts: { cache?: boolean; loaded?: boolean
 }
 
 describe("Membership", () => {
+	it("shapesFor collects value shapes per field name", () => {
+		const { m } = setup([
+			s0("A.base", { Team: { type: "relation", base: "T.base" }, Tags: { type: "select", multiple: true }, N: { type: "number" } }),
+			s0("B.base", { Team: { type: "select", multiple: true } }),
+		]);
+		expect([...m.shapesFor("team")].sort()).toEqual(["list", "scalar"]);
+		expect([...m.shapesFor("tags")]).toEqual(["list"]);
+		expect([...m.shapesFor("n")]).toEqual(["native"]);
+		expect(m.shapesFor("zzz").size).toBe(0);
+	});
 	it("is null until every schema base scanned", () => {
 		const { m, push } = setup();
 		push("A-People.base", ["p/ada.md"]);

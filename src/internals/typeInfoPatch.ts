@@ -43,7 +43,7 @@ export function installTypeInfoPatch(app: App, env: WidgetEnv, widgets: PluginWi
 	let active = true;
 	// The table only rebuilds a cell when the identity of `inferred` changes, so `refresh` bumps the generation.
 	let generation = 0;
-	const cache = new Map<TypeWidget, Map<TypeWidget, CacheEntry>>();
+	const cache = new Map<TypeWidget, Map<TypeWidget, Map<string, CacheEntry>>>();
 
 	const original = (info: TypeInfo, value: unknown): TypeWidget => {
 		try {
@@ -62,12 +62,29 @@ export function installTypeInfoPatch(app: App, env: WidgetEnv, widgets: PluginWi
 		return native ? native.render(el, value, ctx) : undefined;
 	};
 
-	const makeHull = (info: TypeInfo): TypeWidget => ({
+	const isStringArray = (v: unknown): boolean => Array.isArray(v) && v.every((x) => typeof x === "string");
+
+	/**
+	 * `validate` gets no file context (measured 2026-10-09: one argument), so this only checks the value's shape
+	 * against the shapes any schema allows for the field name.
+	 */
+	const validateShape = (info: TypeInfo, name: string, value: unknown): boolean => {
+		const shapes = membership.shapesFor(name);
+		if (value === null || value === undefined) {
+			if (shapes.has("list") || shapes.has("scalar")) return true;
+		} else {
+			if (shapes.has("list") && isStringArray(value)) return true;
+			if (shapes.has("scalar") && typeof value === "string") return true;
+		}
+		return info.expected.validate(value);
+	};
+
+	const makeHull = (info: TypeInfo, name: string): TypeWidget => ({
 		...info.expected,
 		type: info.expected.type,
 		icon: info.expected.icon,
 		name: info.expected.name,
-		validate: () => true,
+		validate: (value: unknown) => validateShape(info, name, value),
 		render(el: HTMLElement, value: unknown, ctx: unknown): unknown {
 			if (active) {
 				try {
@@ -82,16 +99,21 @@ export function installTypeInfoPatch(app: App, env: WidgetEnv, widgets: PluginWi
 		},
 	});
 
-	const hullFor = (info: TypeInfo): TypeWidget => {
-		let inner = cache.get(info.expected);
-		if (!inner) {
-			inner = new Map<TypeWidget, CacheEntry>();
-			cache.set(info.expected, inner);
+	const hullFor = (info: TypeInfo, name: string): TypeWidget => {
+		let byInferred = cache.get(info.expected);
+		if (!byInferred) {
+			byInferred = new Map<TypeWidget, Map<string, CacheEntry>>();
+			cache.set(info.expected, byInferred);
 		}
-		let entry = inner.get(info.inferred);
+		let inner = byInferred.get(info.inferred);
+		if (!inner) {
+			inner = new Map<string, CacheEntry>();
+			byInferred.set(info.inferred, inner);
+		}
+		let entry = inner.get(name);
 		if (!entry || entry.generation !== generation) {
-			entry = { generation, hull: makeHull(info) };
-			inner.set(info.inferred, entry);
+			entry = { generation, hull: makeHull(info, name) };
+			inner.set(name, entry);
 		}
 		return entry.hull;
 	};
@@ -103,8 +125,9 @@ export function installTypeInfoPatch(app: App, env: WidgetEnv, widgets: PluginWi
 				if (!active) return info;
 				try {
 					if (!info?.expected || !info.inferred) return info;
-					if (!membership.knownFieldNames().has(String(name).toLowerCase())) return info;
-					const hull = hullFor(info);
+					const key = String(name).toLowerCase();
+					if (!membership.knownFieldNames().has(key)) return info;
+					const hull = hullFor(info, key);
 					return { ...info, expected: hull, inferred: hull };
 				} catch (e) {
 					console.error("Improved Bases: getTypeInfo patch failed", e);

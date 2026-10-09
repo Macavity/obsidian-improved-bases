@@ -13,11 +13,12 @@ interface FakeMtm {
 interface FakeMembership {
   knownFieldNames(): Set<string>;
   resolve(path: string, key: string): FieldSchema | null;
+  shapesFor?(name: string): Set<"list" | "scalar" | "native">;
   on(name: string, cb: (...a: unknown[]) => void): unknown;
   offref?(ref: unknown): void;
 }
 
-const widget = (type: string) => ({ type, validate: () => true, render: vi.fn(() => ({ type, focus() {} })) });
+const widget = (type: string) => ({ type, validate: (_v?: unknown): boolean => true, render: vi.fn(() => ({ type, focus() {} })) });
 
 function fakeApp() {
   const text = widget("text");
@@ -97,6 +98,32 @@ describe("typeInfoPatch", () => {
     patch.uninstall();
     expect(handlers.size).toBe(0);
     expect(mtm.trigger).toHaveBeenLastCalledWith("changed", "team");
+  });
+  it("validates by the value shapes the schemas allow for the field name", () => {
+    const { app, text, mtm } = fakeApp();
+    const orig = vi.fn((v: unknown) => typeof v === "number");
+    text.validate = orig;
+    const shapes: Record<string, Set<"list" | "scalar" | "native">> = {
+      tags: new Set(["list"]), team: new Set(["scalar"]), n: new Set(["native"]),
+    };
+    const membership: FakeMembership = {
+      knownFieldNames: () => new Set(Object.keys(shapes)),
+      resolve: () => null,
+      shapesFor: (n) => shapes[n] ?? new Set(),
+      on: vi.fn(),
+    };
+    installTypeInfoPatch(app, env(membership), widgets({}));
+    const v = (name: string, value: unknown) => mtm.getTypeInfo(name, value).expected.validate(value);
+    expect(v("Tags", ["a", "b"])).toBe(true);
+    expect(v("Tags", [])).toBe(true);
+    expect(v("Tags", null)).toBe(true);
+    expect(v("Tags", "a")).toBe(false); // no list/scalar match -> original validate
+    expect(v("Tags", [1])).toBe(false);
+    expect(v("Team", "x")).toBe(true);
+    expect(v("Team", null)).toBe(true);
+    expect(v("Team", ["x"])).toBe(false);
+    expect(v("N", "x")).toBe(false);
+    expect(v("N", 3)).toBe(true);
   });
   it("returns null when internals are missing", () => {
     expect(installTypeInfoPatch({ metadataTypeManager: {} } as unknown as App, {} as WidgetEnv, {} as PluginWidgets)).toBeNull();
