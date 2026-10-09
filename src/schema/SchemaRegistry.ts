@@ -34,9 +34,8 @@ export class SchemaRegistry extends Events {
 		on(vault.on("modify", (f) => isBase(f) && void this.refresh(f.path)));
 		on(vault.on("delete", (f) => isBase(f) && void this.refresh(f.path)));
 		on(vault.on("rename", (f, old) => {
-			if (!isBase(f)) return;
 			void this.refresh(old);
-			void this.refresh(f.path);
+			if (isBase(f)) void this.refresh(f.path);
 		}));
 		const bases = vault.getFiles().filter((f) => f.extension === "base");
 		await Promise.all(bases.map((f) => this.refresh(f.path, true)));

@@ -50,8 +50,7 @@ export class ImprovedBasesSettingTab extends PluginSettingTab {
 	}
 
 	async setControlValue(key: string, value: unknown): Promise<void> {
-		const settings = this.plugin.settings as unknown as Record<string, unknown>;
-		settings[key] = value;
+		this.plugin.settings = mergeSettings({ ...this.plugin.settings, [key]: value });
 		await this.plugin.saveSettings();
 		if (key === "widgetsEnabled") this.plugin.applyWidgetsEnabled();
 	}

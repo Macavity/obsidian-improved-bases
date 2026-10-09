@@ -75,4 +75,17 @@ describe("SchemaRegistry", () => {
 		await new Promise((res) => setTimeout(res, 0));
 		expect([...(r.schemas()[0]?.fields.keys() ?? [])]).toEqual(["fresh"]);
 	});
+	it("drops the schema when a base is renamed to another extension", async () => {
+		const { app, fire, files } = fakeApp(new Map([["A.base", () => Promise.resolve(yaml("X"))]]));
+		const r = new SchemaRegistry(app);
+		await r.load();
+		expect(r.schemas()).toHaveLength(1);
+		files.delete("A.base");
+		const renamed = new TFile();
+		renamed.path = "A.txt";
+		renamed.extension = "txt";
+		fire("rename", renamed, "A.base");
+		await new Promise((res) => setTimeout(res, 0));
+		expect(r.schemas()).toHaveLength(0);
+	});
 });
