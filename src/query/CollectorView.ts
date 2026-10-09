@@ -16,6 +16,13 @@ const ICON_SVG =
 	'<circle cx="50" cy="50" r="38" fill="none" stroke="currentColor" stroke-width="8"/>' +
 	'<line x1="20" y1="80" x2="80" y2="20" stroke="currentColor" stroke-width="8"/>';
 
+/** Wraps YAML in a ```base block whose fence is longer than any backtick run inside the YAML. */
+export function baseFence(yaml: string): string {
+	const longest = Math.max(0, ...(yaml.match(/`+/g) ?? []).map((m) => m.length));
+	const fence = "`".repeat(Math.max(3, longest + 1));
+	return `${fence}base\n${yaml}${yaml.endsWith("\n") ? "" : "\n"}${fence}\n`;
+}
+
 type Push = (files: TFile[]) => void;
 
 class CollectorView extends BasesView {
@@ -70,7 +77,7 @@ export function registerCollector(plugin: Plugin): MountCollector {
 			host.remove();
 		});
 		try {
-			await MarkdownRenderer.render(app, "```base\n" + stringifyYaml(source) + "```\n", host, file.path, component);
+			await MarkdownRenderer.render(app, baseFence(stringifyYaml(source)), host, file.path, component);
 		} catch (e) {
 			component.unload();
 			throw e;
