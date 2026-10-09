@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { updateSchemaSource } from "../src/schema/SchemaWriter";
+import { activateSchemaSource, resetSchemaSource, updateSchemaSource } from "../src/schema/SchemaWriter";
 
 const src = `# keep me
 filters:
@@ -32,5 +32,30 @@ describe("updateSchemaSource", () => {
     const second = updateSchemaSource(first, (f) => { delete f.Team; });
     expect(second).not.toContain("Team");
     expect(second).toContain("Role:");
+  });
+});
+
+describe("activateSchemaSource", () => {
+  it("activates an empty schema node once", () => {
+    const text = "filters:\n  and:\n    - file.inFolder(\"D\")\n";
+    const out = activateSchemaSource(text);
+    expect(out).toContain("improved-bases:");
+    expect(out.startsWith(text)).toBe(true);
+    expect(activateSchemaSource(out)).toBe(out);
+    expect(updateSchemaSource(out, (f) => { f.A = { type: "text" }; })).toContain("A:");
+  });
+});
+
+describe("resetSchemaSource", () => {
+  it("replaces an invalid schema value with an empty schema and keeps the rest", () => {
+    const out = resetSchemaSource("improved-bases: 5\nviews: []\n");
+    expect(out).toMatch(/improved-bases:\n {2}fields: \{\}/);
+    expect(out).toContain("views: []");
+    expect(out).not.toContain("5");
+  });
+  it("drops existing fields", () => {
+    const out = resetSchemaSource(updateSchemaSource(src, (f) => { f.Role = { type: "text" }; }));
+    expect(out).not.toContain("Role:");
+    expect(out).toContain("filters:");
   });
 });

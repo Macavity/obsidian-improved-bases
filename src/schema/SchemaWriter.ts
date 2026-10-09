@@ -40,6 +40,13 @@ export function activateSchemaSource(source: string): string {
 	return doc.toString();
 }
 
+/** Replaces the whole `improved-bases` value with an empty schema, even if it was invalid. */
+export function resetSchemaSource(source: string): string {
+	const doc = parseDocument(source);
+	doc.set(SCHEMA_KEY, { fields: {} });
+	return doc.toString();
+}
+
 export class SchemaWriter {
 	constructor(private readonly app: App) {}
 
@@ -55,5 +62,9 @@ export class SchemaWriter {
 
 	async activate(basePath: string): Promise<void> {
 		await this.app.vault.process(this.fileOf(basePath), activateSchemaSource);
+	}
+
+	async reset(basePath: string): Promise<void> {
+		await this.app.vault.process(this.fileOf(basePath), resetSchemaSource);
 	}
 }
