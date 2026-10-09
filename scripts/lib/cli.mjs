@@ -69,7 +69,7 @@ export function listVaults() {
 export function ensureVault() {
 	const rows = listVaults().map(({ name, path }) => [name, path]);
 	const hits = rows.filter(([name]) => name === VAULT);
-	const hint = "Run `pnpm vault:link`, then `pnpm vault:open` and confirm the dialog in Obsidian.";
+	const hint = "Run `pnpm vault:link-test`, then `pnpm vault:open` and confirm the dialog in Obsidian.";
 	if (hits.length === 0) throw new Error(`Vault "${VAULT}" is not registered. ${hint}`);
 	if (hits.length > 1) throw new Error(`Several vaults are named "${VAULT}"; refusing to run.`);
 	const real = (p) => {

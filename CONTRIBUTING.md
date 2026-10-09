@@ -32,7 +32,7 @@ Build artifacts (`main.js`, `manifest.json`, `styles.css`) are produced at the r
 
 Test vault setup (once):
 
-1. `pnpm vault:link` creates the symlink `test-vault/.obsidian/plugins/improved-bases` -> repo root (a symlink, not a Finder alias; `--copy` copies the three files instead).
+1. `pnpm vault:link-test` creates the symlink `test-vault/.obsidian/plugins/improved-bases` -> repo root (a symlink, not a Finder alias; `--copy` copies the three files instead).
 2. `pnpm vault:open`, confirm "Open folder as vault" in Obsidian, turn off Restricted mode and make sure `improved-bases` is enabled.
 3. `pnpm dev` in one terminal; `pnpm reload` after each rebuild.
 

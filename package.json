@@ -16,6 +16,7 @@
 		"lint:fix": "node scripts/lint-wrapper.mjs --fix",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
 		"vault:link": "node scripts/vault-link.mjs",
+		"vault:link-test": "node scripts/vault-link.mjs --test",
 		"vault:open": "node scripts/vault-open.mjs",
 		"vault:reset": "node scripts/vault-reset.mjs",
 		"reload": "node scripts/reload.mjs",
