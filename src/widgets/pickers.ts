@@ -11,13 +11,12 @@ export class EntryPicker extends FuzzySuggestModal<TFile> {
 		app: App,
 		private readonly entries: TFile[] | null,
 		private readonly onPick: (file: TFile) => void,
-		emptyText?: string,
 		overlays?: OverlayRegistry,
 	) {
 		super(app);
 		this.unregister = overlays?.add(() => this.close()) ?? null;
 		this.setPlaceholder("Select an entry");
-		if (emptyText) this.emptyStateText = emptyText;
+		this.emptyStateText = "No entries";
 	}
 
 	getItems(): TFile[] {
@@ -35,6 +34,23 @@ export class EntryPicker extends FuzzySuggestModal<TFile> {
 	onClose(): void {
 		super.onClose();
 		this.unregister?.();
+	}
+}
+
+/** Picks one of the given base paths. */
+export class BasePicker extends FuzzySuggestModal<string> {
+	constructor(app: App, private readonly paths: string[], private readonly onPick: (p: string) => void) {
+		super(app);
+		this.setPlaceholder("Select a target base");
+	}
+	getItems(): string[] {
+		return this.paths;
+	}
+	getItemText(p: string): string {
+		return p;
+	}
+	onChooseItem(p: string): void {
+		this.onPick(p);
 	}
 }
 
@@ -88,7 +104,6 @@ export function openOptionMenu(
 	const input = wrap.createEl("input", { attr: { type: "text", placeholder: "Search or create", "aria-label": "Search or create" } });
 	menuDom.prepend(wrap);
 	const hint = menuDom.createDiv({ cls: "improved-bases-menu-create is-hidden" });
-	const visible = (): { value: string }[] => rows.filter((r) => !r.dom?.hasClass("is-hidden"));
 	const update = (): void => {
 		const q = input.value.trim().toLowerCase();
 		for (const r of rows) r.dom?.toggleClass("is-hidden", q !== "" && !r.value.toLowerCase().includes(q));
@@ -101,9 +116,8 @@ export function openOptionMenu(
 		const q = input.value.trim();
 		if (!q) return;
 		const exact = rows.find((r) => r.value.toLowerCase() === q.toLowerCase());
-		const pick = exact?.value ?? (visible().length === 1 ? visible()[0]?.value : undefined);
 		menu.hide();
-		if (pick !== undefined) onPick(pick);
+		if (exact) onPick(exact.value);
 		else onCreate(q);
 	};
 	internals.onEnter(submit);

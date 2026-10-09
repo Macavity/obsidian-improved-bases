@@ -24,18 +24,18 @@ export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, fiel
 	};
 
 	const openPicker = (): void => {
-		const missing = !(app.vault.getAbstractFileByPath(field.base) instanceof TFile);
-		const entries = missing ? null : membership.targetEntries(field.base);
-		const emptyText = entries === null ? `Target base not found: ${field.base}` : "No entries";
-		if (entries === null) new Notice(emptyText);
-		new EntryPicker(app, entries, (file: TFile) => {
+		if (!(app.vault.getAbstractFileByPath(field.base) instanceof TFile)) {
+			new Notice(`Target base not found: ${field.base}`);
+			return;
+		}
+		new EntryPicker(app, membership.targetEntries(field.base), (file: TFile) => {
 			const link = `[[${app.metadataCache.fileToLinktext(file, ctx.sourcePath, true)}]]`;
 			if (field.multiple) {
 				if (!links.includes(link)) commit([...links, link]);
 			} else {
 				commit([link]);
 			}
-		}, emptyText, env.overlays).open();
+		}, env.overlays).open();
 	};
 
 	const draw = (): void => {
