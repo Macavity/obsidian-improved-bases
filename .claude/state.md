@@ -39,8 +39,16 @@ Plan: `.claude/plans/2026-10-02-improved-bases.md` (Subagent-Driven). Branch `fe
 - Import: Farbe nur exakte COLORS sonst grey+skipped; erste Notiz gewinnt; `multiple` aus Mitglieds-Frontmatter; obsolete `<Spalte>_pill`-Formeln gemeldet, nicht geändert.
 - Offen: leerer Import-Ordner (`normalizePath("")` = "/"); Settings-Tab wird bei Laufzeit-Unsupported nicht neu gerendert; Smoke `evalJs` ohne Timeout (hängt bei verdecktem Fenster → `app:reload`).
 
+## Phase 4 + Final: Commits 13300c4…1ffa8fc
+- Task 14: README (Umfang, Grenzen, Schema, Befehle, Import, Settings), `pnpm perf`, Smoke: Cards/List-Nicht-Regression, Verwaist-Hinweis, `evalJs` 30-s-Timeout (SIGKILL), Hover-Check nur `hover-link`-Event (Popover fokusabhängig).
+- Perf (2000 Notizen, 10 Bases, Fenster sichtbar): ready 370 ms, Tabelle 113 ms. Verdecktes Fenster: 44 s (Throttling) → dokumentiert.
+- Final-Review (opus): Merge, 5 Nits behoben (`isUnsafeKey` lowercase, tote Exporte, `obsidian` devDependency 1.13.0, `removeIcon`).
+- Entscheidung: Notice bei kaputtem Schema bleibt wie Spec (einmal pro Laden/Fehleränderung).
+- Offen: P6 Mobil-Test (blockiert nur Release); Minors: Remount bei Schema-Writes, `knownFieldNames`-Cache/Generation pro Name, leerer Import-Ordner, Settings-Tab bei Laufzeit-Unsupported.
+- Smoke-Hygiene: Vault-Fenster sichtbar halten, nicht hineinklicken; Hänger → `obsidian vault="test-vault" reload` + `pnpm vault:reset`.
+
 ## Nächster Schritt
-Task 14 (Smoke-Erweiterung inkl. Cards/List-Nicht-Regression, README, Perf; pausiert für Mobil-Test P6) → Final-Review (opus) → finishing-a-development-branch.
+Branch `feat/improved-bases` fertig, nicht gepusht. Nutzer entscheidet: Merge lokal / PR / behalten.
 
 ## Fakten für Task 8
 - Tabelle baut Zellen nur bei neuer Widget-Identität von `inferred` neu → Hüllen-Cache braucht Generation (bei Schema-/Mitgliedschaftsänderung hochzählen).
