@@ -67,8 +67,8 @@ describe("installSchemaButton", () => {
 		expect(t1.querySelectorAll(".improved-bases-toolbar-item")).toHaveLength(1);
 		(a.workspace as unknown as { triggerLayout(): void }).triggerLayout();
 		expect(t1.querySelectorAll(".improved-bases-toolbar-item")).toHaveLength(1);
-		const c2 = div(document.body, "workspace-leaf-content");
-		const t2 = toolbar(c2);
+		const c2 = div(document.body, "el-p"); // neutral wrapper, as Obsidian renders embeds
+		const t2 = toolbar(div(div(c2, "internal-embed"), "bases-embed"));
 		await new Promise((r) => setTimeout(r, 0));
 		expect(t2.querySelectorAll(".improved-bases-toolbar-item")).toHaveLength(1);
 		(t1.querySelector(".improved-bases-toolbar-item") as HTMLElement).click();

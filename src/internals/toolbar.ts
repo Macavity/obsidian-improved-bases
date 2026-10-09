@@ -48,9 +48,8 @@ export function installSchemaButton(app: App, onOpen: (basePath: string) => void
 	const observer = new MutationObserver((records) => {
 		for (const record of records) {
 			record.addedNodes.forEach((node) => {
+				// No class pre-filter: embeds arrive wrapped in neutral containers (e.g. `div.el-p`).
 				if (!node.instanceOf(Element)) return;
-				const cls = typeof node.className === "string" ? node.className : "";
-				if (!cls.includes("bases-") && !cls.includes("workspace-leaf-content")) return;
 				if (node.matches(".bases-toolbar")) inject(node);
 				node.querySelectorAll(SELECTOR).forEach(inject);
 			});
