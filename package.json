@@ -44,6 +44,7 @@
 		"globals": "14.0.0",
 		"happy-dom": "^20.14.5",
 		"jiti": "2.6.1",
+		"obsidian": "1.13.0",
 		"tslib": "2.4.0",
 		"typescript": "5.8.3",
 		"typescript-eslint": "^8.50.1",
@@ -51,7 +52,6 @@
 	},
 	"dependencies": {
 		"monkey-around": "^3.0.0",
-		"obsidian": "latest",
 		"yaml": "^2.9.1"
 	},
 	"packageManager": "pnpm@10.20.0"

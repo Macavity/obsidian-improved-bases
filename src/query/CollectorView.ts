@@ -1,4 +1,4 @@
-import { BasesView, Component, MarkdownRenderer, Plugin, QueryController, TFile, addIcon, parseYaml, stringifyYaml } from "obsidian";
+import { BasesView, Component, MarkdownRenderer, Plugin, QueryController, TFile, addIcon, parseYaml, removeIcon, stringifyYaml } from "obsidian";
 import type { MountCollector } from "./BaseQuery";
 
 export class BaseNotFoundError extends Error {
@@ -43,6 +43,7 @@ export function registerCollector(plugin: Plugin): MountCollector {
 	let seq = 0;
 
 	addIcon(COLLECTOR_ICON, ICON_SVG);
+	plugin.register(() => removeIcon(COLLECTOR_ICON));
 	plugin.registerBasesView(COLLECTOR_VIEW, {
 		name: "Improved Bases collector",
 		icon: COLLECTOR_ICON,

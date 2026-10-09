@@ -1,4 +1,5 @@
 import { COLORS, NATIVE_TYPES, SCHEMA_KEY } from "./types";
+import { isUnsafeKey } from "./keys";
 import type { BaseSchema, Color, FieldSchema, NativeType, SelectOption } from "./types";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -64,6 +65,10 @@ export function parseSchema(basePath: string, raw: unknown): { schema: BaseSchem
   const errors: string[] = [];
   const fields: BaseSchema["fields"] = new Map();
   for (const [name, def] of Object.entries(rawFields)) {
+    if (isUnsafeKey(name)) {
+      errors.push(`field "${name}": reserved name`);
+      continue;
+    }
     const key = name.toLowerCase();
     if (fields.has(key)) {
       errors.push(`duplicate field name "${name}"`);

@@ -1,8 +1,6 @@
 import { App, EventRef, Plugin, TAbstractFile, TFile } from "obsidian";
 import { cliQuery, cliQueryAvailable } from "../internals/cliQuery";
-import { BaseNotFoundError, COLLECTOR_VIEW, registerCollector } from "./CollectorView";
-
-export { COLLECTOR_VIEW };
+import { BaseNotFoundError, registerCollector } from "./CollectorView";
 
 export interface BaseQuery {
 	/** cb fires with the current result after the first scan and on every change (deduplicated). */

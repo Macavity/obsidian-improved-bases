@@ -1,4 +1,4 @@
-import { App, Platform, Plugin } from "obsidian";
+import { App, Platform } from "obsidian";
 
 /** Undocumented CLI handler as registered by Obsidian (`app.cli.handlers`). */
 export type CliHandler = (args: Record<string, string>) => unknown;
@@ -19,11 +19,6 @@ export function getCliHandler(app: App, name: string): CliHandler | null {
 	} catch {
 		return null;
 	}
-}
-
-/** True when the public Bases view API (`registerBasesView`) exists. */
-export function hasBasesViewApi(plugin: Plugin): boolean {
-	return typeof (plugin as Partial<Plugin>).registerBasesView === "function";
 }
 
 /** Shape of a registered property type widget (`metadataTypeManager.registeredTypeWidgets[type]`). */

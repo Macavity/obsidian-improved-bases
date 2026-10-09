@@ -24,7 +24,7 @@ export function updateSchemaSource(source: string, mutate: (fields: RawFields) =
     doc.setIn([SCHEMA_KEY, "fields"], doc.createNode({}));
   }
   for (const name of Object.keys(before)) {
-    if (!(name in after)) doc.deleteIn([SCHEMA_KEY, "fields", name]);
+    if (!Object.hasOwn(after, name)) doc.deleteIn([SCHEMA_KEY, "fields", name]);
   }
   for (const [name, value] of Object.entries(after)) {
     if (!same(before[name], value)) doc.setIn([SCHEMA_KEY, "fields", name], value);

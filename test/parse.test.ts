@@ -57,3 +57,12 @@ describe("parseSchema", () => {
     expect(r.schema!.fields.size).toBe(0);
   });
 });
+
+describe("parseSchema unsafe names", () => {
+  it("rejects reserved field names case-insensitively", () => {
+    const raw = { "improved-bases": { fields: { Constructor: { type: "text" } } } };
+    const { schema, errors } = parseSchema("A.base", raw);
+    expect(schema).toBeNull();
+    expect(errors[0]).toMatch(/reserved/);
+  });
+});
