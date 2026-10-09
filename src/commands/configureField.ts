@@ -1,7 +1,8 @@
-import { FuzzySuggestModal, type DropdownComponent, Modal, Notice, Setting, TFile, type App, type Plugin } from "obsidian";
+import { type DropdownComponent, Modal, Notice, Setting, TFile, type App, type Plugin } from "obsidian";
 import type { RawFields } from "../schema/SchemaWriter";
 import { COLORS, NATIVE_TYPES, type Color, type FieldSchema } from "../schema/types";
 import { findOwnKey, isUnsafeKey } from "../schema/keys";
+import { BasePicker } from "../widgets/pickers";
 import type { WidgetEnv } from "../widgets/types";
 import type { SchemaRegistry } from "../schema/SchemaRegistry";
 
@@ -75,20 +76,20 @@ export function parseOptionLines(text: string): { options: Record<string, Color>
 	return { options, errors };
 }
 
-class BasePicker extends FuzzySuggestModal<string> {
-	constructor(app: App, private readonly paths: string[], private readonly onPick: (p: string) => void) {
-		super(app);
-		this.setPlaceholder("Select a target base");
+/** Pure: draft from the form state; for an existing field an emptied options textarea clears the options. */
+export function buildDraft(base: FieldDraft, optionsText: string, existed: boolean): { draft: FieldDraft; errors: string[] } {
+	const draft: FieldDraft = { ...base, name: base.name.trim() };
+	const errors: string[] = [];
+	if (draft.type === "select") {
+		if (optionsText.trim()) {
+			const parsed = parseOptionLines(optionsText);
+			draft.options = parsed.options;
+			errors.push(...parsed.errors);
+		} else if (existed) {
+			draft.options = {};
+		}
 	}
-	getItems(): string[] {
-		return this.paths;
-	}
-	getItemText(p: string): string {
-		return p;
-	}
-	onChooseItem(p: string): void {
-		this.onPick(p);
-	}
+	return { draft, errors };
 }
 
 export class ConfigureFieldModal extends Modal {
@@ -192,13 +193,7 @@ export class ConfigureFieldModal extends Modal {
 	}
 
 	private submit(): void {
-		const draft: FieldDraft = { ...this.draft, name: this.draft.name.trim() };
-		const lineErrors: string[] = [];
-		if (draft.type === "select" && this.optionsText.trim()) {
-			const parsed = parseOptionLines(this.optionsText);
-			draft.options = parsed.options;
-			lineErrors.push(...parsed.errors);
-		}
+		const { draft, errors: lineErrors } = buildDraft(this.draft, this.optionsText, this.existing.has(this.draft.name.trim().toLowerCase()));
 		const types = new Map([...this.existing].map(([k, v]) => [k, { name: v.name, type: v.field.type }]));
 		const errors = [...lineErrors, ...validateDraft(draft, this.basePaths(), types)];
 		if (errors.length) {
@@ -214,35 +209,43 @@ export class ConfigureFieldModal extends Modal {
 	}
 }
 
-/** Schema base the command acts on: the active schema `.base`, or the first schema base containing the active note. */
-function targetBase(plugin: Plugin, env: WidgetEnv, registry: SchemaRegistry): string | null {
+/** Pure: schema bases the command can act on for the active file (`.base` itself, or the bases containing the note). */
+export function candidateBases(file: { path: string; extension: string }, schemaPaths: string[], ready: boolean, membershipBases: (path: string) => string[]): string[] {
+	if (file.extension === "base") return schemaPaths.includes(file.path) ? [file.path] : [];
+	if (file.extension !== "md" || !ready) return [];
+	return membershipBases(file.path);
+}
+
+function targetBases(plugin: Plugin, env: WidgetEnv, registry: SchemaRegistry): string[] {
 	const file = plugin.app.workspace.getActiveFile();
-	if (!(file instanceof TFile)) return null;
-	if (file.extension === "base") return registry.schemas().some((s) => s.basePath === file.path) ? file.path : null;
-	if (file.extension !== "md" || !env.membership.ready) return null;
-	return env.membership.schemaBasesOf(file.path)[0] ?? null;
+	if (!(file instanceof TFile)) return [];
+	return candidateBases(file, registry.schemas().map((s) => s.basePath), env.membership.ready, (p) => env.membership.schemaBasesOf(p));
 }
 
 export function registerConfigureField(plugin: Plugin, env: WidgetEnv, registry: SchemaRegistry): void {
+	const openModal = (basePath: string): void => {
+		const names = new Set<string>();
+		for (const f of env.membership.targetEntries(basePath) ?? []) {
+			for (const k of Object.keys(plugin.app.metadataCache.getFileCache(f)?.frontmatter ?? {})) {
+				if (k !== "position") names.add(k);
+			}
+		}
+		const existing = registry.schemas().find((x) => x.basePath === basePath)?.fields ?? new Map();
+		new ConfigureFieldModal(plugin.app, basePath, [...names].sort(), existing, (draft) => {
+			env.writer.update(basePath, draftToMutation(draft)).catch((e: unknown) => {
+				new Notice(`Could not save field: ${e instanceof Error ? e.message : String(e)}`);
+			});
+		}).open();
+	};
 	plugin.addCommand({
 		id: "configure-field",
 		name: "Configure field",
 		checkCallback: (checking) => {
-			const basePath = targetBase(plugin, env, registry);
-			if (!basePath) return false;
+			const bases = targetBases(plugin, env, registry);
+			if (!bases.length) return false;
 			if (!checking) {
-				const names = new Set<string>();
-				for (const f of env.membership.targetEntries(basePath) ?? []) {
-					for (const k of Object.keys(plugin.app.metadataCache.getFileCache(f)?.frontmatter ?? {})) {
-						if (k !== "position") names.add(k);
-					}
-				}
-				const existing = registry.schemas().find((x) => x.basePath === basePath)?.fields ?? new Map();
-				new ConfigureFieldModal(plugin.app, basePath, [...names].sort(), existing, (draft) => {
-					env.writer.update(basePath, draftToMutation(draft)).catch((e: unknown) => {
-						new Notice(`Could not save field: ${e instanceof Error ? e.message : String(e)}`);
-					});
-				}).open();
+				if (bases.length === 1) openModal(bases[0] as string);
+				else new BasePicker(plugin.app, bases, openModal).open();
 			}
 			return true;
 		},

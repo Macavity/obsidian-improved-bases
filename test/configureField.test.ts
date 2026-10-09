@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { draftToMutation, parseOptionLines, validateDraft } from "../src/commands/configureField";
+import { buildDraft, candidateBases, draftToMutation, parseOptionLines, validateDraft } from "../src/commands/configureField";
 import { addOptionMutation, setColorMutation } from "../src/widgets/values";
 import { activateSchemaSource, updateSchemaSource, type RawFields } from "../src/schema/SchemaWriter";
 
@@ -64,5 +64,23 @@ describe("configure field", () => {
     setColorMutation("__proto__", "x", "red")(f);
     expect(Object.hasOwn(Object.prototype, "x")).toBe(false);
     expect(Object.keys(f)).toEqual([]);
+  });
+  it("clears options of an existing select field when the textarea is emptied", () => {
+    const base = { name: "Prio", type: "select" as const, multiple: false };
+    const { draft } = buildDraft(base, "  ", true);
+    expect(draft.options).toEqual({});
+    const f: RawFields = { Prio: { type: "select", multiple: false, options: { A: "red" } } };
+    draftToMutation(draft)(f);
+    expect(f.Prio?.options).toEqual({});
+    expect(buildDraft(base, "", false).draft.options).toBeUndefined();
+    expect(buildDraft(base, "A: red", true).draft.options).toEqual({ A: "red" });
+  });
+  it("lists candidate bases for the active file", () => {
+    const via = (p: string) => (p === "n.md" ? ["A.base", "B.base"] : []);
+    expect(candidateBases({ path: "n.md", extension: "md" }, ["A.base"], true, via)).toEqual(["A.base", "B.base"]);
+    expect(candidateBases({ path: "n.md", extension: "md" }, [], false, via)).toEqual([]);
+    expect(candidateBases({ path: "A.base", extension: "base" }, ["A.base"], false, via)).toEqual(["A.base"]);
+    expect(candidateBases({ path: "X.base", extension: "base" }, ["A.base"], true, via)).toEqual([]);
+    expect(candidateBases({ path: "x.png", extension: "png" }, [], true, via)).toEqual([]);
   });
 });
