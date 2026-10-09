@@ -120,3 +120,61 @@
 	width: var(--icon-s);
 	height: var(--icon-s);
 }
+
+.improved-bases-schema .improved-bases-field-row {
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+.improved-bases-schema .improved-bases-field-summary {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	padding: var(--size-4-2) 0;
+	cursor: pointer;
+}
+.improved-bases-schema .improved-bases-field-chevron {
+	display: inline-flex;
+	color: var(--text-muted);
+}
+.improved-bases-schema .improved-bases-field-summary-text {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.improved-bases-schema .improved-bases-field-editor {
+	padding-left: var(--size-4-6);
+	padding-bottom: var(--size-4-2);
+}
+.improved-bases-schema .improved-bases-options .setting-item-control {
+	flex-direction: column;
+	align-items: flex-end;
+	gap: var(--size-4-2);
+}
+.improved-bases-schema .improved-bases-option-list {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: var(--size-2-2);
+}
+.improved-bases-schema .improved-bases-option-row,
+.improved-bases-schema .improved-bases-option-add {
+	display: flex;
+	align-items: center;
+	gap: var(--size-2-2);
+}
+.improved-bases-schema .improved-bases-option-row .improved-bases-pill {
+	cursor: pointer;
+}
+.improved-bases-schema .improved-bases-schema-error {
+	color: var(--text-error);
+}
+.improved-bases-schema .improved-bases-add-field {
+	margin-top: var(--size-4-3);
+	display: inline-flex;
+	align-items: center;
+	gap: var(--size-2-2);
+}
+.improved-bases-schema .improved-bases-add-field-icon {
+	display: inline-flex;
+}
