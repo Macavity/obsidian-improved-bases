@@ -33,46 +33,53 @@ export function fieldsToDrafts(fields: ReadonlyMap<string, { name: string; field
 	});
 }
 
+const isRenamed = (x: FieldDraft): boolean => x.originalName !== null && x.originalName.toLowerCase() !== x.name.toLowerCase();
+
+/** Name errors for one draft; `seen` and `vacated` hold lowercased names of the whole list. */
+function validateName(draft: FieldDraft, seen: Set<string>, vacated: Set<string>): string[] {
+	const name = draft.name;
+	const errors: string[] = [];
+	if (name !== name.trim()) errors.push(`Field name '${name}' has surrounding whitespace`);
+	if (isUnsafeKey(name)) errors.push(`Field name '${name}' is reserved`);
+	const lower = name.toLowerCase();
+	if (seen.has(lower)) errors.push(`Duplicate field '${name}'`);
+	seen.add(lower);
+	if (isRenamed(draft) && vacated.has(lower)) errors.push(`Field '${name}': another field is renamed from this name`);
+	return errors;
+}
+
+function validateOptions(name: string, options: OptionDraft[]): string[] {
+	const errors: string[] = [];
+	const values = new Set<string>();
+	for (const o of options) {
+		if (!o.value.trim()) errors.push(`Field '${name}': option value is empty`);
+		else if (isUnsafeKey(o.value)) errors.push(`Field '${name}': option '${o.value}' is reserved`);
+		else if (values.has(o.value)) errors.push(`Field '${name}': duplicate option '${o.value}'`);
+		values.add(o.value);
+		if (!isColor(o.color)) errors.push(`Field '${name}': invalid color for option '${o.value}'`);
+	}
+	return errors;
+}
+
 /** Human-readable validation errors; empty when drafts are valid. */
 export function validateDrafts(drafts: FieldDraft[], basePaths: string[]): string[] {
 	const errors: string[] = [];
 	const seen = new Set<string>();
 	// Names other fields are renamed away from; renaming onto one would swap values between fields.
-	const vacated = new Set(
-		drafts
-			.filter((x) => x.originalName !== null && x.originalName.toLowerCase() !== x.name.toLowerCase())
-			.map((x) => (x.originalName as string).toLowerCase()),
-	);
+	const vacated = new Set(drafts.filter(isRenamed).map((x) => (x.originalName as string).toLowerCase()));
 	for (const draft of drafts) {
 		const name = draft.name;
 		if (!name.trim()) {
 			errors.push("Field name is empty");
 			continue;
 		}
-		if (name !== name.trim()) errors.push(`Field name '${name}' has surrounding whitespace`);
-		if (isUnsafeKey(name)) errors.push(`Field name '${name}' is reserved`);
-		const lower = name.toLowerCase();
-		if (seen.has(lower)) errors.push(`Duplicate field '${name}'`);
-		seen.add(lower);
-		if (draft.originalName !== null && draft.originalName.toLowerCase() !== lower && vacated.has(lower)) {
-			errors.push(`Field '${name}': another field is renamed from this name`);
-		}
+		errors.push(...validateName(draft, seen, vacated));
 		if (!TYPES.includes(draft.type)) {
 			errors.push(`Field '${name}': unknown type '${String(draft.type)}'`);
-			continue;
-		}
-		if (draft.type === "relation" && !(draft.base && basePaths.includes(draft.base))) {
+		} else if (draft.type === "relation" && !(draft.base && basePaths.includes(draft.base))) {
 			errors.push(`Field '${name}': choose a valid base`);
-		}
-		if (draft.type === "select") {
-			const values = new Set<string>();
-			for (const o of draft.options) {
-				if (!o.value.trim()) errors.push(`Field '${name}': option value is empty`);
-				else if (isUnsafeKey(o.value)) errors.push(`Field '${name}': option '${o.value}' is reserved`);
-				else if (values.has(o.value)) errors.push(`Field '${name}': duplicate option '${o.value}'`);
-				values.add(o.value);
-				if (!isColor(o.color)) errors.push(`Field '${name}': invalid color for option '${o.value}'`);
-			}
+		} else if (draft.type === "select") {
+			errors.push(...validateOptions(name, draft.options));
 		}
 	}
 	return errors;
@@ -88,19 +95,18 @@ export function draftsToMutation(drafts: FieldDraft[], originalNames: string[]):
 		}
 		for (const draft of drafts) {
 			if (!draft.name.trim() || isUnsafeKey(draft.name)) continue;
-			let value: Record<string, unknown>;
-			if (draft.type === "relation") {
-				value = { type: "relation", base: draft.base, multiple: draft.multiple };
-			} else if (draft.type === "select") {
-				const options = Object.create(null) as Record<string, unknown>;
-				for (const o of draft.options) setOption(options, o.value, o.color);
-				value = { type: "select", multiple: draft.multiple, options };
-			} else {
-				value = { type: draft.type };
-			}
-			Object.defineProperty(f, draft.name, { value, writable: true, enumerable: true, configurable: true });
+			Object.defineProperty(f, draft.name, { value: draftToField(draft), writable: true, enumerable: true, configurable: true });
 		}
 	};
+}
+
+/** Raw schema value for one draft. */
+function draftToField(draft: FieldDraft): Record<string, unknown> {
+	if (draft.type === "relation") return { type: "relation", base: draft.base, multiple: draft.multiple };
+	if (draft.type !== "select") return { type: draft.type };
+	const options = Object.create(null) as Record<string, unknown>;
+	for (const o of draft.options) setOption(options, o.value, o.color);
+	return { type: "select", multiple: draft.multiple, options };
 }
 
 /** Existing fields whose name changed (including case-only changes). */

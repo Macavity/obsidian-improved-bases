@@ -16,7 +16,7 @@ export interface SchemaSettingsInput {
 	canRename: () => boolean;
 }
 
-interface Handlers {
+export interface SchemaSettingsHandlers {
 	onSave: (drafts: FieldDraft[]) => Promise<void>;
 	onReset: () => Promise<void>;
 }
@@ -53,7 +53,7 @@ export class SchemaSettingsModal extends Modal {
 	constructor(
 		app: App,
 		private readonly input: SchemaSettingsInput,
-		private readonly handlers: Handlers,
+		private readonly handlers: SchemaSettingsHandlers,
 	) {
 		super(app);
 		this.drafts = input.state.kind === "fields"
@@ -77,19 +77,16 @@ export class SchemaSettingsModal extends Modal {
 	private renderError(message: string): void {
 		const { contentEl } = this;
 		contentEl.createDiv({ cls: "improved-bases-schema-error", text: message });
-		this.errorEl = contentEl.createDiv({ cls: "improved-bases-form-error" });
 		let confirming = false;
-		new Setting(contentEl)
-			.addButton((b) => b.setButtonText("Cancel").onClick(() => this.close()))
-			.addButton((b) => {
-				b.setButtonText("Reset schema").setDestructive();
-				b.buttonEl.addClass("improved-bases-reset");
-				b.onClick(() => {
-					if (!confirming) {
-						confirming = true;
-						b.setButtonText("Confirm reset");
-						return;
-					}
+		this.renderFooter((b) => {
+			b.setButtonText("Reset schema").setDestructive();
+			b.buttonEl.addClass("improved-bases-reset");
+			b.onClick(() => {
+				if (!confirming) {
+					confirming = true;
+					b.setButtonText("Confirm reset");
+					return;
+				}
 					b.setDisabled(true);
 					void this.handlers.onReset().then(
 						() => this.close(),
@@ -118,14 +115,19 @@ export class SchemaSettingsModal extends Modal {
 			this.focusNext = draft;
 			this.renderList();
 		});
-		this.errorEl = contentEl.createDiv({ cls: "improved-bases-form-error" });
-		new Setting(contentEl)
+		this.renderFooter((b) => {
+			b.setButtonText("Save").setCta();
+			b.buttonEl.addClass("improved-bases-save");
+			b.onClick(() => void this.save(b));
+		});
+	}
+
+	/** Error line plus a Cancel button and one primary action. */
+	private renderFooter(primary: (b: ButtonComponent) => void): void {
+		this.errorEl = this.contentEl.createDiv({ cls: "improved-bases-form-error" });
+		new Setting(this.contentEl)
 			.addButton((b) => b.setButtonText("Cancel").onClick(() => this.close()))
-			.addButton((b) => {
-				b.setButtonText("Save").setCta();
-				b.buttonEl.addClass("improved-bases-save");
-				b.onClick(() => void this.save(b));
-			});
+			.addButton(primary);
 	}
 
 	private renderList(): void {

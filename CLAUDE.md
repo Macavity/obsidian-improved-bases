@@ -6,6 +6,11 @@ Obsidian plugin (id `improved-bases`). Package manager: pnpm.
 - `pnpm build` – typecheck + production build
 - `pnpm dev` – watch build
 - `pnpm lint` / `pnpm lint:fix`
+- `pnpm quality` – fallow full-repo analysis (dead code, dupes, complexity); must pass before a PR
+- `pnpm quality:audit` – fallow audit of changed files vs `main`; also runs in CI and in the commit/push gate
+- `pnpm check` – typecheck + lint + test + quality
+- `pnpm test` also writes Istanbul coverage to `coverage/`; fallow reads it for CRAP scores. Missing coverage, not refactoring, is the usual fix for a CRAP finding.
+- Any fallow exception (`thresholdOverrides`, `fallow-ignore` comments, suppressions) needs the user's explicit approval first. Never add one on your own.
 
 ## Skills
 Obsidian knowledge lives in `.claude/skills/` (`obsidian-dev`, `obsidian-ops`, `obsidian-ref`, `project`). These are maintained by hand; there is no generator.

@@ -25,14 +25,19 @@ export class Events {
 }
 
 export class Component {
+	private cleanups: (() => unknown)[] = [];
 	load(): void {}
-	unload(): void {}
+	unload(): void {
+		for (const cb of this.cleanups.splice(0)) cb();
+	}
 	onload(): void {}
 	onunload(): void {}
 	addChild<T extends Component>(child: T): T {
 		return child;
 	}
-	register(_cb: () => unknown): void {}
+	register(cb: () => unknown): void {
+		this.cleanups.push(cb);
+	}
 	registerEvent(_ref: unknown): void {}
 	registerDomEvent(..._args: unknown[]): void {}
 	registerInterval(id: number): number {
@@ -47,6 +52,7 @@ export class Plugin extends Component {
 		return cmd;
 	}
 	addSettingTab(_tab: unknown): void {}
+	registerBasesView(_id: string, _def: unknown): void {}
 	loadData(): Promise<unknown> {
 		return Promise.resolve(null);
 	}
@@ -68,12 +74,32 @@ export class Notice {
 }
 
 export class Modal {
-	constructor(public app: unknown) {}
-	open(): void {}
-	close(): void {}
+	modalEl: HTMLElement;
+	titleEl: HTMLElement;
+	contentEl: HTMLElement;
+	constructor(public app: unknown) {
+		this.modalEl = document.createElement("div");
+		this.titleEl = this.modalEl.appendChild(document.createElement("div"));
+		this.contentEl = this.modalEl.appendChild(document.createElement("div"));
+	}
+	open(): void {
+		document.body.appendChild(this.modalEl);
+		this.onOpen();
+	}
+	close(): void {
+		this.onClose();
+		this.modalEl.remove();
+	}
+	onOpen(): void {}
+	onClose(): void {}
+	setTitle(title: string): this {
+		this.titleEl.textContent = title;
+		return this;
+	}
 }
 
 export class FuzzySuggestModal<T> extends Modal {
+	setPlaceholder(_text: string): void {}
 	getItems(): T[] {
 		return [];
 	}
@@ -122,6 +148,173 @@ export class MarkdownRenderer {
 }
 
 export function addIcon(_iconId: string, _svgContent: string): void {}
+
+/** Wikilinks only; anything else is "not a link", as in Obsidian. */
+export class LinkValue {
+	constructor(private readonly raw: string) {}
+	static parseFromString(_app: unknown, raw: string, _sourcePath: string): LinkValue | null {
+		return /^\[\[.*\]\]$/.test(raw) ? new LinkValue(raw) : null;
+	}
+	renderTo(el: HTMLElement, _ctx: unknown): void {
+		el.textContent = this.raw;
+	}
+}
+
+export function removeIcon(_iconId: string): void {}
+
+export class ButtonComponent {
+	buttonEl: HTMLButtonElement;
+	constructor(containerEl: HTMLElement) {
+		this.buttonEl = containerEl.createEl("button");
+	}
+	setButtonText(text: string): this {
+		this.buttonEl.textContent = text;
+		return this;
+	}
+	setCta(): this {
+		return this;
+	}
+	setDestructive(): this {
+		return this;
+	}
+	setDisabled(disabled: boolean): this {
+		this.buttonEl.disabled = disabled;
+		return this;
+	}
+	onClick(cb: (evt: MouseEvent) => unknown): this {
+		this.buttonEl.addEventListener("click", cb);
+		return this;
+	}
+}
+
+export class TextComponent {
+	inputEl: HTMLInputElement;
+	constructor(containerEl: HTMLElement) {
+		this.inputEl = containerEl.createEl("input");
+	}
+	setValue(value: string): this {
+		this.inputEl.value = value;
+		return this;
+	}
+	onChange(cb: (value: string) => unknown): this {
+		this.inputEl.addEventListener("input", () => cb(this.inputEl.value));
+		return this;
+	}
+}
+
+export class DropdownComponent {
+	selectEl: HTMLSelectElement;
+	constructor(containerEl: HTMLElement) {
+		this.selectEl = containerEl.createEl("select");
+	}
+	addOption(value: string, display: string): this {
+		this.selectEl.createEl("option", { text: display, attr: { value } });
+		return this;
+	}
+	setValue(value: string): this {
+		this.selectEl.value = value;
+		return this;
+	}
+	onChange(cb: (value: string) => unknown): this {
+		this.selectEl.addEventListener("change", () => cb(this.selectEl.value));
+		return this;
+	}
+}
+
+export class ToggleComponent {
+	toggleEl: HTMLElement;
+	private value = false;
+	constructor(containerEl: HTMLElement) {
+		this.toggleEl = containerEl.createDiv();
+	}
+	setValue(value: boolean): this {
+		this.value = value;
+		return this;
+	}
+	onChange(cb: (value: boolean) => unknown): this {
+		this.toggleEl.addEventListener("click", () => {
+			this.value = !this.value;
+			cb(this.value);
+		});
+		return this;
+	}
+}
+
+export class Setting {
+	settingEl: HTMLElement;
+	nameEl: HTMLElement;
+	controlEl: HTMLElement;
+	constructor(containerEl: HTMLElement) {
+		this.settingEl = containerEl.createDiv({ cls: "setting-item" });
+		this.nameEl = this.settingEl.createDiv({ cls: "setting-item-name" });
+		this.controlEl = this.settingEl.createDiv({ cls: "setting-item-control" });
+	}
+	setName(name: string): this {
+		this.nameEl.textContent = name;
+		return this;
+	}
+	setDesc(_desc: string): this {
+		return this;
+	}
+	addButton(cb: (b: ButtonComponent) => unknown): this {
+		cb(new ButtonComponent(this.controlEl));
+		return this;
+	}
+	addText(cb: (t: TextComponent) => unknown): this {
+		cb(new TextComponent(this.controlEl));
+		return this;
+	}
+	addDropdown(cb: (d: DropdownComponent) => unknown): this {
+		cb(new DropdownComponent(this.controlEl));
+		return this;
+	}
+	addToggle(cb: (t: ToggleComponent) => unknown): this {
+		cb(new ToggleComponent(this.controlEl));
+		return this;
+	}
+}
+
+export class MenuItem {
+	private clickHandler: (() => unknown) | null = null;
+	setTitle(_title: string): this {
+		return this;
+	}
+	setIcon(_icon: string): this {
+		return this;
+	}
+	setSection(_section: string): this {
+		return this;
+	}
+	onClick(cb: () => unknown): this {
+		this.clickHandler = cb;
+		return this;
+	}
+	click(): void {
+		this.clickHandler?.();
+	}
+}
+
+export class Menu {
+	items: MenuItem[] = [];
+	addItem(cb: (item: MenuItem) => unknown): this {
+		const item = new MenuItem();
+		cb(item);
+		this.items.push(item);
+		return this;
+	}
+	setUseNativeMenu(_flag: boolean): this {
+		return this;
+	}
+	showAtMouseEvent(_evt: MouseEvent): this {
+		return this;
+	}
+	onHide(_cb: () => unknown): this {
+		return this;
+	}
+	hide(): this {
+		return this;
+	}
+}
 
 export function setIcon(el: HTMLElement, iconId: string): void {
 	el.setAttribute("data-icon", iconId);

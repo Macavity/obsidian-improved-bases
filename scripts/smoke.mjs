@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { parse as parseYaml } from "yaml";
 import { obs, evalJs, assert, ensureVault, waitFor } from "./lib/cli.mjs";
 
@@ -292,7 +293,12 @@ run("Verwaist.base",
 await waitFor(() => evalJs("[...document.querySelectorAll('.notice')].some((n) => n.textContent.includes('Target base not found'))") === "true", 5000);
 run("Verwaist.base", `${ESC} return JSON.stringify(1);`);
 await waitFor(() => evalJs("document.querySelectorAll('.modal-container').length") === "0", 5000);
-execSync("git diff --exit-code --quiet -- test-vault/Verwaist.base", { stdio: "inherit" });
+// Obsidian itself reorders the keys of a base it opens, so compare the parsed content, not the bytes.
+const stable = (text) => JSON.stringify(parseYaml(text), (_k, v) => (v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort()) : v));
+assert(
+	stable(readFileSync("test-vault/Verwaist.base", "utf8")) === stable(execSync("git show HEAD:test-vault/Verwaist.base", { encoding: "utf8" })),
+	"Verwaist.base must not be changed by the plugin",
+);
 console.log("Orphaned target ok");
 
 // Non-regression Cards/List (not covered by the plugin, spec 2026-10-08): render without console errors, relation values as links, no plugin DOM.

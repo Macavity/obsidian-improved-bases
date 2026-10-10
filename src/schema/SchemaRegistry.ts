@@ -5,6 +5,8 @@ import type { BaseSchema } from "./types";
 
 const sig = (s: BaseSchema): string => JSON.stringify([s.basePath, [...s.fields]]);
 
+type Parsed = ReturnType<typeof parseSchema>;
+
 /** Finds all `.base` files with a valid `improved-bases:` section; emits "changed" when the set of schemas or errors changes. */
 export class SchemaRegistry extends Events {
 	private byPath = new Map<string, BaseSchema>();
@@ -60,27 +62,36 @@ export class SchemaRegistry extends Events {
 	private async refresh(path: string, silent = false): Promise<void> {
 		const seq = (this.seqs.get(path) ?? 0) + 1;
 		this.seqs.set(path, seq);
-		const file = this.app.vault.getAbstractFileByPath(path);
-		let schema: BaseSchema | null = null;
-		let errors: string[] = [];
-		if (file instanceof TFile && file.extension === "base") {
-			try {
-				const raw: unknown = parseYaml(await this.app.vault.cachedRead(file));
-				({ schema, errors } = parseSchema(path, raw));
-			} catch (err) {
-				errors = [`invalid YAML: ${err instanceof Error ? err.message : String(err)}`];
-			}
-		}
+		const { schema, errors } = await this.read(path);
 		if (this.seqs.get(path) !== seq) return;
-		const prevSchema = this.byPath.get(path);
-		const prevErr = this.errs.get(path)?.join("\n");
-		if (schema) this.byPath.set(path, schema);
-		else this.byPath.delete(path);
-		if (errors.length) this.errs.set(path, errors);
-		else this.errs.delete(path);
-		const schemaChanged = (prevSchema ? sig(prevSchema) : "") !== (schema ? sig(schema) : "");
-		const errChanged = prevErr !== (errors.length ? errors.join("\n") : undefined);
+		this.apply(path, schema, errors, silent);
+	}
+
+	/** Parses the `.base` at `path`; a missing or non-base file yields no schema and no errors. */
+	private async read(path: string): Promise<Parsed> {
+		const file = this.app.vault.getAbstractFileByPath(path);
+		if (!(file instanceof TFile) || file.extension !== "base") return { schema: null, errors: [] };
+		try {
+			const raw: unknown = parseYaml(await this.app.vault.cachedRead(file));
+			return parseSchema(path, raw);
+		} catch (err) {
+			return { schema: null, errors: [`invalid YAML: ${err instanceof Error ? err.message : String(err)}`] };
+		}
+	}
+
+	/** Stores the result, notifies about new errors and emits "changed" when schema or errors differ. */
+	private apply(path: string, schema: BaseSchema | null, errors: string[], silent: boolean): void {
+		const schemaChanged = replace(this.byPath, path, schema, sig);
+		const errChanged = replace(this.errs, path, errors.length ? errors : null, (e) => e.join("\n"));
 		if (errChanged && errors.length) new Notice(`Improved Bases: ${path}: ${errors[0]}`);
 		if (!silent && (schemaChanged || errChanged)) this.trigger("changed");
 	}
+}
+
+/** Sets or deletes `map[path]`; true when the entry's signature changed. */
+function replace<T>(map: Map<string, T>, path: string, next: T | null, signature: (v: T) => string): boolean {
+	const prev = map.get(path);
+	if (next) map.set(path, next);
+	else map.delete(path);
+	return (prev ? signature(prev) : "") !== (next ? signature(next) : "");
 }

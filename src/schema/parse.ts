@@ -12,6 +12,36 @@ function isValidBasePath(p: unknown): p is string {
 	return p.split("/").every((seg) => seg !== ".." && seg !== "." && seg !== "");
 }
 
+function parseRelation(name: string, raw: Record<string, unknown>, multiple: boolean, errors: string[]): FieldSchema | null {
+	if (!isValidBasePath(raw.base)) {
+		errors.push(`field "${name}": base must be a vault-relative path ending in .base (no "..", no absolute path)`);
+		return null;
+	}
+	return { type: "relation", base: raw.base, multiple };
+}
+
+function parseOptions(name: string, raw: unknown, errors: string[]): SelectOption[] | null {
+	const opts = raw ?? {};
+	if (!isRecord(opts)) {
+		errors.push(`field "${name}": options must be a map`);
+		return null;
+	}
+	const options: SelectOption[] = [];
+	for (const [value, color] of Object.entries(opts)) {
+		if (!isColor(color)) {
+			errors.push(`field "${name}": unknown color for option "${value}"`);
+			return null;
+		}
+		options.push({ value, color });
+	}
+	return options;
+}
+
+function parseSelect(name: string, raw: Record<string, unknown>, multiple: boolean, errors: string[]): FieldSchema | null {
+	const options = parseOptions(name, raw.options, errors);
+	return options ? { type: "select", multiple, options } : null;
+}
+
 function parseField(name: string, raw: unknown, errors: string[]): FieldSchema | null {
 	if (!isRecord(raw)) {
 		errors.push(`field "${name}": must be a map`);
@@ -23,32 +53,9 @@ function parseField(name: string, raw: unknown, errors: string[]): FieldSchema |
 		return null;
 	}
 	const multiple = raw.multiple === true;
-	if (type === "relation") {
-		if (!isValidBasePath(raw.base)) {
-			errors.push(`field "${name}": base must be a vault-relative path ending in .base (no "..", no absolute path)`);
-			return null;
-		}
-		return { type: "relation", base: raw.base, multiple };
-	}
-	if (type === "select") {
-		const opts = raw.options ?? {};
-		if (!isRecord(opts)) {
-			errors.push(`field "${name}": options must be a map`);
-			return null;
-		}
-		const options: SelectOption[] = [];
-		for (const [value, color] of Object.entries(opts)) {
-			if (!isColor(color)) {
-				errors.push(`field "${name}": unknown color for option "${value}"`);
-				return null;
-			}
-			options.push({ value, color });
-		}
-		return { type: "select", multiple, options };
-	}
-	if (typeof type === "string" && (NATIVE_TYPES as readonly string[]).includes(type)) {
-		return { type: type as NativeType };
-	}
+	if (type === "relation") return parseRelation(name, raw, multiple, errors);
+	if (type === "select") return parseSelect(name, raw, multiple, errors);
+	if (typeof type === "string" && (NATIVE_TYPES as readonly string[]).includes(type)) return { type: type as NativeType };
 	errors.push(`field "${name}": unknown type`);
 	return null;
 }

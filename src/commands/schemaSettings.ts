@@ -2,7 +2,7 @@ import { Notice, TFile, type App, type Plugin } from "obsidian";
 import { installSchemaButton } from "../internals/toolbar";
 import type { SchemaRegistry } from "../schema/SchemaRegistry";
 import type { WidgetEnv } from "../widgets/types";
-import { SchemaSettingsModal, type SchemaSettingsInput } from "./SchemaSettingsModal";
+import { SchemaSettingsModal, type SchemaSettingsHandlers, type SchemaSettingsInput } from "./SchemaSettingsModal";
 import { draftsToMutation, fieldsToDrafts, renameKey, renames, type FieldDraft } from "./schemaDraft";
 import { findOwnKey } from "../schema/keys";
 
@@ -59,7 +59,8 @@ export function renameSummary(pairs: Pairs, counts: Counts | null): string {
 
 const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
-export function openSchemaSettings(plugin: Plugin, env: WidgetEnv, registry: SchemaRegistry, basePath: string): void {
+/** Dialog input and handlers for one base; the modal itself stays UI-only. */
+export function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, registry: SchemaRegistry, basePath: string): { input: SchemaSettingsInput; handlers: SchemaSettingsHandlers } {
 	const app = plugin.app;
 	const members = env.membership.targetEntries(basePath);
 	const names = new Set<string>();
@@ -94,13 +95,14 @@ export function openSchemaSettings(plugin: Plugin, env: WidgetEnv, registry: Sch
 		new Notice(`Schema saved\n${renameSummary(pairs, counts)}`);
 	};
 	const onReset = (): Promise<void> => env.writer.reset(basePath);
-	new SchemaSettingsModal(app, input, { onSave, onReset }).open();
+	return { input, handlers: { onSave, onReset } };
 }
 
 export function registerSchemaSettings(plugin: Plugin, env: WidgetEnv, registry: SchemaRegistry): void {
 	const open = (basePath: string): void => {
 		try {
-			openSchemaSettings(plugin, env, registry, basePath);
+			const { input, handlers } = buildSchemaSettings(plugin, env, registry, basePath);
+			new SchemaSettingsModal(plugin.app, input, handlers).open();
 		} catch (e) {
 			new Notice(`Could not open schema settings: ${message(e)}`);
 		}
