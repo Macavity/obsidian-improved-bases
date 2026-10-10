@@ -70,3 +70,10 @@ Append-only audit trail. Add one dated entry per generation or refresh run, reco
 - source_commit: aed8819 (was 8e51900)
 - Coverage: Schema toolbar item mirrors Obsidian's `div.bases-toolbar-item > div.text-icon-button` markup; plugin CSS for the item removed.
 - Pages: [Internals](./modules/internals.md), [Overview](./OVERVIEW.md)
+
+## 2026-10-10: refresh (base-wide schema fields)
+
+- Profile: internal/standard
+- source_commit: 391fff1 (was aed8819)
+- Coverage: dialog lists all base fields (view orders, `properties:`, member keys) with native type labels; add to chosen view; remove deletes from notes and base; rename also rewrites view columns; new pure `baseDoc.ts`, `SchemaWriter.activate` removed, toolbar passes the view name.
+- Pages: [Commands](./modules/commands.md), [Schema](./modules/schema.md), [Internals](./modules/internals.md), [Schema edit](./flows/schema-edit.md), [Field schema](./concepts/field-schema.md), [Schema base](./concepts/schema-base.md), [Overview](./OVERVIEW.md)

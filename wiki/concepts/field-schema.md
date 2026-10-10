@@ -22,13 +22,13 @@ Field names are matched case-insensitively (the map key is lowercased, the origi
 
 ## Why it matters
 
-It is the contract between the three sides of the plugin: the parser guarantees the shape, the widgets render from it, and the writer mutations produce it. `multiple` decides the storage shape, which is why widgets flag a [value mismatch](./value-mismatch.md) when the existing property does not fit. A native type in a schema forces that native widget for members regardless of `types.json` (`NATIVE_WIDGET` map in [typeInfoPatch.ts](../../src/internals/typeInfoPatch.ts)).
+It is the contract between the three sides of the plugin: the parser guarantees the shape, the widgets render from it, and the writer mutations produce it. `multiple` decides the storage shape, which is why widgets flag a [value mismatch](./value-mismatch.md) when the existing property does not fit. The plugin section stores only customization (`relation`, `select`); a property without an entry is "native" and the dialog shows Obsidian's detected type. A native type written by hand in a schema (pinned) forces that native widget for members regardless of `types.json` (`NATIVE_WIDGET` map in [typeInfoPatch.ts](../../src/internals/typeInfoPatch.ts)).
 
 ## Where it lives
 
 - Types and `COLORS`/`NATIVE_TYPES` constants: [types.ts](../../src/schema/types.ts).
 - Validation: `parseField()` in [parse.ts](../../src/schema/parse.ts) (`isValidBasePath()` for relation targets).
-- Creation: `draftsToMutation()` in [schemaDraft.ts](../../src/commands/schemaDraft.ts) (edited in the schema settings dialog), option mutations in [values.ts](../../src/widgets/values.ts).
+- Creation: `draftsToEdits()` in [schemaDraft.ts](../../src/commands/schemaDraft.ts) (edited in the schema settings dialog), option mutations in [values.ts](../../src/widgets/values.ts).
 - Consumption: `RelationWidget` / `SelectWidget` ([Widgets](../modules/widgets.md)).
 
 ## Related
