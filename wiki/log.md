@@ -63,3 +63,10 @@ Append-only audit trail. Add one dated entry per generation or refresh run, reco
 - source_commit: 8e51900 (was 0c710b9)
 - Coverage: `renameKey()` matches exact keys; `migrateRenames()` prefilters from frontmatter on disk; `membersKnown()` replaces `canRename`; saved relation targets stay valid in validation.
 - Pages: [Commands](./modules/commands.md), [Schema edit](./flows/schema-edit.md), [Overview](./OVERVIEW.md)
+
+## 2026-10-10: refresh (toolbar item markup)
+
+- Profile: internal/standard
+- source_commit: aed8819 (was 8e51900)
+- Coverage: Schema toolbar item mirrors Obsidian's `div.bases-toolbar-item > div.text-icon-button` markup; plugin CSS for the item removed.
+- Pages: [Internals](./modules/internals.md), [Overview](./OVERVIEW.md)
