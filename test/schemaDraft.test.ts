@@ -4,12 +4,14 @@ import { draftsToMutation, fieldsToDrafts, renameKey, renames, validateDrafts, t
 import { updateSchemaSource, type RawFields } from "../src/schema/SchemaWriter";
 import { parseSchema } from "../src/schema/parse";
 
-const d = (p: Partial<FieldDraft>): FieldDraft => ({ originalName: null, name: "X", type: "text", multiple: false, options: [], ...p });
+const d = (p: Partial<FieldDraft>): FieldDraft => ({ originalName: null, originalBase: null, name: "X", type: "text", multiple: false, options: [], ...p });
 
 describe("schemaDraft", () => {
 	it("roundtrips fields to drafts", () => {
 		const fields = new Map([["role", { name: "Role", field: { type: "select" as const, multiple: true, options: [{ value: "A", color: "red" as const }] } }]]);
 		expect(fieldsToDrafts(fields)).toEqual([d({ originalName: "Role", name: "Role", type: "select", multiple: true, options: [{ value: "A", color: "red" }] })]);
+		const rel = new Map([["lead", { name: "Lead", field: { type: "relation" as const, base: "M.base", multiple: false } }]]);
+		expect(fieldsToDrafts(rel)).toEqual([d({ originalName: "Lead", originalBase: "M.base", name: "Lead", type: "relation", base: "M.base" })]);
 	});
 	it("validates names, duplicates, bases, options", () => {
 		expect(validateDrafts([d({ name: "" })], [])).toHaveLength(1);
@@ -17,6 +19,9 @@ describe("schemaDraft", () => {
 		expect(validateDrafts([d({ name: "Role" }), d({ name: "role" })], []).join()).toMatch(/duplicate/i);
 		expect(validateDrafts([d({ name: "L", type: "relation", base: "X.base" })], ["M.base"]).join()).toMatch(/base/i);
 		expect(validateDrafts([d({ name: "L", type: "relation", base: "M.base" })], ["M.base"])).toEqual([]);
+		// a saved target that no longer exists (orphaned base) stays valid, a different missing one does not
+		expect(validateDrafts([d({ originalName: "L", originalBase: "Gone.base", name: "L", type: "relation", base: "Gone.base" })], ["M.base"])).toEqual([]);
+		expect(validateDrafts([d({ originalName: "L", originalBase: "Gone.base", name: "L", type: "relation", base: "Other.base" })], ["M.base"]).join()).toMatch(/base/i);
 		expect(validateDrafts([d({ name: "S", type: "select", options: [{ value: "", color: "red" }] })], []).join()).toMatch(/option/i);
 		expect(validateDrafts([d({ name: "S", type: "select", options: [{ value: "A", color: "red" }, { value: "A", color: "blue" }] })], []).join()).toMatch(/duplicate/i);
 		expect(validateDrafts([d({ name: "S", type: "select", options: [{ value: "A", color: "nope" as never }] })], []).join()).toMatch(/color/i);
@@ -67,14 +72,13 @@ describe("schemaDraft", () => {
 		expect(validateDrafts([d({ originalName: "A", name: "b" }), d({ originalName: "B", name: "C" })], []).join()).toMatch(/renamed from/i);
 		expect(validateDrafts([d({ originalName: "a", name: "A" }), d({ originalName: "B", name: "B" })], [])).toEqual([]);
 	});
-	it("renames frontmatter keys case-insensitively", () => {
-		const fm: Record<string, unknown> = { role: "x" };
-		expect(renameKey(fm, "Role", "Rolle")).toBe("renamed");
-		expect(fm).toEqual({ Rolle: "x" });
-		expect(renameKey({ role: 1, ROLLE: 2 }, "Role", "Rolle")).toBe("conflict");
-		const same: Record<string, unknown> = { role: 1 };
-		expect(renameKey(same, "role", "Role")).toBe("renamed");
-		expect(fm).toEqual({ Rolle: "x" });
-		expect(same).toEqual({ Role: 1 });
+	it("matches frontmatter keys exactly, as YAML does", () => {
+		const fm: Record<string, unknown> = { team: "old", Team: "" };
+		expect(renameKey(fm, "Team", "Teams")).toBe("renamed");
+		expect(fm).toEqual({ team: "old", Teams: "" });
+		expect(renameKey({ team: "old" }, "Team", "Teams")).toBe("missing");
+		const caseOnly: Record<string, unknown> = { Team: 1 };
+		expect(renameKey(caseOnly, "Team", "team")).toBe("renamed");
+		expect(caseOnly).toEqual({ team: 1 });
 	});
 });

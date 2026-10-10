@@ -4,7 +4,7 @@ import { SchemaSettingsModal, type SchemaSettingsInput } from "../src/commands/S
 import type { FieldDraft } from "../src/commands/schemaDraft";
 import { OverlayRegistry } from "../src/widgets/types";
 
-const d = (p: Partial<FieldDraft>): FieldDraft => ({ originalName: null, name: "X", type: "text", multiple: false, options: [], ...p });
+const d = (p: Partial<FieldDraft>): FieldDraft => ({ originalName: null, originalBase: null, name: "X", type: "text", multiple: false, options: [], ...p });
 const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 
 function open(state: SchemaSettingsInput["state"], opts: Partial<SchemaSettingsInput> = {}) {
@@ -16,7 +16,7 @@ function open(state: SchemaSettingsInput["state"], opts: Partial<SchemaSettingsI
 		propertyNames: ["Role"],
 		basePaths: ["Teams.base"],
 		overlays: new OverlayRegistry(),
-		canRename: () => true,
+		membersKnown: () => true,
 		...opts,
 	};
 	const modal = new SchemaSettingsModal({} as App, input, { onSave, onReset });
@@ -104,7 +104,7 @@ describe("SchemaSettingsModal", () => {
 	});
 
 	it("shows validation errors and refuses renames while members are unknown", async () => {
-		const { q, onSave, error } = open({ kind: "fields", drafts: [d({ originalName: "A", name: "A" }), d({ name: "" })] }, { canRename: () => false });
+		const { q, onSave, error } = open({ kind: "fields", drafts: [d({ originalName: "A", name: "A" }), d({ name: "" })] }, { membersKnown: () => false });
 		q<HTMLElement>(".improved-bases-save").click();
 		await tick();
 		expect(error()).toBe("Field name is empty");

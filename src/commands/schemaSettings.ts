@@ -1,10 +1,9 @@
-import { Notice, TFile, type App, type Plugin } from "obsidian";
+import { getFrontMatterInfo, Notice, parseYaml, TFile, type App, type Plugin } from "obsidian";
 import { installSchemaButton } from "../internals/toolbar";
 import type { SchemaRegistry } from "../schema/SchemaRegistry";
 import type { WidgetEnv } from "../widgets/types";
 import { SchemaSettingsModal, type SchemaSettingsHandlers, type SchemaSettingsInput } from "./SchemaSettingsModal";
 import { draftsToMutation, fieldsToDrafts, renameKey, renames, type FieldDraft } from "./schemaDraft";
-import { findOwnKey } from "../schema/keys";
 
 type Pairs = { from: string; to: string }[];
 type Counts = { renamed: number; conflict: number; failed: number };
@@ -18,14 +17,28 @@ export function schemaState(registry: SchemaRegistry, basePath: string): SchemaS
 	return { kind: "fields", drafts: [] };
 }
 
+/**
+ * Whether the note's frontmatter on disk has one of the keys; `processFrontMatter` rewrites a note even
+ * when nothing changes, so only notes that need it are passed on. Unparseable frontmatter counts as
+ * "maybe" and is left to `processFrontMatter`, which then reports the failure.
+ */
+async function hasAnyKey(app: App, file: TFile, keys: string[]): Promise<boolean> {
+	const info = getFrontMatterInfo(await app.vault.cachedRead(file));
+	if (!info.exists) return false;
+	try {
+		const fm: unknown = parseYaml(info.frontmatter);
+		return typeof fm === "object" && fm !== null && keys.some((k) => Object.hasOwn(fm, k));
+	} catch {
+		return true;
+	}
+}
+
 /** Renames frontmatter keys in the notes that have one of them, one file at a time; counts are per note. */
 export async function migrateRenames(app: App, files: TFile[], pairs: Pairs): Promise<Counts> {
 	const counts: Counts = { renamed: 0, conflict: 0, failed: 0 };
-	const affected = files.filter((file) => {
-		const fm = app.metadataCache.getFileCache(file)?.frontmatter;
-		return fm !== undefined && pairs.some((p) => findOwnKey(fm, p.from) !== undefined);
-	});
-	for (const file of affected) {
+	const keys = pairs.map((p) => p.from);
+	for (const file of files) {
+		if (!(await hasAnyKey(app, file, keys))) continue;
 		let renamed = false;
 		let conflict = false;
 		try {
@@ -69,7 +82,7 @@ export function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, registry: Sc
 			if (k !== "position") names.add(k);
 		}
 	}
-	const basePaths = app.vault.getFiles().filter((f) => f.extension === "base" && f.path !== basePath).map((f) => f.path).sort();
+	const basePaths = app.vault.getFiles().filter((f) => f.extension === "base").map((f) => f.path).sort();
 	const state = schemaState(registry, basePath);
 	const originalNames = state.kind === "fields" ? state.drafts.flatMap((d) => (d.originalName === null ? [] : [d.originalName])) : [];
 	const input: SchemaSettingsInput = {
@@ -78,7 +91,7 @@ export function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, registry: Sc
 		propertyNames: [...names].sort(),
 		basePaths,
 		overlays: env.overlays,
-		canRename: () => env.membership.ready,
+		membersKnown: () => env.membership.targetEntries(basePath) !== null,
 	};
 	const onSave = async (drafts: FieldDraft[]): Promise<void> => {
 		if (!registry.schemas().some((s) => s.basePath === basePath) && !registry.errors().has(basePath)) {

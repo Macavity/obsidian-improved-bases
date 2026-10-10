@@ -23,12 +23,19 @@ describe("schemaState", () => {
 });
 
 describe("migrateRenames", () => {
-  it("migrates sequentially, skips notes without the key and counts outcomes per note", async () => {
+  it("migrates sequentially, skips notes without the key on disk and counts outcomes per note", async () => {
     const calls: string[] = [];
     const resolvers: (() => void)[] = [];
-    const fms: Record<string, Record<string, unknown>> = { "a.md": { role: 1 }, "b.md": { Role: 1, Rolle: 2 }, "c.md": {}, "d.md": { Role: 1 } };
+    const fms: Record<string, Record<string, unknown>> = { "a.md": { Role: 1 }, "b.md": { Role: 1, Rolle: 2 }, "c.md": { role: 1 }, "d.md": { Role: 1 }, "e.md": {} };
+    const texts: Record<string, string> = {
+      "a.md": "---\nRole: 1\n---\n",
+      "b.md": "---\nRole: 1\nRolle: 2\n---\n",
+      "c.md": "---\nrole: 1\n---\nbody",
+      "d.md": "---\nRole: [\n---\n", // broken YAML: left to processFrontMatter
+      "e.md": "no frontmatter",
+    };
     const app = {
-      metadataCache: { getFileCache: (f: { path: string }) => ({ frontmatter: fms[f.path] }) },
+      vault: { cachedRead: (f: { path: string }) => Promise.resolve(texts[f.path]) },
       fileManager: {
         processFrontMatter: (f: { path: string }, fn: (fm: Record<string, unknown>) => void) =>
           new Promise<void>((resolve, reject) => {
@@ -39,7 +46,7 @@ describe("migrateRenames", () => {
           }),
       },
     } as unknown as App;
-    const files = ["a.md", "b.md", "c.md", "d.md"].map((path) => ({ path }) as TFile);
+    const files = ["a.md", "b.md", "c.md", "d.md", "e.md"].map((path) => ({ path }) as TFile);
     const done = migrateRenames(app, files, [{ from: "Role", to: "Rolle" }]);
     const tick = () => new Promise<void>((r) => setTimeout(r, 0));
     await tick();
@@ -51,9 +58,10 @@ describe("migrateRenames", () => {
     expect(calls).toEqual(["a.md", "b.md"]);
     resolvers[1]?.();
     expect(await done).toEqual({ renamed: 1, conflict: 1, failed: 1 });
-    expect(calls).toEqual(["a.md", "b.md", "d.md"]); // c.md has no such key
+    expect(calls).toEqual(["a.md", "b.md", "d.md"]); // c.md only has `role`, e.md has no frontmatter
     expect(fms["a.md"]).toEqual({ Rolle: 1 });
     expect(fms["b.md"]).toEqual({ Role: 1, Rolle: 2 });
+    expect(fms["c.md"]).toEqual({ role: 1 });
   });
 });
 
@@ -72,7 +80,7 @@ describe("renameSummary", () => {
 
 describe("buildSchemaSettings", () => {
   const file = (path: string, frontmatter?: Record<string, unknown>) => ({ path, extension: path.split(".").pop(), frontmatter }) as unknown as TFile;
-  function setup(opts: { schema?: boolean; error?: boolean; members?: TFile[] | null; ready?: boolean } = {}) {
+  function setup(opts: { schema?: boolean; error?: boolean; members?: TFile[] | null } = {}) {
     const members = opts.members === undefined ? [file("a.md", { Role: 1, position: {} }), file("b.md", { Team: 2 })] : opts.members;
     const fields = new Map([["role", { name: "Role", field: { type: "text" as const } }]]);
     const reg = registry(opts.schema ? [{ basePath: "M.base", fields }] : [], opts.error ? { "M.base": ["bad"] } : {});
@@ -80,13 +88,18 @@ describe("buildSchemaSettings", () => {
       fn((f as unknown as { frontmatter: Record<string, unknown> }).frontmatter);
       return Promise.resolve();
     });
+    const text = (f: TFile) => {
+      const fm = (f as unknown as { frontmatter?: Record<string, unknown> }).frontmatter;
+      return fm ? `---\n${Object.entries(fm).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join("\n")}\n---\n` : "";
+    };
     const app = {
       metadataCache: { getFileCache: (f: TFile) => ({ frontmatter: (f as unknown as { frontmatter?: Record<string, unknown> }).frontmatter }) },
-      vault: { getFiles: () => [file("Z.base"), file("M.base"), file("n.md"), file("A.base")] },
+      vault: { getFiles: () => [], cachedRead: (f: TFile) => Promise.resolve(text(f)) },
       fileManager: { processFrontMatter },
     } as unknown as App;
+    (app.vault as { getFiles: () => TFile[] }).getFiles = () => [file("Z.base"), file("M.base"), file("n.md"), file("A.base")];
     const writer = { activate: vi.fn(() => Promise.resolve()), update: vi.fn(() => Promise.resolve()), reset: vi.fn(() => Promise.resolve()) };
-    const membership = { ready: opts.ready ?? true, targetEntries: () => members };
+    const membership = { targetEntries: () => members };
     const env = { app, writer, membership, overlays: {} } as unknown as WidgetEnv;
     return { ...buildSchemaSettings({ app } as unknown as Plugin, env, reg, "M.base"), processFrontMatter, writer, membership };
   }
@@ -94,14 +107,14 @@ describe("buildSchemaSettings", () => {
   it("collects property names and other bases", () => {
     const { input } = setup({ schema: true });
     expect(input.propertyNames).toEqual(["Role", "Team"]);
-    expect(input.basePaths).toEqual(["A.base", "Z.base"]);
+    expect(input.basePaths).toEqual(["A.base", "M.base", "Z.base"]); // includes itself: self-relations are allowed
     expect(input.state).toMatchObject({ kind: "fields", drafts: [{ originalName: "Role", name: "Role" }] });
   });
-  it("reads membership readiness live", () => {
-    const { input, membership } = setup({ ready: false });
-    expect(input.canRename()).toBe(false);
-    membership.ready = true;
-    expect(input.canRename()).toBe(true);
+  it("knows the members only once this base has a query result", () => {
+    const { input, membership } = setup({ members: null });
+    expect(input.membersKnown()).toBe(false);
+    membership.targetEntries = () => [];
+    expect(input.membersKnown()).toBe(true);
   });
   it("activates a base without schema before the first save", async () => {
     const { handlers, writer } = setup();
@@ -115,10 +128,10 @@ describe("buildSchemaSettings", () => {
   });
   it("migrates renamed properties after the schema write", async () => {
     const { handlers, processFrontMatter } = setup({ schema: true });
-    await handlers.onSave([{ originalName: "Role", name: "Rolle", type: "text", multiple: false, options: [] }]);
+    await handlers.onSave([{ originalName: "Role", originalBase: null, name: "Rolle", type: "text", multiple: false, options: [] }]);
     expect(processFrontMatter).toHaveBeenCalledTimes(1);
     const second = setup({ schema: true, members: null });
-    await second.handlers.onSave([{ originalName: "Role", name: "Rolle", type: "text", multiple: false, options: [] }]);
+    await second.handlers.onSave([{ originalName: "Role", originalBase: null, name: "Rolle", type: "text", multiple: false, options: [] }]);
     expect(second.processFrontMatter).not.toHaveBeenCalled();
   });
   it("resets through the writer", async () => {

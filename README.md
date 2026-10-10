@@ -56,7 +56,7 @@ views: ...
 - `multiple` (default `false`): `false` stores a string (`"[[X]]"` or `Value`), `true` stores a YAML list.
 - `options`: maps each value to a color: `red`, `orange`, `yellow`, `green`, `lime`, `cyan`, `blue`, `violet`, `pink`, `brown`, `grey`, `black`, `white`. Map order is display order. Unknown values show grey.
 - `base`: vault path of the target base. It needs no schema itself.
-- Field names are the property names; case is ignored as in Obsidian.
+- Field names are the property names. Obsidian and Bases treat `Team` and `team` as one property, so the plugin resolves field names that way too; writes to notes (renames) always use the exact key.
 - A note belongs to a schema base when it is in the result of that base (its filters apply), regardless of folder.
 
 Values that do not fit the schema (a link outside the target base, a list where `multiple: false`) are kept, shown with a marker, and only rewritten into the schema format when you edit them.
@@ -71,7 +71,7 @@ A dialog edits all fields of a base without touching YAML. Open it via:
 
 The dialog edits field name, type, `multiple`, the target base of a relation, and the options of a select with their colors. Save writes all fields at once; a base without a schema becomes a schema base on first save.
 
-Renaming a field also renames that property in all notes of the base (notes are processed one by one). A note that already has both keys is skipped. A notice reports how many notes were renamed, skipped or failed. A rename is refused while the base members are still unknown (right after startup). Renaming a select option does not change note values; notes keep the old value and show it as off-schema.
+Renaming a field also renames that property in all notes of the base (notes are processed one by one; only notes whose frontmatter has the exact old key are touched). A note that already has both keys is skipped. A notice reports how many notes were renamed, skipped or failed. A rename is refused while the base members are still unknown (right after startup). Renaming a select option does not change note values; notes keep the old value and show it as off-schema.
 
 If the `improved-bases:` section of a base is invalid, the dialog shows the parse error and offers "Reset schema" (with a confirmation step), which replaces the section with an empty schema.
 

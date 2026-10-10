@@ -123,6 +123,11 @@ export const Platform = {
 	isMobileApp: false,
 };
 
+export function getFrontMatterInfo(text: string): { exists: boolean; frontmatter: string } {
+	const m = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text);
+	return m ? { exists: true, frontmatter: m[1] ?? "" } : { exists: false, frontmatter: "" };
+}
+
 export function parseYaml(text: string): unknown {
 	return parse(text);
 }

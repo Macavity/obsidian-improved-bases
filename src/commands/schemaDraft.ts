@@ -5,9 +5,10 @@ import type { RawFields } from "../schema/SchemaWriter";
 /** One select option while editing. */
 export interface OptionDraft { value: string; color: Color }
 
-/** Editable copy of a field; `originalName` is null for new fields. */
+/** Editable copy of a field; `originalName` is null for new fields, `originalBase` the saved relation target. */
 export interface FieldDraft {
 	originalName: string | null;
+	originalBase: string | null;
 	name: string;
 	type: FieldSchema["type"];
 	multiple: boolean;
@@ -21,10 +22,11 @@ export const TYPES: readonly FieldSchema["type"][] = ["relation", "select", ...N
 /** Drafts in map order. */
 export function fieldsToDrafts(fields: ReadonlyMap<string, { name: string; field: FieldSchema }>): FieldDraft[] {
 	return [...fields.values()].map(({ name, field }) => {
-		const draft: FieldDraft = { originalName: name, name, type: field.type, multiple: false, options: [] };
+		const draft: FieldDraft = { originalName: name, originalBase: null, name, type: field.type, multiple: false, options: [] };
 		if (field.type === "relation") {
 			draft.multiple = field.multiple;
 			draft.base = field.base;
+			draft.originalBase = field.base;
 		} else if (field.type === "select") {
 			draft.multiple = field.multiple;
 			draft.options = field.options.map((o) => ({ value: o.value, color: o.color }));
@@ -76,7 +78,8 @@ export function validateDrafts(drafts: FieldDraft[], basePaths: string[]): strin
 		errors.push(...validateName(draft, seen, vacated));
 		if (!TYPES.includes(draft.type)) {
 			errors.push(`Field '${name}': unknown type '${String(draft.type)}'`);
-		} else if (draft.type === "relation" && !(draft.base && basePaths.includes(draft.base))) {
+		} else if (draft.type === "relation" && !(draft.base && (basePaths.includes(draft.base) || draft.base === draft.originalBase))) {
+			// A saved target stays valid even when its file is gone, so unrelated edits can still be saved.
 			errors.push(`Field '${name}': choose a valid base`);
 		} else if (draft.type === "select") {
 			errors.push(...validateOptions(name, draft.options));
@@ -116,16 +119,13 @@ export function renames(drafts: FieldDraft[]): { from: string; to: string }[] {
 		.map((x) => ({ from: x.originalName as string, to: x.name }));
 }
 
-/** Moves a frontmatter value from `from` (any case) to `to` without touching prototypes. */
+/** Moves a frontmatter value from `from` to `to` without touching prototypes; keys are exact, as in YAML. */
 export function renameKey(frontmatter: Record<string, unknown>, from: string, to: string): "renamed" | "missing" | "conflict" {
-	// Keys match case-insensitively, as the plugin resolves properties that way.
-	const key = findOwnKey(frontmatter, from);
-	if (key === undefined) return "missing";
+	if (!Object.hasOwn(frontmatter, from)) return "missing";
 	if (isUnsafeKey(to)) return "conflict";
-	if (key === to) return "missing"; // already in the target form, nothing to move
-	const existing = findOwnKey(frontmatter, to);
-	if (existing !== undefined && existing !== key) return "conflict";
-	Object.defineProperty(frontmatter, to, { value: frontmatter[key], writable: true, enumerable: true, configurable: true });
-	delete frontmatter[key];
+	if (to === from) return "missing";
+	if (Object.hasOwn(frontmatter, to)) return "conflict";
+	Object.defineProperty(frontmatter, to, { value: frontmatter[from], writable: true, enumerable: true, configurable: true });
+	delete frontmatter[from];
 	return "renamed";
 }

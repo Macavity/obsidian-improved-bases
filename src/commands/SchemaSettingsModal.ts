@@ -9,11 +9,11 @@ export interface SchemaSettingsInput {
 	state: { kind: "fields"; drafts: FieldDraft[] } | { kind: "error"; message: string };
 	/** Datalist suggestions for field names. */
 	propertyNames: string[];
-	/** Target base candidates, without `basePath`. */
+	/** Target base candidates (a base may relate to itself). */
 	basePaths: string[];
 	overlays: OverlayRegistry;
-	/** False while base members are unknown; renames are refused then. */
-	canRename: () => boolean;
+	/** Whether the members of this base are known; a rename needs them to migrate the notes. */
+	membersKnown: () => boolean;
 }
 
 export interface SchemaSettingsHandlers {
@@ -109,7 +109,7 @@ export class SchemaSettingsModal extends Modal {
 		setIcon(add.createSpan({ cls: "improved-bases-add-field-icon" }), "plus");
 		add.createSpan({ text: "Add field" });
 		add.addEventListener("click", () => {
-			const draft: FieldDraft = { originalName: null, name: "", type: "text", multiple: false, options: [] };
+			const draft: FieldDraft = { originalName: null, originalBase: null, name: "", type: "text", multiple: false, options: [] };
 			this.drafts.push(draft);
 			this.expanded.add(draft);
 			this.focusNext = draft;
@@ -295,7 +295,7 @@ export class SchemaSettingsModal extends Modal {
 	private async save(button: ButtonComponent): Promise<void> {
 		for (const draft of this.drafts) draft.name = draft.name.trim();
 		const errors = validateDrafts(this.drafts, this.input.basePaths);
-		if (renames(this.drafts).length > 0 && !this.input.canRename()) {
+		if (renames(this.drafts).length > 0 && !this.input.membersKnown()) {
 			errors.push("Base members are still loading, try again in a moment");
 		}
 		if (errors.length) {
