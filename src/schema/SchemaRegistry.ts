@@ -53,6 +53,7 @@ export class SchemaRegistry extends Events {
 		return [...this.byPath.values()].sort((a, b) => (a.basePath < b.basePath ? -1 : a.basePath > b.basePath ? 1 : 0));
 	}
 
+	// fallow-ignore-next-line unused-class-member -- called through the structural type in activateSchema.canActivate
 	errors(): Map<string, string[]> {
 		return new Map(this.errs);
 	}

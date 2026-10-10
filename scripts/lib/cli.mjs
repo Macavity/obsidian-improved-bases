@@ -4,11 +4,11 @@ import { realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const VAULT = "test-vault";
+const VAULT = "test-vault";
 export const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const VAULT_PATH = join(REPO, "test-vault");
 
-export const CLI_TIMEOUT_MS = 30000;
+const CLI_TIMEOUT_MS = 30000;
 
 function run(args) {
 	try {

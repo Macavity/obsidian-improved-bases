@@ -92,7 +92,7 @@ export function buildDraft(base: FieldDraft, optionsText: string, existed: boole
 	return { draft, errors };
 }
 
-export class ConfigureFieldModal extends Modal {
+class ConfigureFieldModal extends Modal {
 	private draft: FieldDraft = { name: "", type: "text", multiple: false };
 	private optionsText = "";
 	private body: HTMLElement | null = null;
