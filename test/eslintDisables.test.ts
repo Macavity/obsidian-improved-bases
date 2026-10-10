@@ -23,6 +23,14 @@ describe("eslint-disable checks", () => {
     ]);
   });
 
+  it("reports both problems of one line", () => {
+    const line = "// eslint-disable-next-line obsidianmd/no-static-styles-assignment";
+    expect(findDisableIssues([line]).map((i: { problem: string }) => i.problem)).toEqual([
+      "missing description",
+      'rule "obsidianmd/no-static-styles-assignment" cannot be disabled',
+    ]);
+  });
+
   it("does not match a rule name that is only a prefix", () => {
     expect(findDisableIssues(["// eslint-disable-next-line obsidianmd/ui/sentence-case-x -- ok"])).toEqual([]);
   });

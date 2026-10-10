@@ -12,7 +12,7 @@
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"quality": "fallow",
-		"audit": "fallow audit",
+		"quality:audit": "fallow audit",
 		"check": "pnpm typecheck && pnpm lint && pnpm test && pnpm quality",
 		"lint": "node scripts/lint-wrapper.mjs",
 		"lint:fix": "node scripts/lint-wrapper.mjs --fix",
@@ -55,5 +55,8 @@
 		"monkey-around": "^3.0.0",
 		"yaml": "^2.9.1"
 	},
-	"packageManager": "pnpm@10.20.0"
+	"packageManager": "pnpm@10.20.0",
+	"engines": {
+		"node": ">=20"
+	}
 }

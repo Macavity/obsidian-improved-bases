@@ -26,5 +26,5 @@ Append-only audit trail. Add one dated entry per generation or refresh run, reco
 
 - Profile: internal/standard
 - source_commit: 91b61c4 (was f31ff83)
-- Coverage: fallow adoption (config, `pnpm quality`/`pnpm audit`, Claude Code commit gate, CI workflow), merged eslint-disable check script, un-exported internals (`ConfigureFieldModal`, collector constants), new pure helpers `fieldNode()`, `splitNoteName()`, `wantedPaths()`; removed `tslib`, `jiti`, `@typescript-eslint/eslint-plugin`.
+- Coverage: fallow adoption (config, `pnpm quality`/`pnpm quality:audit`, Claude Code commit gate, CI workflow), merged eslint-disable check script, un-exported internals (`ConfigureFieldModal`, collector constants), new pure helpers `fieldNode()`, `splitNoteName()`, `wantedPaths()`; removed `tslib`, `jiti`, `@typescript-eslint/eslint-plugin`.
 - Pages: [Tooling](./modules/tooling.md), [Commands](./modules/commands.md), [Add a field type](./guides/add-a-field-type.md), [Overview](./OVERVIEW.md)
