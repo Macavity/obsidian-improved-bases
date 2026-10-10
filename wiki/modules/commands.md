@@ -21,8 +21,8 @@ tags:
 ## Public API / entry points
 
 - `registerActivateSchema(plugin, writer, registry)`, `canActivate(registry, path)`
-- `registerConfigureField(plugin, env, registry)`, `ConfigureFieldModal`, `draftToMutation()`, `validateDraft()`, `parseOptionLines()`, `FieldDraft`
-- `registerImportOptions(plugin, env, getFolder)`, `planImport()`, `importMutation()`, `OptionNote`, `ImportPlan`
+- `registerConfigureField(plugin, env, registry)`, `draftToMutation()`, `fieldNode()`, `validateDraft()`, `parseOptionLines()`, `buildDraft()`, `FieldDraft` (`ConfigureFieldModal` is module-private)
+- `registerImportOptions(plugin, env, getFolder)`, `planImport()`, `splitNoteName()`, `importMutation()`, `OptionNote`, `ImportPlan`
 
 ## Key files
 

@@ -27,7 +27,7 @@ Build artifacts (`main.js`, `manifest.json`, `styles.css`) are produced at the r
 
 ## Testing
 
-- Unit: `pnpm test` (vitest + happy-dom, `obsidian` mocked in `test/__mocks__/obsidian.ts`). `pnpm check` = typecheck + lint + test.
+- Unit: `pnpm test` (vitest + happy-dom, `obsidian` mocked in `test/__mocks__/obsidian.ts`). `pnpm check` = typecheck + lint + test + quality.
 - Integration: `pnpm smoke` runs against the versioned vault `test-vault/`, never against a working vault. All CLI calls go through `scripts/lib/cli.mjs`, which always passes `vault="test-vault"` and aborts unless that vault is registered at `<repo>/test-vault`.
 
 Test vault setup (once):
@@ -40,11 +40,20 @@ Test vault setup (once):
 
 `pnpm vault:reset` restores `test-vault/` to `HEAD` and removes untracked files (the symlink and `workspace*.json` are gitignored and stay). Change fixtures only in a commit.
 
+## Code quality
+
+[Fallow](https://fallow.tools) measures dead code, duplication and complexity; the policy lives in `.fallowrc.json`.
+
+- `pnpm quality` analyzes the whole repo and must pass before you open a PR. The repo is kept clean: no unused exports, no duplicates, no function above the default thresholds (cyclomatic 20, cognitive 15, CRAP 30).
+- `pnpm audit` checks only the files you changed against `main` and fails on findings your change introduces. CI runs the same audit on every PR and posts a summary comment; pushes to `main` run the full analysis.
+- In Claude Code, `.claude/hooks/fallow-gate.sh` runs the audit before every `git commit`/`git push` and blocks on a `fail` verdict (needs `jq`).
+- Handle findings in this order: fix the code; model an intentional exception in `.fallowrc.json` (`entry`, `usedClassMembers`, `ignoreDependencies`); only as a last resort suppress one line with `// fallow-ignore-next-line <issue> -- reason`. Never raise thresholds to hide a hotspot.
+
 ## Pull requests
 
 - Open an issue first for anything non-trivial so we can agree on direction before you spend time on it.
 - Keep PRs focused. One concern per PR is easier to review.
-- Run `pnpm lint` and `pnpm build` before submitting; CI will run these too.
+- Run `pnpm check` and `pnpm build` before submitting; CI will run these too.
 - Follow the existing code style. Use **"properties"** (not "frontmatter") when referring to YAML metadata. **"Markdown"** is always capitalized.
 - Update the README if you change user-facing behavior.
 

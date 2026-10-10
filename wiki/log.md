@@ -21,3 +21,10 @@ Append-only audit trail. Add one dated entry per generation or refresh run, reco
 - source_commit: f31ff83 (was 92843cd)
 - Coverage: shape-based hull `validate` and cache key, relation picker without target base, `BasePicker` and multi-base Configure field, exact-match Enter, rename refresh, settings merge, shared helpers, `baseFence`.
 - Pages: [Hull widget](./concepts/hull-widget.md), [Membership](./concepts/membership.md), [Widget render](./flows/widget-render.md), [Internals](./modules/internals.md), [Widgets](./modules/widgets.md), [Commands](./modules/commands.md), [Schema](./modules/schema.md), [Query](./modules/query.md), [Plugin core](./modules/plugin-core.md), [Overview](./OVERVIEW.md)
+
+## 2026-10-10: refresh
+
+- Profile: internal/standard
+- source_commit: 91b61c4 (was f31ff83)
+- Coverage: fallow adoption (config, `pnpm quality`/`pnpm audit`, Claude Code commit gate, CI workflow), merged eslint-disable check script, un-exported internals (`ConfigureFieldModal`, collector constants), new pure helpers `fieldNode()`, `splitNoteName()`, `wantedPaths()`; removed `tslib`, `jiti`, `@typescript-eslint/eslint-plugin`.
+- Pages: [Tooling](./modules/tooling.md), [Commands](./modules/commands.md), [Add a field type](./guides/add-a-field-type.md), [Overview](./OVERVIEW.md)
