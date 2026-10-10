@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { activateSchemaSource, resetSchemaSource, updateSchemaSource } from "../src/schema/SchemaWriter";
+import { TFile, type App } from "obsidian";
+import { SchemaWriter, resetSchemaSource, updateSchemaSource } from "../src/schema/SchemaWriter";
+import { EMPTY_EDITS } from "../src/schema/baseDoc";
 
 const src = `# keep me
 filters:
@@ -45,17 +47,6 @@ describe("updateSchemaSource", () => {
   });
 });
 
-describe("activateSchemaSource", () => {
-  it("activates an empty schema node once", () => {
-    const text = "filters:\n  and:\n    - file.inFolder(\"D\")\n";
-    const out = activateSchemaSource(text);
-    expect(out).toContain("improved-bases:");
-    expect(out.startsWith(text)).toBe(true);
-    expect(activateSchemaSource(out)).toBe(out);
-    expect(updateSchemaSource(out, (f) => { f.A = { type: "text" }; })).toContain("A:");
-  });
-});
-
 describe("resetSchemaSource", () => {
   it("replaces an invalid schema value with an empty schema and keeps the rest", () => {
     const out = resetSchemaSource("improved-bases: 5\nviews: []\n");
@@ -67,5 +58,22 @@ describe("resetSchemaSource", () => {
     const out = resetSchemaSource(updateSchemaSource(src, (f) => { f.Role = { type: "text" }; }));
     expect(out).not.toContain("Role:");
     expect(out).toContain("filters:");
+  });
+});
+
+describe("SchemaWriter.update", () => {
+  it("applies column edits and the schema mutation through vault.process", async () => {
+    const file = Object.assign(new TFile(), { path: "B.base" });
+    let data = "views:\n  - type: table\n    order:\n      - Role\n";
+    const app = {
+      vault: {
+        getAbstractFileByPath: (p: string) => (p === file.path ? file : null),
+        process: (_f: TFile, fn: (d: string) => string) => { data = fn(data); return Promise.resolve(data); },
+      },
+    } as unknown as App;
+    await new SchemaWriter(app).update("B.base", (f) => { f.Job = { type: "text" }; }, { ...EMPTY_EDITS, rename: [{ from: "Role", to: "Job" }] });
+    expect(data).toContain("- Job\n");
+    expect(data).toMatch(/fields:\n {4}Job:/);
+    await expect(new SchemaWriter(app).update("X.base", () => {})).rejects.toThrow(/X.base/);
   });
 });

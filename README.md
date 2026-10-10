@@ -52,7 +52,7 @@ filters: ...
 views: ...
 ```
 
-- `type`: `relation`, `select`, or a native type passed through (`text`, `list`, `number`, `checkbox`, `date`, `datetime`). A native type means the native widget of that type is used for notes of this base, regardless of `types.json`.
+- `type`: `relation`, `select`, or a native type passed through (`text`, `list`, `number`, `checkbox`, `date`, `datetime`). A native type means the native widget of that type is used for notes of this base, regardless of `types.json`. The dialog never creates native entries and keeps hand-written ones unchanged; pinning a native type is hand-edit only.
 - `multiple` (default `false`): `false` stores a string (`"[[X]]"` or `Value`), `true` stores a YAML list.
 - `options`: maps each value to a color: `red`, `orange`, `yellow`, `green`, `lime`, `cyan`, `blue`, `violet`, `pink`, `brown`, `grey`, `black`, `white`. Map order is display order. Unknown values show grey.
 - `base`: vault path of the target base. It needs no schema itself.
@@ -69,9 +69,13 @@ A dialog edits all fields of a base without touching YAML. Open it via:
 - **Schema settings** in the tab menu, the more-options menu or the file explorer context menu of a `.base` file,
 - the command "Open schema settings".
 
-The dialog edits field name, type, `multiple`, the target base of a relation, and the options of a select with their colors. Save writes all fields at once; a base without a schema becomes a schema base on first save.
+The dialog lists every field the base knows: the columns of all views, the `properties:` keys and the property keys of the member notes. Rows follow the order of the current view (the one the dialog was opened from), the rest is alphabetical. A field without a plugin entry is native and shows Obsidian's detected type in the type dropdown (`native (text)`, ...). The other choices are `relation` and `select`; switching a field back to native deletes its plugin entry. The dialog edits field name, type, `multiple`, the target base of a relation, and the options of a select with their colors. Save writes all changes at once in one write to the base file; a base without a schema becomes a schema base on first save.
 
-Renaming a field also renames that property in all notes of the base (notes are processed one by one; only notes whose frontmatter has the exact old key are touched). A note that already has both keys is skipped. A notice reports how many notes were renamed, skipped or failed. A rename is refused while the base members are still unknown (right after startup). Renaming a select option does not change note values; notes keep the old value and show it as off-schema.
+**Add field** appends the property to the `order` of a view. With more than one view, "Add new fields to" picks it; it is preselected with the view the dialog was opened from (the first view when opened from a command or menu).
+
+**Remove field** asks "Remove 'X' and its value from N notes?" first (and says so when filters or formulas reference the field). On save the property is deleted from all notes of the base (matching `X` and `x` alike, as Obsidian does) and from the base itself (`order` of all views, `properties:`, `summaries`, `sort`, `groupBy`). It is refused while the base members are still unknown (right after startup).
+
+Renaming a field also renames that property in all notes of the base (notes are processed one by one; only notes whose frontmatter has the exact old key are touched) and in the base file (`order`, `properties:`, `summaries`, `sort`, `groupBy`). A note that already has both keys is skipped. A notice reports how many notes were renamed, skipped or failed. A rename is refused while the base members are still unknown. Filters and formulas are not rewritten: if they reference the old name, the dialog shows a hint and the notice says "Filters or formulas still reference 'X', update them manually". Renaming a select option does not change note values; notes keep the old value and show it as off-schema.
 
 If the `improved-bases:` section of a base is invalid, the dialog shows the parse error and offers "Reset schema" (with a confirmation step), which replaces the section with an empty schema.
 
