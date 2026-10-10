@@ -77,3 +77,10 @@ Append-only audit trail. Add one dated entry per generation or refresh run, reco
 - source_commit: 391fff1 (was aed8819)
 - Coverage: dialog lists all base fields (view orders, `properties:`, member keys) with native type labels; add to chosen view; remove deletes from notes and base; rename also rewrites view columns; new pure `baseDoc.ts`, `SchemaWriter.activate` removed, toolbar passes the view name.
 - Pages: [Commands](./modules/commands.md), [Schema](./modules/schema.md), [Internals](./modules/internals.md), [Schema edit](./flows/schema-edit.md), [Field schema](./concepts/field-schema.md), [Schema base](./concepts/schema-base.md), [Overview](./OVERVIEW.md)
+
+## 2026-10-10: refresh (review fixes)
+
+- Profile: internal/standard
+- source_commit: 9b45bc0 (was 391fff1)
+- Coverage: validation blocks reusing a removed field's name and checks reserved names only for new or renamed fields; untouched schema entries keep their key spelling; removal matches note keys case-insensitively in one pass and counts unreadable notes as failed; duplicate map keys are dropped on column rename; pinned type shown in the dialog; removal warns about filter/formula references.
+- Pages: [Commands](./modules/commands.md), [Schema edit](./flows/schema-edit.md), [Overview](./OVERVIEW.md)

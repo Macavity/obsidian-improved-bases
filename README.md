@@ -73,7 +73,7 @@ The dialog lists every field the base knows: the columns of all views, the `prop
 
 **Add field** appends the property to the `order` of a view. With more than one view, "Add new fields to" picks it; it is preselected with the view the dialog was opened from (the first view when opened from a command or menu).
 
-**Remove field** asks "Remove 'X' and its value from N notes?" first. On save the property is deleted from all notes of the base and from the base itself (`order` of all views, `properties:`, `summaries`, `sort`, `groupBy`). It is refused while the base members are still unknown (right after startup).
+**Remove field** asks "Remove 'X' and its value from N notes?" first (and says so when filters or formulas reference the field). On save the property is deleted from all notes of the base (matching `X` and `x` alike, as Obsidian does) and from the base itself (`order` of all views, `properties:`, `summaries`, `sort`, `groupBy`). It is refused while the base members are still unknown (right after startup).
 
 Renaming a field also renames that property in all notes of the base (notes are processed one by one; only notes whose frontmatter has the exact old key are touched) and in the base file (`order`, `properties:`, `summaries`, `sort`, `groupBy`). A note that already has both keys is skipped. A notice reports how many notes were renamed, skipped or failed. A rename is refused while the base members are still unknown. Filters and formulas are not rewritten: if they reference the old name, the dialog shows a hint and the notice says "Filters or formulas still reference 'X', update them manually". Renaming a select option does not change note values; notes keep the old value and show it as off-schema.
 
