@@ -22,6 +22,13 @@ Append-only audit trail. Add one dated entry per generation or refresh run, reco
 - Coverage: shape-based hull `validate` and cache key, relation picker without target base, `BasePicker` and multi-base Configure field, exact-match Enter, rename refresh, settings merge, shared helpers, `baseFence`.
 - Pages: [Hull widget](./concepts/hull-widget.md), [Membership](./concepts/membership.md), [Widget render](./flows/widget-render.md), [Internals](./modules/internals.md), [Widgets](./modules/widgets.md), [Commands](./modules/commands.md), [Schema](./modules/schema.md), [Query](./modules/query.md), [Plugin core](./modules/plugin-core.md), [Overview](./OVERVIEW.md)
 
+## 2026-10-09: refresh
+
+- Profile: internal/standard
+- source_commit: 24a4ba9 (was f31ff83)
+- Coverage: schema settings dialog replaces "Activate as schema base", "Configure field" and "Import option notes" (`importFolder` setting and `Optionen` fixtures removed); draft model, rename migration, `SchemaWriter.reset()`, Bases toolbar button, smoke section and test setup.
+- Pages: [Commands](./modules/commands.md), [Internals](./modules/internals.md), [Schema](./modules/schema.md), [Plugin core](./modules/plugin-core.md), [Tooling](./modules/tooling.md), [Schema edit](./flows/schema-edit.md), [Plugin load and ready](./flows/plugin-load-and-ready.md), [Field schema](./concepts/field-schema.md), [Schema base](./concepts/schema-base.md), [Membership](./concepts/membership.md), [Widgets](./modules/widgets.md), [Layers](./architecture/layers.md), [Obsidian internals](./architecture/obsidian-internals.md), [Add a field type](./guides/add-a-field-type.md), [Overview](./OVERVIEW.md)
+
 ## 2026-10-10: refresh
 
 - Profile: internal/standard
@@ -35,3 +42,24 @@ Append-only audit trail. Add one dated entry per generation or refresh run, reco
 - source_commit: 2c6a55a (was 85f2855)
 - Coverage: shared test vault for git worktrees: `VAULT_PATH` resolves to the main checkout, `FIXTURES` to the current one; `vault-sync.mjs` mirrors fixtures, `vault:link-test` re-links, `smoke`/`perf` include the relink step; `IMPROVED_BASES_TEST_VAULT` override.
 - Pages: [Tooling](./modules/tooling.md), [Run tests and smoke checks](./guides/run-tests-and-smoke.md), [Overview](./OVERVIEW.md)
+
+## 2026-10-10: refresh (review fixes)
+
+- Profile: internal/standard
+- source_commit: f26dfc8 (was 24a4ba9)
+- Coverage: review fixes: validation (trim, swapped renames), case-insensitive rename migration with prefilter and per-note counts, field order kept on rename, code-block toolbars skipped, button-based toolbar idempotency.
+- Pages: [Commands](./modules/commands.md), [Internals](./modules/internals.md), [Schema](./modules/schema.md), [Schema edit](./flows/schema-edit.md), [Overview](./OVERVIEW.md)
+
+## 2026-10-10: refresh (merge main)
+
+- Profile: internal/standard
+- source_commit: 0c710b9 (was f26dfc8)
+- Coverage: merge of main's fallow adoption into the schema settings branch; Istanbul coverage from `pnpm test` feeds fallow CRAP scores; new unit tests for the settings modal, save handler, widget toggle, collector mount, CLI detection and both widgets; `buildSchemaSettings()` split from the modal opener; `Membership.schemaBasesOf()` removed; smoke compares `Verwaist.base` semantically.
+- Pages: [Tooling](./modules/tooling.md), [Commands](./modules/commands.md), [Overview](./OVERVIEW.md)
+
+## 2026-10-10: refresh (rename semantics)
+
+- Profile: internal/standard
+- source_commit: 8e51900 (was 0c710b9)
+- Coverage: `renameKey()` matches exact keys; `migrateRenames()` prefilters from frontmatter on disk; `membersKnown()` replaces `canRename`; saved relation targets stay valid in validation.
+- Pages: [Commands](./modules/commands.md), [Schema edit](./flows/schema-edit.md), [Overview](./OVERVIEW.md)

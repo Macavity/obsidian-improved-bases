@@ -20,7 +20,7 @@ It is the unit of scoping: the same property name can be a relation in one base 
 
 - Parsed by `parseSchema()` in [parse.ts](../../src/schema/parse.ts); `SCHEMA_KEY` in [types.ts](../../src/schema/types.ts).
 - Tracked by `SchemaRegistry` in [SchemaRegistry.ts](../../src/schema/SchemaRegistry.ts) (`schemas()` sorted by path, `errors()`).
-- Created by `activateSchemaSource()` in [SchemaWriter.ts](../../src/schema/SchemaWriter.ts) via the "Activate as schema base" command ([Commands](../modules/commands.md)).
+- Created by `activateSchemaSource()` in [SchemaWriter.ts](../../src/schema/SchemaWriter.ts) on the first save of the schema settings dialog ([Commands](../modules/commands.md)); a broken section is replaced by `resetSchemaSource()` ("Reset schema").
 - Fixtures: `test-vault/Teams.base`, `Mitarbeiter.base`, and `Kaputt.base` as an invalid example ([Tooling](../modules/tooling.md)).
 
 ## Related

@@ -37,4 +37,6 @@ test-vault/.trash/
 
 # OpenKnowledge working data
 .ok/
+.claude/worktrees
 .fallow/
+coverage/

@@ -34,7 +34,7 @@ sequenceDiagram
   M->>R: on("changed")
   P->>T: applyWidgetsEnabled() -> installTypeInfoPatch()
   T->>M: on("changed"), on("targets-changed")
-  P->>O: addCommand x3, addSettingTab
+  P->>O: registerSchemaSettings, addSettingTab
   O-->>P: workspace.onLayoutReady
   P->>R: load() scans all .base files
   R-->>M: trigger("changed")
@@ -53,7 +53,7 @@ sequenceDiagram
 2. `createBaseQuery(this)` registers the `improved-bases-collector` Bases view and icon ([Query](../modules/query.md)); no query runs yet.
 3. `new Membership(...)` subscribes to registry `changed` and to `metadataCache.resolved`; `resolved` is pre-set if `resolvedLinks` already has entries. Its first `sync()` finds no schemas, so nothing is watched.
 4. `widgetsSupported = getMetadataTypeManager(app) !== null`; if false, one `Notice`. `applyWidgetsEnabled()` installs the patch when enabled and supported. The patch's install-time `refresh()` is a no-op because `knownFieldNames()` is empty.
-5. Commands and the settings tab are registered.
+5. `registerSchemaSettings()` (command, file menu item, toolbar button) and the settings tab are registered.
 6. On `workspace.onLayoutReady`, `registry.load()` reads every `.base` (silent refreshes), sets `loaded = true`, triggers `changed`.
 7. `Membership.sync()` computes the wanted set (every schema base plus every relation target base) and calls `query.watch()` for each. Field names of all changed schemas are collected as `affected`.
 8. `BaseQuery` mounts each entry: CLI first scan if available, then the collector ([Base query watch](./base-query-watch.md)). Each result lands in `Membership.onResult()`, which re-arms the quiet timer.

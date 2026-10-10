@@ -47,6 +47,8 @@ jobs:
       # Dependency findings need node_modules; the action reads the fallow
       # version to install from the devDependency in package.json.
       - run: pnpm install --frozen-lockfile
+      # Coverage feeds fallow's CRAP scores (health.coverage in .fallowrc.json).
+      - run: pnpm test
       # Pull requests: `fallow audit` gates only findings the PR introduces and
       # posts a sticky summary comment. Pushes to main: full analysis with the
       # health score; any finding fails the job because the repo is kept clean.

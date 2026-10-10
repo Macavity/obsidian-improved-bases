@@ -38,10 +38,14 @@ flowchart LR
     RW --> pickers
   end
   subgraph commands["commands/"]
-    act[activateSchema] --> Writer
-    cfg[configureField] --> Writer
-    imp[importOptions] --> Writer
+    ss[schemaSettings] --> Writer
+    modal[SchemaSettingsModal] --> draft[schemaDraft]
+    ss --> modal
   end
+  subgraph toolbar["internals/toolbar.ts"]
+    btn[installSchemaButton]
+  end
+  ss --> btn
   Registry --> M
   BQ --> M
   cli --> BQ
@@ -62,7 +66,7 @@ flowchart LR
 | Patch | `installTypeInfoPatch()` in [typeInfoPatch.ts](../../src/internals/typeInfoPatch.ts) | Wraps `getTypeInfo` and returns [hull widgets](../concepts/hull-widget.md) for known field names. |
 | Widgets | `RelationWidget`, `SelectWidget` in [widgets/](../modules/widgets.md) | Render chips/pills, pickers, and commit values via `ctx.onChange`. |
 | Writer | `SchemaWriter` in [SchemaWriter.ts](../../src/schema/SchemaWriter.ts) | The only code that modifies a `.base`; edits `improved-bases.fields` byte-preservingly through the `yaml` document API. |
-| Commands | [commands/](../modules/commands.md) | User-triggered schema mutations through `SchemaWriter`. |
+| Commands | [commands/](../modules/commands.md) | The schema settings dialog and its entry points (command, file menu, toolbar button); writes through `SchemaWriter`. |
 
 ## Design decisions
 

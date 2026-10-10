@@ -1,4 +1,4 @@
-import { parseDocument } from "yaml";
+import { isMap, parseDocument, type Pair } from "yaml";
 import type { App } from "obsidian";
 import { TFile } from "obsidian";
 import { SCHEMA_KEY } from "./types";
@@ -29,6 +29,13 @@ export function updateSchemaSource(source: string, mutate: (fields: RawFields) =
 	for (const [name, value] of Object.entries(after)) {
 		if (!same(before[name], value)) doc.setIn([SCHEMA_KEY, "fields", name], value);
 	}
+	// `setIn` appends; restore the caller's order so renamed fields keep their place.
+	const map = doc.getIn([SCHEMA_KEY, "fields"]);
+	if (isMap(map)) {
+		const order = Object.keys(after);
+		const index = (p: Pair): number => order.indexOf(String((p.key as { value?: unknown }).value ?? p.key));
+		map.items.sort((a, b) => index(a) - index(b));
+	}
 	return doc.toString();
 }
 
@@ -37,6 +44,13 @@ export function activateSchemaSource(source: string): string {
 	const doc = parseDocument(source);
 	if (doc.has(SCHEMA_KEY)) return source;
 	doc.setIn([SCHEMA_KEY, "fields"], doc.createNode({}));
+	return doc.toString();
+}
+
+/** Replaces the whole `improved-bases` value with an empty schema, even if it was invalid. */
+export function resetSchemaSource(source: string): string {
+	const doc = parseDocument(source);
+	doc.set(SCHEMA_KEY, { fields: {} });
 	return doc.toString();
 }
 
@@ -55,5 +69,9 @@ export class SchemaWriter {
 
 	async activate(basePath: string): Promise<void> {
 		await this.app.vault.process(this.fileOf(basePath), activateSchemaSource);
+	}
+
+	async reset(basePath: string): Promise<void> {
+		await this.app.vault.process(this.fileOf(basePath), resetSchemaSource);
 	}
 }

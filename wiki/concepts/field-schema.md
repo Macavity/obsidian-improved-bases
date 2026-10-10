@@ -28,7 +28,7 @@ It is the contract between the three sides of the plugin: the parser guarantees 
 
 - Types and `COLORS`/`NATIVE_TYPES` constants: [types.ts](../../src/schema/types.ts).
 - Validation: `parseField()` in [parse.ts](../../src/schema/parse.ts) (`isValidBasePath()` for relation targets).
-- Creation: `draftToMutation()` in [configureField.ts](../../src/commands/configureField.ts), `importMutation()` in [importOptions.ts](../../src/commands/importOptions.ts), option mutations in [values.ts](../../src/widgets/values.ts).
+- Creation: `draftsToMutation()` in [schemaDraft.ts](../../src/commands/schemaDraft.ts) (edited in the schema settings dialog), option mutations in [values.ts](../../src/widgets/values.ts).
 - Consumption: `RelationWidget` / `SelectWidget` ([Widgets](../modules/widgets.md)).
 
 ## Related

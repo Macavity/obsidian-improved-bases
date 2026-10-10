@@ -7,9 +7,7 @@ import { SchemaWriter } from "./schema/SchemaWriter";
 import { OverlayRegistry, WidgetEnv } from "./widgets/types";
 import { RelationWidget } from "./widgets/RelationWidget";
 import { SelectWidget } from "./widgets/SelectWidget";
-import { registerActivateSchema } from "./commands/activateSchema";
-import { registerConfigureField } from "./commands/configureField";
-import { registerImportOptions } from "./commands/importOptions";
+import { registerSchemaSettings } from "./commands/schemaSettings";
 import { getMetadataTypeManager } from "./internals/detect";
 import { ImprovedBasesSettings, ImprovedBasesSettingTab, mergeSettings } from "./settings";
 
@@ -45,9 +43,7 @@ export default class ImprovedBasesPlugin extends Plugin {
 			this.typeInfoPatch?.uninstall();
 			this.typeInfoPatch = null;
 		});
-		registerActivateSchema(this, this.writer, this.registry);
-		registerConfigureField(this, env, this.registry);
-		registerImportOptions(this, env, () => this.settings.importFolder);
+		registerSchemaSettings(this, env, this.registry);
 		this.app.workspace.onLayoutReady(() => void this.registry.load());
 		this.addSettingTab(new ImprovedBasesSettingTab(this.app, this));
 	}

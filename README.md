@@ -31,7 +31,7 @@ Limits:
 
 ## Schema format
 
-Add an `improved-bases:` key to a `.base` file, or run the command "Activate as schema base" and then "Configure field".
+Add an `improved-bases:` key to a `.base` file, or edit it with the schema settings dialog (see [Schema settings](#schema-settings)).
 
 ```yaml
 improved-bases:
@@ -56,25 +56,34 @@ views: ...
 - `multiple` (default `false`): `false` stores a string (`"[[X]]"` or `Value`), `true` stores a YAML list.
 - `options`: maps each value to a color: `red`, `orange`, `yellow`, `green`, `lime`, `cyan`, `blue`, `violet`, `pink`, `brown`, `grey`, `black`, `white`. Map order is display order. Unknown values show grey.
 - `base`: vault path of the target base. It needs no schema itself.
-- Field names are the property names; case is ignored as in Obsidian.
+- Field names are the property names. Obsidian and Bases treat `Team` and `team` as one property, so the plugin resolves field names that way too; writes to notes (renames) always use the exact key.
 - A note belongs to a schema base when it is in the result of that base (its filters apply), regardless of folder.
 
 Values that do not fit the schema (a link outside the target base, a list where `multiple: false`) are kept, shown with a marker, and only rewritten into the schema format when you edit them.
+
+## Schema settings
+
+A dialog edits all fields of a base without touching YAML. Open it via:
+
+- the **Schema** button in the Bases toolbar, also inside embedded bases,
+- **Schema settings** in the tab menu, the more-options menu or the file explorer context menu of a `.base` file,
+- the command "Open schema settings".
+
+The dialog edits field name, type, `multiple`, the target base of a relation, and the options of a select with their colors. Save writes all fields at once; a base without a schema becomes a schema base on first save.
+
+Renaming a field also renames that property in all notes of the base (notes are processed one by one; only notes whose frontmatter has the exact old key are touched). A note that already has both keys is skipped. A notice reports how many notes were renamed, skipped or failed. A rename is refused while the base members are still unknown (right after startup). Renaming a select option does not change note values; notes keep the old value and show it as off-schema.
+
+If the `improved-bases:` section of a base is invalid, the dialog shows the parse error and offers "Reset schema" (with a confirmation step), which replaces the section with an empty schema.
 
 ## Commands
 
 | Command | ID | Available |
 |---|---|---|
-| Activate as schema base | `improved-bases:activate-schema-base` | on a `.base` file without schema |
-| Configure field | `improved-bases:configure-field` | on a schema base, or on a note that belongs to one |
-| Import option notes | `improved-bases:import-option-notes` | on a schema base |
-
-**Import option notes** reads notes from the import folder (setting, default `Optionen`) named `<Column> - <Value>.md`, e.g. `Role - Developer.md`. The `Farbe` property of the note sets the color (one of the colors above, otherwise grey). The column becomes a select field with these options; the first note wins on duplicates. Existing option colors are kept; note files are never changed.
+| Open schema settings | `improved-bases:open-schema-settings` | on an active `.base` file |
 
 ## Settings
 
 - **Enable widgets:** turns the plugin widgets on or off without disabling the plugin. Off means everything renders natively.
-- **Import folder:** folder with the option notes (default `Optionen`).
 
 ## Unsupported Obsidian versions
 

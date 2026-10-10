@@ -26,7 +26,7 @@ It is the only place that knows *context*. Obsidian asks for a widget by propert
 
 - [Membership.ts](../../src/schema/Membership.ts): `sync()` (diff schemas, manage watches), `onResult()`, `armQuiet()`, `resolveWithBase()`, `schemaBasesOf()`, `shapesFor(name)` (value shapes `list`/`scalar`/`native` any schema allows for a field; feeds the hull's `validate`).
 - Constructed in [main.ts](../../src/main.ts) with `{ cache: app.metadataCache }`; tests inject `quietMs` and a fake cache.
-- Consumers: `typeInfoPatch` (resolve + events), `RelationWidget` (`targetEntries`), `SelectWidget` (`resolveWithBase` for the schema base to write to), `configureField` and `importOptions` (`ready`, `schemaBasesOf`, `targetEntries`).
+- Consumers: `typeInfoPatch` (resolve + events), `RelationWidget` (`targetEntries`), `SelectWidget` (`resolveWithBase` for the schema base to write to), `openSchemaSettings()` (`ready`, `targetEntries`).
 - Smoke and perf scripts poll `plugin.membership.ready` ([Tooling](../modules/tooling.md)).
 
 ## Related
