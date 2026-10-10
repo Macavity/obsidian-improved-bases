@@ -3,18 +3,21 @@ import { installSchemaButton } from "../internals/toolbar";
 import type { SchemaRegistry } from "../schema/SchemaRegistry";
 import type { WidgetEnv } from "../widgets/types";
 import { SchemaSettingsModal, type SchemaSettingsHandlers, type SchemaSettingsInput } from "./SchemaSettingsModal";
-import { draftsToMutation, fieldsToDrafts, renameKey, renames, type FieldDraft } from "./schemaDraft";
+import { draftsToEdits, knownFieldDrafts, removals, renameKey, renames, type FieldDraft } from "./schemaDraft";
+import { readBaseColumns, referencesName, type BaseColumns } from "../schema/baseDoc";
+import { getMetadataTypeManager } from "../internals/detect";
 
 type Pairs = { from: string; to: string }[];
 type Counts = { renamed: number; conflict: number; failed: number };
 
-/** Modal state for a base: its fields, its schema errors, or an empty field list. */
-export function schemaState(registry: SchemaRegistry, basePath: string): SchemaSettingsInput["state"] {
-	const schema = registry.schemas().find((s) => s.basePath === basePath);
-	if (schema) return { kind: "fields", drafts: fieldsToDrafts(schema.fields) };
+type State = SchemaSettingsInput["state"];
+
+/** Modal state for a base: its known fields, or the schema errors. */
+export function schemaState(registry: SchemaRegistry, basePath: string, columns: BaseColumns, memberKeys: string[], nativeLabel: (name: string) => string | null, currentView: number): State {
 	const errors = registry.errors().get(basePath);
-	if (errors) return { kind: "error", message: errors.join("; ") };
-	return { kind: "fields", drafts: [] };
+	if (errors) return { kind: "error", message: errors.join("; "), resettable: true };
+	const schemaFields = registry.schemas().find((s) => s.basePath === basePath)?.fields ?? null;
+	return { kind: "fields", drafts: knownFieldDrafts({ columns, schemaFields, memberKeys, nativeLabel, currentView }) };
 }
 
 /**
@@ -70,11 +73,61 @@ export function renameSummary(pairs: Pairs, counts: Counts | null): string {
 	return parts.join(", ");
 }
 
+/** Deletes the keys from the notes that have one of them; counts are per note. */
+export async function removeProperties(app: App, files: TFile[], names: string[]): Promise<{ removed: number; failed: number }> {
+	const result = { removed: 0, failed: 0 };
+	for (const file of files) {
+		if (!(await hasAnyKey(app, file, names))) continue;
+		try {
+			await app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
+				for (const name of names) if (Object.hasOwn(fm, name)) delete fm[name];
+			});
+			result.removed++;
+		} catch (e) {
+			console.error(`Improved Bases: removing properties from ${file.path} failed`, e);
+			result.failed++;
+		}
+	}
+	return result;
+}
+
+/** Number of notes whose frontmatter on disk has the key. */
+export async function countNotesWithKey(app: App, files: TFile[], name: string): Promise<number> {
+	let count = 0;
+	for (const file of files) if (await hasAnyKey(app, file, [name])) count++;
+	return count;
+}
+
+/** Notice body after a save. */
+export function saveSummary(parts: { renames: string; removed: { name: string; removed: number; failed: number }[]; referenced: string[] }): string {
+	const lines: string[] = [];
+	if (parts.renames) lines.push(parts.renames);
+	for (const r of parts.removed) lines.push(`Removed '${r.name}' from ${r.removed} ${r.removed === 1 ? "note" : "notes"}${r.failed > 0 ? `, ${r.failed} failed` : ""}`);
+	for (const name of parts.referenced) lines.push(`Filters or formulas still reference '${name}', update them manually`);
+	return lines.join("\n");
+}
+
 const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
+function nativeLabelOf(app: App): (name: string) => string | null {
+	return (name) => {
+		const mtm = getMetadataTypeManager(app);
+		if (!mtm) return null;
+		try {
+			const type: unknown = mtm.getTypeInfo(name, null).expected.type;
+			return typeof type === "string" ? type : null;
+		} catch {
+			return null;
+		}
+	};
+}
+
 /** Dialog input and handlers for one base; the modal itself stays UI-only. */
-export function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, registry: SchemaRegistry, basePath: string): { input: SchemaSettingsInput; handlers: SchemaSettingsHandlers } {
+export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, registry: SchemaRegistry, basePath: string, viewName: string | null): Promise<{ input: SchemaSettingsInput; handlers: SchemaSettingsHandlers }> {
 	const app = plugin.app;
+	const file = app.vault.getAbstractFileByPath(basePath);
+	if (!(file instanceof TFile)) throw new Error("Base not found");
+	const source = await app.vault.cachedRead(file);
 	const members = env.membership.targetEntries(basePath);
 	const names = new Set<string>();
 	for (const f of members ?? []) {
@@ -82,39 +135,68 @@ export function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, registry: Sc
 			if (k !== "position") names.add(k);
 		}
 	}
+	const memberKeys = [...names].sort();
 	const basePaths = app.vault.getFiles().filter((f) => f.extension === "base").map((f) => f.path).sort();
-	const state = schemaState(registry, basePath);
+	let state: State;
+	let views: string[] = [];
+	let defaultViewIndex = 0;
+	let expressions: string[] = [];
+	try {
+		const columns = readBaseColumns(source);
+		views = columns.views;
+		expressions = columns.expressions;
+		const index = viewName === null ? -1 : views.indexOf(viewName);
+		defaultViewIndex = index < 0 ? 0 : index;
+		state = schemaState(registry, basePath, columns, memberKeys, nativeLabelOf(app), defaultViewIndex);
+	} catch (e) {
+		state = { kind: "error", message: message(e), resettable: false };
+	}
 	const originalNames = state.kind === "fields" ? state.drafts.flatMap((d) => (d.originalName === null ? [] : [d.originalName])) : [];
 	const input: SchemaSettingsInput = {
 		basePath,
 		state,
-		propertyNames: [...names].sort(),
+		propertyNames: memberKeys,
 		basePaths,
 		overlays: env.overlays,
 		membersKnown: () => env.membership.targetEntries(basePath) !== null,
+		views,
+		defaultViewIndex,
+		expressions,
 	};
-	const onSave = async (drafts: FieldDraft[]): Promise<void> => {
-		if (!registry.schemas().some((s) => s.basePath === basePath) && !registry.errors().has(basePath)) {
-			await env.writer.activate(basePath);
-		}
-		await env.writer.update(basePath, draftsToMutation(drafts, originalNames));
+	const onSave = async (drafts: FieldDraft[], addView: number): Promise<void> => {
+		const { edits, mutate } = draftsToEdits(drafts, originalNames, addView);
+		await env.writer.update(basePath, mutate, edits);
 		const pairs = renames(drafts);
-		if (!pairs.length) {
+		const removedNames = removals(drafts);
+		if (!pairs.length && !removedNames.length) {
 			new Notice("Schema saved");
 			return;
 		}
-		const members = env.membership.targetEntries(basePath);
-		const counts = members ? await migrateRenames(app, members, pairs) : null;
-		new Notice(`Schema saved\n${renameSummary(pairs, counts)}`);
+		const current = env.membership.targetEntries(basePath);
+		let renameText = renameSummary(pairs, current && pairs.length ? await migrateRenames(app, current, pairs) : null);
+		const removed: { name: string; removed: number; failed: number }[] = [];
+		if (removedNames.length) {
+			if (current) {
+				for (const name of removedNames) removed.push({ name, ...(await removeProperties(app, current, [name])) });
+			} else {
+				renameText = [renameText, "Properties not removed: base members unknown"].filter(Boolean).join("\n");
+			}
+		}
+		const referenced = pairs.filter((p) => referencesName(expressions, p.from)).map((p) => p.from);
+		new Notice(`Schema saved\n${saveSummary({ renames: renameText, removed, referenced })}`);
 	};
 	const onReset = (): Promise<void> => env.writer.reset(basePath);
-	return { input, handlers: { onSave, onReset } };
+	const countAffected = async (name: string): Promise<number> => {
+		const current = env.membership.targetEntries(basePath);
+		return current ? countNotesWithKey(app, current, name) : 0;
+	};
+	return { input, handlers: { onSave, onReset, countAffected } };
 }
 
 export function registerSchemaSettings(plugin: Plugin, env: WidgetEnv, registry: SchemaRegistry): void {
-	const open = (basePath: string): void => {
+	const open = async (basePath: string, viewName: string | null): Promise<void> => {
 		try {
-			const { input, handlers } = buildSchemaSettings(plugin, env, registry, basePath);
+			const { input, handlers } = await buildSchemaSettings(plugin, env, registry, basePath, viewName);
 			new SchemaSettingsModal(plugin.app, input, handlers).open();
 		} catch (e) {
 			new Notice(`Could not open schema settings: ${message(e)}`);
@@ -126,7 +208,7 @@ export function registerSchemaSettings(plugin: Plugin, env: WidgetEnv, registry:
 		checkCallback: (checking) => {
 			const file = plugin.app.workspace.getActiveFile();
 			if (!(file instanceof TFile) || file.extension !== "base") return false;
-			if (!checking) open(file.path);
+			if (!checking) void open(file.path, null);
 			return true;
 		},
 	});
@@ -134,8 +216,8 @@ export function registerSchemaSettings(plugin: Plugin, env: WidgetEnv, registry:
 		plugin.app.workspace.on("file-menu", (menu, file, source) => {
 			if (!["tab-header", "more-options", "file-explorer-context-menu"].includes(source)) return;
 			if (!(file instanceof TFile) || file.extension !== "base") return;
-			menu.addItem((item) => item.setSection("action").setTitle("Schema settings").setIcon("lucide-shapes").onClick(() => open(file.path)));
+			menu.addItem((item) => item.setSection("action").setTitle("Schema settings").setIcon("lucide-shapes").onClick(() => void open(file.path, null)));
 		}),
 	);
-	plugin.register(installSchemaButton(plugin.app, open));
+	plugin.register(installSchemaButton(plugin.app, (path, view) => void open(path, view)));
 }

@@ -10,14 +10,6 @@ export function updateSchemaSource(source: string, mutate: (fields: RawFields) =
 	return updateBaseSource(source, EMPTY_EDITS, mutate);
 }
 
-/** Adds an empty `improved-bases: { fields: {} }` node; no-op if the key exists. */
-export function activateSchemaSource(source: string): string {
-	const doc = parseDocument(source);
-	if (doc.has(SCHEMA_KEY)) return source;
-	doc.setIn([SCHEMA_KEY, "fields"], doc.createNode({}));
-	return doc.toString();
-}
-
 /** Replaces the whole `improved-bases` value with an empty schema, even if it was invalid. */
 export function resetSchemaSource(source: string): string {
 	const doc = parseDocument(source);
@@ -34,16 +26,9 @@ export class SchemaWriter {
 		return file;
 	}
 
-	async update(basePath: string, mutate: (fields: RawFields) => void): Promise<void> {
-		await this.app.vault.process(this.fileOf(basePath), (data) => updateSchemaSource(data, mutate));
-	}
-
-	async updateBase(basePath: string, edits: ColumnEdits, mutate: (fields: RawFields) => void): Promise<void> {
+	/** Applies the schema mutation and, optionally, column edits in one write. */
+	async update(basePath: string, mutate: (fields: RawFields) => void, edits: ColumnEdits = EMPTY_EDITS): Promise<void> {
 		await this.app.vault.process(this.fileOf(basePath), (data) => updateBaseSource(data, edits, mutate));
-	}
-
-	async activate(basePath: string): Promise<void> {
-		await this.app.vault.process(this.fileOf(basePath), activateSchemaSource);
 	}
 
 	async reset(basePath: string): Promise<void> {
