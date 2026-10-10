@@ -6,7 +6,8 @@ import { SCHEMA_KEY } from "./types";
 
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
 
-export type RawFields = Record<string, Record<string, unknown>>;
+import type { RawFields } from "./baseDoc";
+export type { RawFields } from "./baseDoc";
 
 /** Edits only `improved-bases.fields`; everything else is preserved byte-for-byte. */
 export function updateSchemaSource(source: string, mutate: (fields: RawFields) => void): string {
