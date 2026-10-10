@@ -37,3 +37,4 @@ test-vault/.trash/
 
 # OpenKnowledge working data
 .ok/
+.fallow/
