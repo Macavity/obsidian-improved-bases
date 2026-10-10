@@ -16,7 +16,7 @@ const fmText = (f: TFile) => {
   const fm = (f as unknown as { frontmatter?: Record<string, unknown> }).frontmatter;
   return fm ? `---\n${Object.entries(fm).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join("\n")}\n---\n` : "";
 };
-const d = (o: Partial<FieldDraft>): FieldDraft => ({ originalName: null, originalBase: null, name: "", type: "native", nativeLabel: null, pinned: null, hadCustomization: false, removed: false, multiple: false, options: [], ...o });
+const d = (o: Partial<FieldDraft>): FieldDraft => ({ originalName: null, originalBase: null, name: "", type: "native", nativeLabel: null, pinned: null, removed: false, multiple: false, options: [], ...o });
 
 const registry = (schemas: { basePath: string; fields: Map<string, { name: string; field: { type: "text" } }> }[], errors: Record<string, string[]>) =>
   ({ schemas: () => schemas, errors: () => new Map(Object.entries(errors)) }) as unknown as SchemaRegistry;
@@ -97,25 +97,63 @@ describe("saveSummary", () => {
 
 describe("countNotesWithKey / removeProperties", () => {
   const mk = () => [mdFile("a.md", { Old: 1, Keep: 2 }), mdFile("b.md", { Other: 1 }), mdFile("c.md", { Old: 3 })];
-  const app = (fail?: string) => {
+  const fmOf = (f: TFile) => (f as unknown as { frontmatter: Record<string, unknown> }).frontmatter;
+  const app = (fail?: string, unreadable?: string) => {
     const processFrontMatter = vi.fn((f: TFile, fn: (fm: Record<string, unknown>) => void) => {
       if (f.path === fail) return Promise.reject(new Error("boom"));
-      fn((f as unknown as { frontmatter: Record<string, unknown> }).frontmatter);
+      fn(fmOf(f));
       return Promise.resolve();
     });
-    return { app: { vault: { cachedRead: (f: TFile) => Promise.resolve(fmText(f)) }, fileManager: { processFrontMatter } } as unknown as App, processFrontMatter };
+    const cachedRead = (f: TFile) => (f.path === unreadable ? Promise.reject(new Error("io")) : Promise.resolve(fmText(f)));
+    return { app: { vault: { cachedRead }, fileManager: { processFrontMatter } } as unknown as App, processFrontMatter };
   };
   it("counts members whose frontmatter has the key", async () => {
     expect(await countNotesWithKey(app().app, mk(), "Old")).toBe(2);
     expect(await countNotesWithKey(app().app, mk(), "Nope")).toBe(0);
   });
+  it("counts keys case-insensitively", async () => {
+    expect(await countNotesWithKey(app().app, [mdFile("a.md", { status: "x" })], "Status")).toBe(1);
+  });
   it("deletes keys and counts failures", async () => {
     const files = mk();
     const t = app("c.md");
     vi.spyOn(console, "error").mockImplementation(() => undefined);
-    expect(await removeProperties(t.app, files, ["Old"])).toEqual({ removed: 1, failed: 1 });
+    expect(await removeProperties(t.app, files, ["Old"])).toEqual([{ name: "Old", removed: 1, failed: 1 }]);
     expect(t.processFrontMatter).toHaveBeenCalledTimes(2); // b.md skipped
-    expect((files[0] as unknown as { frontmatter: object }).frontmatter).toEqual({ Keep: 2 });
+    expect(fmOf(files[0] as TFile)).toEqual({ Keep: 2 });
+  });
+  it("deletes every case variant of the key", async () => {
+    const files = [mdFile("a.md", { status: "x" }), mdFile("b.md", { Status: 1, status: 2, Keep: 3 })];
+    const t = app();
+    expect(await removeProperties(t.app, files, ["Status"])).toEqual([{ name: "Status", removed: 2, failed: 0 }]);
+    expect(fmOf(files[0] as TFile)).toEqual({});
+    expect(fmOf(files[1] as TFile)).toEqual({ Keep: 3 });
+  });
+  it("removes several names in one pass per note", async () => {
+    const files = [mdFile("a.md", { Old: 1, Other: 2 }), mdFile("b.md", { Old: 3 }), mdFile("c.md", { Keep: 4 })];
+    const t = app();
+    expect(await removeProperties(t.app, files, ["Old", "Other"])).toEqual([{ name: "Old", removed: 2, failed: 0 }, { name: "Other", removed: 1, failed: 0 }]);
+    expect(t.processFrontMatter).toHaveBeenCalledTimes(2);
+    expect(fmOf(files[0] as TFile)).toEqual({});
+    expect(fmOf(files[1] as TFile)).toEqual({});
+  });
+  it("counts a failed write for the names the note had", async () => {
+    const files = [mdFile("a.md", { Old: 1 }), mdFile("b.md", { Old: 2, Other: 3 })];
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    expect(await removeProperties(app("a.md").app, files, ["Old", "Other"])).toEqual([{ name: "Old", removed: 1, failed: 1 }, { name: "Other", removed: 1, failed: 0 }]);
+  });
+  it("counts an unreadable note as failed for every name and continues", async () => {
+    const files = [mdFile("a.md", { Old: 1 }), mdFile("b.md", { Old: 2 })];
+    const t = app(undefined, "a.md");
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    expect(await removeProperties(t.app, files, ["Old", "Other"])).toEqual([{ name: "Old", removed: 1, failed: 1 }, { name: "Other", removed: 0, failed: 1 }]);
+    expect(t.processFrontMatter).toHaveBeenCalledTimes(1);
+  });
+  it("counts an unreadable note as failed when renaming and continues", async () => {
+    const files = [mdFile("a.md", { Old: 1 }), mdFile("b.md", { Old: 2 })];
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    expect(await migrateRenames(app(undefined, "a.md").app, files, [{ from: "Old", to: "New" }])).toEqual({ renamed: 1, conflict: 0, failed: 1 });
+    expect(fmOf(files[1] as TFile)).toEqual({ New: 2 });
   });
 });
 
@@ -188,7 +226,7 @@ describe("buildSchemaSettings", () => {
   it("saves base, migrates renames, removes properties and reports", async () => {
     const t = await build({ base: 'filters: \'Status == "x"\'\nviews:\n  - type: table\n    name: A\n' });
     await t.handlers.onSave([
-      d({ originalName: "Status", name: "Stand", type: "select", hadCustomization: true, options: [] }),
+      d({ originalName: "Status", name: "Stand", type: "select", options: [] }),
       d({ originalName: "Old", name: "Old", removed: true }),
     ], 0);
     expect(t.writer.update).toHaveBeenCalledTimes(1);
@@ -196,6 +234,49 @@ describe("buildSchemaSettings", () => {
     expect(lastNotice()).toMatch(/Renamed Status → Stand in 1 note/);
     expect(lastNotice()).toMatch(/Removed 'Old' from 1 note/);
     expect(lastNotice()).toMatch(/Filters or formulas still reference 'Status'/);
+  });
+  it("writes the base edits and a mutation that renames the schema entry", async () => {
+    const t = await build();
+    await t.handlers.onSave([d({ originalName: "Status", name: "Stand", type: "select", options: [] }), d({ originalName: "Old", name: "Old", removed: true })], 0);
+    expect(t.writer.update).toHaveBeenCalledWith("M.base", expect.any(Function), { add: [], remove: ["Old"], rename: [{ from: "Status", to: "Stand" }] });
+    const mutate = (t.writer.update.mock.calls[0] as unknown as [string, (f: Record<string, Record<string, unknown>>) => void])[1];
+    const fields: Record<string, Record<string, unknown>> = { Status: { type: "text" }, Unrelated: { type: "relation", base: "X.base" } };
+    mutate(fields);
+    expect(Object.keys(fields).sort()).toEqual(["Stand", "Unrelated"]);
+    expect(fields.Stand).toMatchObject({ type: "select" });
+    expect(fields.Unrelated).toEqual({ type: "relation", base: "X.base" });
+  });
+  it("saves the base before renaming and renames before removing", async () => {
+    const t = await build();
+    const log: string[] = [];
+    t.writer.update.mockImplementation(() => { log.push("base"); return Promise.resolve(); });
+    t.processFrontMatter.mockImplementation((_f: TFile, fn: (fm: Record<string, unknown>) => void) => {
+      const fm: Record<string, unknown> = { Status: "x", Old: "y" };
+      fn(fm);
+      log.push(Object.hasOwn(fm, "Stand") ? "rename" : "remove");
+      return Promise.resolve();
+    });
+    await t.handlers.onSave([d({ originalName: "Status", name: "Stand" }), d({ originalName: "Old", name: "Old", removed: true })], 0);
+    expect(log).toEqual(["base", "rename", "remove"]);
+  });
+  it("rejects without touching notes when the base write fails", async () => {
+    const t = await build();
+    t.writer.update.mockImplementation(() => Promise.reject(new Error("disk")));
+    const before = notices.length;
+    await expect(t.handlers.onSave([d({ originalName: "Status", name: "Stand" }), d({ originalName: "Old", name: "Old", removed: true })], 0)).rejects.toThrow("disk");
+    expect(t.processFrontMatter).not.toHaveBeenCalled();
+    expect(notices.length).toBe(before);
+  });
+  it("reports removals as not done when members are unknown", async () => {
+    const t = await build({ members: null });
+    await t.handlers.onSave([d({ originalName: "Old", name: "Old", removed: true })], 0);
+    expect(t.processFrontMatter).not.toHaveBeenCalled();
+    expect(lastNotice()).toContain("Properties not removed: base members unknown");
+  });
+  it("warns when filters or formulas reference a removed field", async () => {
+    const t = await build({ base: 'filters: \'Old == "y"\'\nviews:\n  - type: table\n    name: A\n' });
+    await t.handlers.onSave([d({ originalName: "Old", name: "Old", removed: true })], 0);
+    expect(lastNotice()).toMatch(/Filters or formulas still reference 'Old'/);
   });
   it("does not touch notes when members are unknown", async () => {
     const t = await build({ members: null });

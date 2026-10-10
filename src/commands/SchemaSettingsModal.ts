@@ -40,9 +40,9 @@ function errorText(e: unknown): string {
 	return e instanceof Error ? e.message : String(e);
 }
 
-/** "native", "native (text)" or "native (text, pinned)". */
+/** "native", "native (text)" or "native (number, pinned)"; the pin decides the widget in this base, so its type wins. */
 function nativeText(draft: FieldDraft): string {
-	const label = draft.nativeLabel ?? (draft.pinned ? String(draft.pinned.type) : null);
+	const label = draft.pinned ? String(draft.pinned.type) : draft.nativeLabel;
 	if (label === null) return "native";
 	return draft.pinned ? `native (${label}, pinned)` : `native (${label})`;
 }
@@ -143,7 +143,7 @@ export class SchemaSettingsModal extends Modal {
 		add.addEventListener("click", () => {
 			const draft: FieldDraft = {
 				originalName: null, originalBase: null, name: "", type: "native", nativeLabel: null,
-				pinned: null, hadCustomization: false, removed: false, multiple: false, options: [],
+				pinned: null, removed: false, multiple: false, options: [],
 			};
 			this.drafts.push(draft);
 			this.expanded.add(draft);
@@ -218,7 +218,8 @@ export class SchemaSettingsModal extends Modal {
 	private renderConfirm(row: HTMLElement, draft: FieldDraft, name: string): void {
 		row.empty();
 		const confirm = row.createDiv({ cls: "improved-bases-field-confirm" });
-		const text = confirm.createSpan({ text: `Remove '${name}' and its value from the notes?` });
+		const warning = referencesName(this.input.expressions, name) ? " Filters or formulas reference it." : "";
+		const text = confirm.createSpan({ text: `Remove '${name}' and its value from the notes?${warning}` });
 		const remove = confirm.createEl("button", { cls: "mod-warning improved-bases-confirm-remove", text: "Remove", attr: { type: "button" } });
 		remove.disabled = true;
 		const keep = confirm.createEl("button", { cls: "improved-bases-confirm-keep", text: "Keep", attr: { type: "button" } });
@@ -233,7 +234,7 @@ export class SchemaSettingsModal extends Modal {
 		void this.handlers.countAffected(name).then(
 			(count) => {
 				if (stale()) return;
-				text.setText(`Remove '${name}' and its value from ${count} ${count === 1 ? "note" : "notes"}?`);
+				text.setText(`Remove '${name}' and its value from ${count} ${count === 1 ? "note" : "notes"}?${warning}`);
 				remove.disabled = false;
 			},
 			(e: unknown) => {

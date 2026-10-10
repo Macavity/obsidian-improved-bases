@@ -6,7 +6,7 @@ import { OverlayRegistry } from "../src/widgets/types";
 
 const d = (p: Partial<FieldDraft>): FieldDraft => ({
 	originalName: null, originalBase: null, name: "X", type: "native", nativeLabel: null,
-	pinned: null, hadCustomization: false, removed: false, multiple: false, options: [], ...p,
+	pinned: null, removed: false, multiple: false, options: [], ...p,
 });
 const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 
@@ -196,10 +196,11 @@ describe("SchemaSettingsModal", () => {
 				d({ name: "Tags" }),
 				d({ name: "Alpha", nativeLabel: "text", pinned: { type: "text" } }),
 				d({ name: "Beta", pinned: { type: "number" } }),
+				d({ name: "Gamma", nativeLabel: "text", pinned: { type: "number" } }),
 			],
 		});
 		const rows = Array.from(el.querySelectorAll(".improved-bases-field-summary-text")).map((r) => r.textContent);
-		expect(rows).toEqual(["Status · native (text)", "Tags · native", "Alpha · native (text, pinned)", "Beta · native (number, pinned)"]);
+		expect(rows).toEqual(["Status · native (text)", "Tags · native", "Alpha · native (text, pinned)", "Beta · native (number, pinned)", "Gamma · native (number, pinned)"]);
 		q<HTMLElement>(".improved-bases-field-summary").click();
 		const labels = Array.from(q<HTMLSelectElement>(".improved-bases-field-type").options).map((o) => o.textContent);
 		expect(labels).toEqual(["native (text)", "relation", "select"]);
@@ -282,6 +283,28 @@ describe("SchemaSettingsModal", () => {
 		input.value = "Status";
 		input.dispatchEvent(new Event("input"));
 		expect(q(".improved-bases-field-hint").textContent).toBe("");
+	});
+
+	it("shows the pinned type in the type dropdown", () => {
+		const { q } = open({ kind: "fields", drafts: [d({ name: "G", nativeLabel: "text", pinned: { type: "number" } })] });
+		q<HTMLElement>(".improved-bases-field-summary").click();
+		const labels = Array.from(q<HTMLSelectElement>(".improved-bases-field-type").options).map((o) => o.textContent);
+		expect(labels[0]).toBe("native (number, pinned)");
+	});
+
+	it("warns in the remove confirmation when expressions reference the field", async () => {
+		const { q } = open({ kind: "fields", drafts: [d({ originalName: "Status", name: "Status" })] }, { expressions: ['Status != "a"'], countAffected: () => Promise.resolve(2) });
+		q<HTMLElement>(".improved-bases-field-remove").click();
+		expect(q(".improved-bases-field-confirm").textContent).toMatch(/from the notes\? Filters or formulas reference it\./);
+		await tick();
+		expect(q(".improved-bases-field-confirm").textContent).toMatch(/from 2 notes\? Filters or formulas reference it\./);
+	});
+
+	it("does not warn in the remove confirmation without references", async () => {
+		const { q } = open({ kind: "fields", drafts: [d({ originalName: "Status", name: "Status" })] }, { expressions: ['Other != "a"'] });
+		q<HTMLElement>(".improved-bases-field-remove").click();
+		await tick();
+		expect(q(".improved-bases-field-confirm").textContent).not.toMatch(/reference/);
 	});
 
 	it("passes removed drafts to save", async () => {
