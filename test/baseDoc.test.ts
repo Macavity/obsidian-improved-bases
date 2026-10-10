@@ -1,3 +1,4 @@
+import { parseDocument } from "yaml";
 import { describe, it, expect } from "vitest";
 import { readBaseColumns, referencesName, propertyName, EMPTY_EDITS, updateBaseSource } from "../src/schema/baseDoc";
 
@@ -106,6 +107,25 @@ describe("updateBaseSource", () => {
 		expect(out).toContain("- property: note.Stand\n");
 		expect(out).toMatch(/groupBy:\n {6}property: Stand\n/);
 		expect(out).not.toMatch(/Status(?!\s*!=|"\])/); // only expression strings still mention Status
+	});
+	it("drops renames that would create duplicate map keys", () => {
+		const dup = `properties:
+  note.Status:
+    displayName: A
+  note.status:
+    displayName: B
+views:
+  - type: table
+    summaries:
+      Status: Average
+      note.Status: Sum
+`;
+		const out = updateBaseSource(dup, { ...EMPTY_EDITS, rename: [{ from: "Status", to: "Stand" }] }, noop);
+		const doc = parseDocument(out);
+		expect(doc.errors).toEqual([]);
+		const json = doc.toJS() as { properties: Record<string, unknown>; views: { summaries: unknown }[] };
+		expect(json.properties).toEqual({ "note.Stand": { displayName: "A" } });
+		expect(json.views[0]?.summaries).toEqual({ Stand: "Average", "note.Stand": "Sum" });
 	});
 	it("returns the identical string without changes", () => {
 		expect(updateBaseSource(src, EMPTY_EDITS, noop)).toBe(src);

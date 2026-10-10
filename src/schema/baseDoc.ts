@@ -138,11 +138,23 @@ function editList(list: unknown, edit: EntryEdit, pick: (item: unknown) => unkno
 
 function editKeys(map: unknown, edit: EntryEdit): void {
 	if (!isMap(map)) return;
-	map.items = map.items.filter((pair: Pair) => {
+	const results = map.items.map((pair: Pair) => {
 		const value = scalarString(pair.key);
-		const next = value === null ? undefined : edit(value);
+		return value === null ? undefined : edit(value);
+	});
+	// Keys that stay as they are keep their spelling; a rename onto a taken key is dropped.
+	const taken = new Set<string>();
+	map.items.forEach((pair: Pair, i) => {
+		const value = scalarString(pair.key);
+		if (value !== null && (results[i] === undefined || results[i] === value)) taken.add(value);
+	});
+	map.items = map.items.filter((pair: Pair, i) => {
+		const next = results[i];
 		if (next === null) return false;
-		if (typeof next === "string" && isScalar(pair.key)) pair.key.value = next;
+		if (typeof next !== "string" || !isScalar(pair.key) || pair.key.value === next) return true;
+		if (taken.has(next)) return false;
+		taken.add(next);
+		pair.key.value = next;
 		return true;
 	});
 }
