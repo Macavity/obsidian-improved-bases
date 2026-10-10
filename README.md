@@ -101,7 +101,7 @@ pnpm check    # typecheck + lint + unit tests
 Test vault (`test-vault/`, versioned fixtures; requires the [Obsidian CLI](https://obsidian.md/help/cli)):
 
 ```bash
-pnpm vault:link-test  # symlink plugin into test-vault/.obsidian/plugins/improved-bases
+pnpm vault:link-test  # link the registered test-vault's plugin dir to this checkout (works from worktrees)
 pnpm vault:open   # one-time: confirm the dialog in Obsidian, enable community plugins
 pnpm dev          # watch build, then `pnpm reload` after changes
 pnpm smoke        # reset vault, build, reload, run CLI checks

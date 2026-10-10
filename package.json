@@ -22,8 +22,8 @@
 		"vault:open": "node scripts/vault-open.mjs",
 		"vault:reset": "node scripts/vault-reset.mjs",
 		"reload": "node scripts/reload.mjs",
-		"perf": "pnpm vault:reset && pnpm build && pnpm reload && node scripts/perf.mjs",
-		"smoke": "pnpm vault:reset && pnpm build && pnpm reload && node scripts/smoke.mjs"
+		"perf": "pnpm vault:reset && pnpm vault:link-test && pnpm build && pnpm reload && node scripts/perf.mjs",
+		"smoke": "pnpm vault:reset && pnpm vault:link-test && pnpm build && pnpm reload && node scripts/smoke.mjs"
 	},
 	"author": "Alexander Pape",
 	"license": "MIT",

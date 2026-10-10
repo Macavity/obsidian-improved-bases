@@ -1,9 +1,9 @@
 // Links (or with --copy: copies) the plugin into a vault's .obsidian/plugins/improved-bases. Idempotent.
 // Usage:
-//   node scripts/vault-link.mjs --test            -> test-vault in this repo (pnpm vault:link-test)
+//   node scripts/vault-link.mjs --test            -> the registered test-vault, linked to this checkout (pnpm vault:link-test)
 //   node scripts/vault-link.mjs [vault-name]      -> a vault registered in Obsidian; without a name, pick from a list
 //   --copy copies the three plugin files instead of linking
-import { copyFileSync, existsSync, lstatSync, mkdirSync, readlinkSync, realpathSync, symlinkSync } from "node:fs";
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readlinkSync, realpathSync, symlinkSync, unlinkSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { REPO, VAULT_PATH, listVaults } from "./lib/cli.mjs";
@@ -55,15 +55,22 @@ function copyInstall(target) {
 	console.log(`copied plugin files to ${target}`);
 }
 
-/** True when `target` already is the expected symlink; throws when something else is in the way. */
+/** True when `target` already links to this checkout. A link elsewhere (another worktree) is replaced; anything else throws. */
 function linkExists(target) {
 	let st = null;
 	try {
 		st = lstatSync(target);
 	} catch {}
 	if (!st) return false;
-	if (st.isSymbolicLink() && realpathSync(target) === realpathSync(REPO)) return true;
-	throw new Error(`${target} exists and is not the expected link; remove it manually.`);
+	if (!st.isSymbolicLink()) throw new Error(`${target} exists and is not a symlink; remove it manually.`);
+	let real = null;
+	try {
+		real = realpathSync(target);
+	} catch {}
+	if (real === realpathSync(REPO)) return true;
+	console.log(`re-linking ${target} (was ${readlinkSync(target)})`);
+	unlinkSync(target);
+	return false;
 }
 
 function linkInstall(pluginsDir, target, label) {

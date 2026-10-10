@@ -6,7 +6,19 @@ import { fileURLToPath } from "node:url";
 
 const VAULT = "test-vault";
 export const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
-export const VAULT_PATH = join(REPO, "test-vault");
+/** This checkout's versioned fixtures. */
+export const FIXTURES = join(REPO, "test-vault");
+/** The vault registered in Obsidian: the main checkout's test-vault (worktrees mirror into it), or $IMPROVED_BASES_TEST_VAULT. */
+export const VAULT_PATH = process.env.IMPROVED_BASES_TEST_VAULT ? resolve(process.env.IMPROVED_BASES_TEST_VAULT) : join(mainCheckout(), "test-vault");
+
+function mainCheckout() {
+	try {
+		const common = execFileSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd: REPO, encoding: "utf8" }).trim();
+		return dirname(common);
+	} catch {
+		return REPO;
+	}
+}
 
 const CLI_TIMEOUT_MS = 30000;
 

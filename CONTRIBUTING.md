@@ -28,7 +28,7 @@ Build artifacts (`main.js`, `manifest.json`, `styles.css`) are produced at the r
 ## Testing
 
 - Unit: `pnpm test` (vitest + happy-dom, `obsidian` mocked in `test/__mocks__/obsidian.ts`). `pnpm check` = typecheck + lint + test + quality.
-- Integration: `pnpm smoke` runs against the versioned vault `test-vault/`, never against a working vault. All CLI calls go through `scripts/lib/cli.mjs`, which always passes `vault="test-vault"` and aborts unless that vault is registered at `<repo>/test-vault`.
+- Integration: `pnpm smoke` runs against the versioned vault `test-vault/`, never against a working vault. All CLI calls go through `scripts/lib/cli.mjs`, which always passes `vault="test-vault"` and aborts unless that vault is registered at the main checkout's `test-vault` (override with `IMPROVED_BASES_TEST_VAULT`). Git worktrees share that vault: `vault:reset` mirrors the worktree's fixtures into it and `vault:link-test` points the plugin symlink at the worktree, so Obsidian always loads the checkout that last ran `smoke`, `perf` or `vault:link-test`.
 
 Test vault setup (once):
 
@@ -38,7 +38,7 @@ Test vault setup (once):
 
 `pnpm perf` generates 2000 notes and 10 schema bases in `test-vault/_perf/`, prints `membership.ready` and table render times and resets the vault; it fails if `ready` exceeds 3 s. CLI calls time out after 30 s; keep the test-vault window visible while running `pnpm perf` or `pnpm smoke`, otherwise Chromium throttling causes timeouts. If Obsidian hangs, run `obsidian vault="test-vault" reload` and `pnpm vault:reset`.
 
-`pnpm vault:reset` restores `test-vault/` to `HEAD` and removes untracked files (the symlink and `workspace*.json` are gitignored and stay). Change fixtures only in a commit.
+`pnpm vault:reset` restores `test-vault/` to `HEAD`, removes untracked files and, from a worktree, mirrors the result into the registered vault (the plugin symlink, `workspace*.json`, cache and `.trash` stay). Change fixtures only in a commit.
 
 ## Code quality
 
