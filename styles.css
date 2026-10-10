@@ -159,6 +159,34 @@
 .improved-bases-schema .improved-bases-schema-error {
 	color: var(--text-error);
 }
+.improved-bases-schema .improved-bases-add-view {
+	min-width: 10em;
+}
+.improved-bases-schema .improved-bases-field-confirm {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	padding: var(--size-4-2) 0;
+}
+.improved-bases-schema .improved-bases-field-confirm > span {
+	flex: 1;
+	min-width: 0;
+}
+.improved-bases-schema .improved-bases-field-removed .improved-bases-field-summary {
+	cursor: default;
+}
+.improved-bases-schema .improved-bases-field-removed .improved-bases-field-summary-text {
+	text-decoration: line-through;
+	opacity: 0.7;
+}
+.improved-bases-schema .improved-bases-undo {
+	font-size: var(--font-ui-smaller);
+}
+.improved-bases-schema .improved-bases-field-hint {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	padding-bottom: var(--size-4-2);
+}
 .improved-bases-schema .improved-bases-add-field {
 	margin-top: var(--size-4-3);
 	display: inline-flex;
