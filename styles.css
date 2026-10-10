@@ -111,16 +111,6 @@
 	margin-top: var(--size-4-2);
 }
 
-.improved-bases-toolbar-item {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--size-2-2);
-}
-.improved-bases-toolbar-item .svg-icon {
-	width: var(--icon-s);
-	height: var(--icon-s);
-}
-
 .improved-bases-schema .improved-bases-field-row {
 	border-bottom: 1px solid var(--background-modifier-border);
 }

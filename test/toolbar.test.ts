@@ -71,11 +71,33 @@ describe("installSchemaButton", () => {
 		const t2 = toolbar(div(div(c2, "internal-embed"), "bases-embed"));
 		await new Promise((r) => setTimeout(r, 0));
 		expect(t2.querySelectorAll(".improved-bases-toolbar-item")).toHaveLength(1);
-		(t1.querySelector(".improved-bases-toolbar-item") as HTMLElement).click();
+		(t1.querySelector(".improved-bases-toolbar-item .text-icon-button") as HTMLElement).click();
 		expect(onOpen).toHaveBeenCalledWith("A.base");
 		off();
 		expect((a.workspace as unknown as { offref: ReturnType<typeof vi.fn> }).offref).toHaveBeenCalled();
 		expect(document.querySelectorAll(".improved-bases-toolbar-item")).toHaveLength(0);
+	});
+	it("mirrors the native toolbar item markup so Obsidian's button styles do not apply", () => {
+		document.body.innerHTML = "";
+		const c = div(document.body, "workspace-leaf-content");
+		const t = toolbar(c);
+		const onOpen = vi.fn();
+		const off = installSchemaButton(app([leaf(c, "bases", "A.base")]), onOpen);
+		const item = t.querySelector(".improved-bases-toolbar-item") as HTMLElement;
+		expect(item.tagName).toBe("DIV");
+		expect(item.classList.contains("bases-toolbar-item")).toBe(true);
+		expect(t.querySelector("button")).toBeNull();
+		const button = item.querySelector(".text-icon-button") as HTMLElement;
+		expect(button.getAttribute("role")).toBe("button");
+		expect(button.getAttribute("tabindex")).toBe("0");
+		expect(button.querySelector(".text-button-icon")?.getAttribute("data-icon")).toBe("lucide-shapes");
+		expect(button.querySelector(".text-button-label")?.textContent).toBe("Schema");
+		button.click();
+		button.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+		button.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
+		button.dispatchEvent(new KeyboardEvent("keydown", { key: "a", bubbles: true }));
+		expect(onOpen).toHaveBeenCalledTimes(3);
+		off();
 	});
 	it("skips code-block bases", () => {
 		document.body.innerHTML = "";

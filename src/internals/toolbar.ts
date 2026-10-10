@@ -33,13 +33,21 @@ export function installSchemaButton(app: App, onOpen: (basePath: string) => void
 	const inject = (toolbar: Element): void => {
 		// Code-block bases have no file; checking for the button (not a marker) survives Bases re-rendering the toolbar.
 		if (toolbar.closest(".block-language-base") || toolbar.querySelector(`.${ITEM_CLASS}`)) return;
-		const button = toolbar.createEl("button", { cls: `bases-toolbar-item ${ITEM_CLASS}` });
-		setIcon(button.createSpan(), "lucide-shapes");
-		button.createSpan({ text: "Schema" });
-		button.addEventListener("click", () => {
+		// Same markup as Obsidian's own items (div > div.text-icon-button); a <button> would get the filled button style.
+		const item = toolbar.createDiv({ cls: `bases-toolbar-item ${ITEM_CLASS}` });
+		const button = item.createDiv({ cls: "text-icon-button tappable", attr: { role: "button", tabindex: "0" } });
+		setIcon(button.createSpan({ cls: "text-button-icon" }), "lucide-shapes");
+		button.createSpan({ cls: "text-button-label", text: "Schema" });
+		const open = (): void => {
 			const path = resolveBasePath(app, toolbar);
 			if (path) onOpen(path);
 			else new Notice("Could not determine the base file");
+		};
+		button.addEventListener("click", open);
+		button.addEventListener("keydown", (e) => {
+			if (e.key !== "Enter" && e.key !== " ") return;
+			e.preventDefault();
+			open();
 		});
 	};
 	const sweep = (): void => document.body.querySelectorAll(SELECTOR).forEach(inject);
