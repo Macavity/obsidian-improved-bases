@@ -1,21 +1,24 @@
 import { describe, it, expect } from "vitest";
 import { parse } from "yaml";
-import { draftsToMutation, fieldsToDrafts, renameKey, renames, validateDrafts, type FieldDraft } from "../src/commands/schemaDraft";
-import { updateSchemaSource, type RawFields } from "../src/schema/SchemaWriter";
+import { draftsToEdits, knownFieldDrafts, removals, renameKey, renames, TYPES, validateDrafts, type FieldDraft } from "../src/commands/schemaDraft";
+import { updateSchemaSource } from "../src/schema/SchemaWriter";
+import type { BaseColumns, RawFields } from "../src/schema/baseDoc";
 import { parseSchema } from "../src/schema/parse";
 
-const d = (p: Partial<FieldDraft>): FieldDraft => ({ originalName: null, originalBase: null, name: "X", type: "text", multiple: false, options: [], ...p });
+const d = (p: Partial<FieldDraft>): FieldDraft => ({ originalName: null, originalBase: null, name: "X", type: "native", nativeLabel: null, pinned: null, hadCustomization: false, removed: false, multiple: false, options: [], ...p });
+const mutation = (drafts: FieldDraft[], originals: string[]) => draftsToEdits(drafts, originals, 0).mutate;
+const none: BaseColumns = { views: [], orderByView: [], configured: [], expressions: [] };
 
 describe("schemaDraft", () => {
-	it("roundtrips fields to drafts", () => {
+	it("maps schema fields to drafts", () => {
 		const fields = new Map([["role", { name: "Role", field: { type: "select" as const, multiple: true, options: [{ value: "A", color: "red" as const }] } }]]);
-		expect(fieldsToDrafts(fields)).toEqual([d({ originalName: "Role", name: "Role", type: "select", multiple: true, options: [{ value: "A", color: "red" }] })]);
+		expect(knownFieldDrafts({ columns: none, schemaFields: fields, memberKeys: [], nativeLabel: () => null, currentView: 0 })).toEqual([d({ originalName: "Role", name: "Role", type: "select", hadCustomization: true, multiple: true, options: [{ value: "A", color: "red" }] })]);
 		const rel = new Map([["lead", { name: "Lead", field: { type: "relation" as const, base: "M.base", multiple: false } }]]);
-		expect(fieldsToDrafts(rel)).toEqual([d({ originalName: "Lead", originalBase: "M.base", name: "Lead", type: "relation", base: "M.base" })]);
+		expect(knownFieldDrafts({ columns: none, schemaFields: rel, memberKeys: [], nativeLabel: () => null, currentView: 0 })).toEqual([d({ originalName: "Lead", originalBase: "M.base", name: "Lead", type: "relation", hadCustomization: true, base: "M.base" })]);
 	});
 	it("validates names, duplicates, bases, options", () => {
 		expect(validateDrafts([d({ name: "" })], [])).toHaveLength(1);
-		expect(validateDrafts([d({ name: "__proto__" })], []).join()).toMatch(/reserved/i);
+		expect(validateDrafts([d({ name: "__proto__", pinned: { type: "text" } })], []).join()).toMatch(/reserved/i);
 		expect(validateDrafts([d({ name: "Role" }), d({ name: "role" })], []).join()).toMatch(/duplicate/i);
 		expect(validateDrafts([d({ name: "L", type: "relation", base: "X.base" })], ["M.base"]).join()).toMatch(/base/i);
 		expect(validateDrafts([d({ name: "L", type: "relation", base: "M.base" })], ["M.base"])).toEqual([]);
@@ -28,10 +31,10 @@ describe("schemaDraft", () => {
 	});
 	it("writes, deletes and renames fields; options replaced in draft order", () => {
 		const f: RawFields = { Role: { type: "select", multiple: false, options: { A: "red" } }, Old: { type: "text" }, Keep: { type: "date" } };
-		draftsToMutation([
+		mutation([
 			d({ originalName: "Role", name: "Role", type: "select", options: [{ value: "B", color: "blue" }, { value: "A", color: "red" }] }),
-			d({ originalName: "Old", name: "New", type: "text" }),
-			d({ originalName: "Keep", name: "Keep", type: "date" }),
+			d({ originalName: "Old", name: "New", pinned: { type: "text" } }),
+			d({ originalName: "Keep", name: "Keep", pinned: { type: "date" } }),
 			d({ name: "Lead", type: "relation", base: "M.base", multiple: true }),
 		], ["Role", "Old", "Keep"])(f);
 		expect(Object.keys(f)).toEqual(["Role", "Keep", "New", "Lead"]);
@@ -41,13 +44,13 @@ describe("schemaDraft", () => {
 	});
 	it("is prototype-safe", () => {
 		const f: RawFields = {};
-		draftsToMutation([d({ name: "__proto__" }), d({ name: "S", type: "select", options: [{ value: "__proto__", color: "red" }] })], [])(f);
+		mutation([d({ name: "__proto__", pinned: { type: "text" } }), d({ name: "S", type: "select", options: [{ value: "__proto__", color: "red" }] })], [])(f);
 		expect(Object.getPrototypeOf(f)).toBe(Object.prototype);
 		expect(Object.hasOwn(f.S!.options as object, "__proto__")).toBe(true);
 	});
 	it("produces a parseable schema through updateSchemaSource", () => {
 		const src = "improved-bases:\n  fields: {}\nviews: []\n";
-		const out = updateSchemaSource(src, draftsToMutation([d({ name: "Role", type: "select", options: [{ value: "A", color: "red" }] })], []));
+		const out = updateSchemaSource(src, mutation([d({ name: "Role", type: "select", options: [{ value: "A", color: "red" }] })], []));
 		expect(parseSchema("x.base", parse(out)).errors).toEqual([]);
 	});
 	it("detects renames including case-only", () => {
@@ -80,5 +83,42 @@ describe("schemaDraft", () => {
 		const caseOnly: Record<string, unknown> = { Team: 1 };
 		expect(renameKey(caseOnly, "Team", "team")).toBe("renamed");
 		expect(caseOnly).toEqual({ team: 1 });
+	});
+	const cols: BaseColumns = { views: ["A", "B"], orderByView: [["Team", "Status"], ["Zeta", "Status"]], configured: ["Alpha"], expressions: [] };
+	const schema = new Map([
+		["status", { name: "Status", field: { type: "select" as const, multiple: false, options: [{ value: "x", color: "red" as const }] } }],
+		["alpha", { name: "Alpha", field: { type: "text" as const } }],
+	]);
+	it("builds the union ordered by the current view", () => {
+		const drafts = knownFieldDrafts({ columns: cols, schemaFields: schema, memberKeys: ["created", "team", "position"], nativeLabel: (n) => (n === "Team" ? "multitext" : null), currentView: 1 });
+		expect(drafts.map((x) => x.name)).toEqual(["Zeta", "Status", "Alpha", "created", "Team"]);
+		expect(drafts[1]).toMatchObject({ type: "select", hadCustomization: true, originalName: "Status" });
+		expect(drafts[2]).toMatchObject({ type: "native", pinned: { type: "text" }, originalName: "Alpha" });
+		expect(drafts[4]).toMatchObject({ type: "native", nativeLabel: "multitext", originalName: "Team", pinned: null });
+	});
+	it("treats an out-of-range view as no current view", () => {
+		const drafts = knownFieldDrafts({ columns: cols, schemaFields: null, memberKeys: [], nativeLabel: () => null, currentView: 5 });
+		expect(drafts.map((x) => x.name)).toEqual(["Alpha", "Status", "Team", "Zeta"]);
+	});
+	it("turns drafts into column edits and a schema mutation", () => {
+		const drafts = [
+			d({ originalName: "Status", name: "Stand", type: "select", hadCustomization: true, options: [{ value: "x", color: "red" }] }),
+			d({ originalName: "Team", name: "Team", type: "native", hadCustomization: true }),
+			d({ originalName: "Alpha", name: "Alpha", type: "native", pinned: { type: "text" } }),
+			d({ originalName: "Old", name: "Old", removed: true }),
+			d({ originalName: null, name: "Neu", type: "native" }),
+		];
+		const { edits, mutate } = draftsToEdits(drafts, ["Status", "Team", "Alpha"], 1);
+		expect(edits).toEqual({ add: [{ view: 1, names: ["Neu"] }], remove: ["Old"], rename: [{ from: "Status", to: "Stand" }] });
+		const f: RawFields = { Status: { type: "select", multiple: false, options: { x: "red" } }, Team: { type: "relation", base: "T.base", multiple: true }, Alpha: { type: "text" } };
+		mutate(f);
+		expect(Object.keys(f)).toEqual(["Alpha", "Stand"]);
+		expect(f.Alpha).toEqual({ type: "text" });
+		expect(removals(drafts)).toEqual(["Old"]);
+		expect(renames(drafts)).toEqual([{ from: "Status", to: "Stand" }]);
+		expect(TYPES).toEqual(["native", "relation", "select"]);
+	});
+	it("skips removed drafts in validation", () => {
+		expect(validateDrafts([d({ name: "", removed: true, originalName: "X" })], [])).toEqual([]);
 	});
 });

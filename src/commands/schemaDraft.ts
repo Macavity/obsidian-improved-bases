@@ -1,6 +1,12 @@
-import { isColor, NATIVE_TYPES, type Color, type FieldSchema } from "../schema/types";
+import { isColor, type BaseSchema, type Color, type FieldSchema } from "../schema/types";
 import { findOwnKey, isUnsafeKey, setOption } from "../schema/keys";
-import type { RawFields } from "../schema/SchemaWriter";
+import type { BaseColumns, ColumnEdits, RawFields } from "../schema/baseDoc";
+
+/** Field kinds in the dialog: native (Obsidian's own type), or a plugin customization. */
+export type DraftType = "native" | "relation" | "select";
+
+/** All selectable field types. */
+export const TYPES: readonly DraftType[] = ["native", "relation", "select"];
 
 /** One select option while editing. */
 export interface OptionDraft { value: string; color: Color }
@@ -10,32 +16,73 @@ export interface FieldDraft {
 	originalName: string | null;
 	originalBase: string | null;
 	name: string;
-	type: FieldSchema["type"];
+	type: DraftType;
+	/** Obsidian's type for this property ("text", "multitext", "tags", ...) or null. */
+	nativeLabel: string | null;
+	/** Hand-written native entry, written back unchanged. */
+	pinned: Record<string, unknown> | null;
+	/** The original schema entry was a relation or select. */
+	hadCustomization: boolean;
+	removed: boolean;
 	multiple: boolean;
 	base?: string;
 	options: OptionDraft[];
 }
 
-/** All selectable field types. */
-export const TYPES: readonly FieldSchema["type"][] = ["relation", "select", ...NATIVE_TYPES];
-
-/** Drafts in map order. */
-export function fieldsToDrafts(fields: ReadonlyMap<string, { name: string; field: FieldSchema }>): FieldDraft[] {
-	return [...fields.values()].map(({ name, field }) => {
-		const draft: FieldDraft = { originalName: name, originalBase: null, name, type: field.type, multiple: false, options: [] };
-		if (field.type === "relation") {
-			draft.multiple = field.multiple;
-			draft.base = field.base;
-			draft.originalBase = field.base;
-		} else if (field.type === "select") {
-			draft.multiple = field.multiple;
-			draft.options = field.options.map((o) => ({ value: o.value, color: o.color }));
-		}
-		return draft;
-	});
+export interface KnownFieldsInput {
+	columns: BaseColumns;
+	schemaFields: BaseSchema["fields"] | null;
+	memberKeys: string[];
+	nativeLabel: (name: string) => string | null;
+	currentView: number;
 }
 
-const isRenamed = (x: FieldDraft): boolean => x.originalName !== null && x.originalName.toLowerCase() !== x.name.toLowerCase();
+/** Names in source order, deduplicated case-insensitively (first spelling wins). */
+function collectNames(input: KnownFieldsInput, current: string[]): string[] {
+	const { columns, schemaFields, memberKeys } = input;
+	const seen = new Set<string>();
+	const names: string[] = [];
+	const add = (n: string): void => {
+		const key = n.toLowerCase();
+		if (seen.has(key)) return;
+		seen.add(key);
+		names.push(n);
+	};
+	current.forEach(add);
+	columns.orderByView.forEach((order) => order.forEach(add));
+	columns.configured.forEach(add);
+	memberKeys.filter((k) => k !== "position").forEach(add);
+	for (const { name } of schemaFields?.values() ?? []) add(name);
+	return names;
+}
+
+function toDraft(name: string, field: FieldSchema | undefined, label: string | null): FieldDraft {
+	const draft: FieldDraft = {
+		originalName: name, originalBase: null, name, type: "native", nativeLabel: label,
+		pinned: null, hadCustomization: false, removed: false, multiple: false, options: [],
+	};
+	if (!field) return draft;
+	if (field.type === "relation") {
+		Object.assign(draft, { type: "relation", base: field.base, originalBase: field.base, multiple: field.multiple, hadCustomization: true });
+	} else if (field.type === "select") {
+		Object.assign(draft, { type: "select", multiple: field.multiple, hadCustomization: true, options: field.options.map((o) => ({ value: o.value, color: o.color })) });
+	} else {
+		draft.pinned = { type: field.type };
+	}
+	return draft;
+}
+
+/** Every field the base knows, current view's order first, the rest alphabetical. */
+export function knownFieldDrafts(input: KnownFieldsInput): FieldDraft[] {
+	const current = input.columns.orderByView[input.currentView] ?? [];
+	const names = collectNames(input, current);
+	const lead = new Set(current.map((n) => n.toLowerCase()));
+	const first = names.filter((n) => lead.has(n.toLowerCase()));
+	const rest = names.filter((n) => !lead.has(n.toLowerCase())).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+	return [...first, ...rest].map((n) => toDraft(n, input.schemaFields?.get(n.toLowerCase())?.field, input.nativeLabel(n)));
+}
+
+const isRenamed = (x: FieldDraft): boolean => !x.removed && x.originalName !== null && x.originalName.toLowerCase() !== x.name.toLowerCase();
 
 /** Name errors for one draft; `seen` and `vacated` hold lowercased names of the whole list. */
 function validateName(draft: FieldDraft, seen: Set<string>, vacated: Set<string>): string[] {
@@ -69,7 +116,7 @@ export function validateDrafts(drafts: FieldDraft[], basePaths: string[]): strin
 	const seen = new Set<string>();
 	// Names other fields are renamed away from; renaming onto one would swap values between fields.
 	const vacated = new Set(drafts.filter(isRenamed).map((x) => (x.originalName as string).toLowerCase()));
-	for (const draft of drafts) {
+	for (const draft of drafts.filter((x) => !x.removed)) {
 		const name = draft.name;
 		if (!name.trim()) {
 			errors.push("Field name is empty");
@@ -88,33 +135,45 @@ export function validateDrafts(drafts: FieldDraft[], basePaths: string[]): strin
 	return errors;
 }
 
-/** Mutation for `updateSchemaSource`: removes dropped/renamed fields, writes all drafts. */
-export function draftsToMutation(drafts: FieldDraft[], originalNames: string[]): (f: RawFields) => void {
-	return (f) => {
-		const names = new Set(drafts.map((x) => x.name));
+/** Column edits plus the schema mutation for `updateBaseSource`. */
+export function draftsToEdits(drafts: FieldDraft[], originalNames: string[], addView: number): { edits: ColumnEdits; mutate: (f: RawFields) => void } {
+	const added = drafts.filter((x) => x.originalName === null && !x.removed && x.name.trim()).map((x) => x.name);
+	const edits: ColumnEdits = { add: added.length ? [{ view: addView, names: added }] : [], remove: removals(drafts), rename: renames(drafts) };
+	const live = drafts.filter((x) => !x.removed);
+	const mutate = (f: RawFields): void => {
+		const names = new Set(live.map((x) => x.name));
 		for (const original of originalNames) {
 			const key = findOwnKey(f, original);
 			if (key !== undefined && !names.has(key)) delete f[key];
 		}
-		for (const draft of drafts) {
+		for (const draft of live) {
 			if (!draft.name.trim() || isUnsafeKey(draft.name)) continue;
-			Object.defineProperty(f, draft.name, { value: draftToField(draft), writable: true, enumerable: true, configurable: true });
+			const value = draftToField(draft);
+			if (value) Object.defineProperty(f, draft.name, { value, writable: true, enumerable: true, configurable: true });
+			else if (Object.hasOwn(f, draft.name)) delete f[draft.name];
 		}
 	};
+	return { edits, mutate };
 }
 
 /** Raw schema value for one draft. */
-function draftToField(draft: FieldDraft): Record<string, unknown> {
+function draftToField(draft: FieldDraft): Record<string, unknown> | null {
+	if (draft.type === "native") return draft.pinned;
 	if (draft.type === "relation") return { type: "relation", base: draft.base, multiple: draft.multiple };
-	if (draft.type !== "select") return { type: draft.type };
 	const options = Object.create(null) as Record<string, unknown>;
 	for (const o of draft.options) setOption(options, o.value, o.color);
 	return { type: "select", multiple: draft.multiple, options };
 }
 
-/** Existing fields whose name changed (including case-only changes). */
+/** OriginalName of every removed draft. */
+export function removals(drafts: FieldDraft[]): string[] {
+	return drafts.filter((x) => x.removed && x.originalName !== null).map((x) => x.originalName as string);
+}
+
+/** Existing, kept fields whose name changed (including case-only changes). */
 export function renames(drafts: FieldDraft[]): { from: string; to: string }[] {
 	return drafts
+		.filter((x) => !x.removed)
 		.filter((x) => x.originalName !== null && x.originalName !== x.name)
 		.map((x) => ({ from: x.originalName as string, to: x.name }));
 }
