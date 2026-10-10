@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildDraft, candidateBases, draftToMutation, parseOptionLines, validateDraft } from "../src/commands/configureField";
+import { buildDraft, candidateBases, draftToMutation, fieldNode, parseOptionLines, validateDraft } from "../src/commands/configureField";
 import { addOptionMutation, setColorMutation } from "../src/widgets/values";
 import { activateSchemaSource, updateSchemaSource, type RawFields } from "../src/schema/SchemaWriter";
 
@@ -82,5 +82,17 @@ describe("configure field", () => {
     expect(candidateBases({ path: "A.base", extension: "base" }, ["A.base"], false, via)).toEqual(["A.base"]);
     expect(candidateBases({ path: "X.base", extension: "base" }, ["A.base"], true, via)).toEqual([]);
     expect(candidateBases({ path: "x.png", extension: "png" }, [], true, via)).toEqual([]);
+  });
+});
+
+describe("fieldNode", () => {
+  it("keeps the previous select options when the draft has none", () => {
+    expect(fieldNode({ name: "P", type: "select", multiple: false }, { type: "select", options: { A: "red" } }))
+      .toEqual({ type: "select", multiple: false, options: { A: "red" } });
+  });
+  it("ignores previous options of a non-select field", () => {
+    expect(fieldNode({ name: "P", type: "select", multiple: true }, { type: "text" }))
+      .toEqual({ type: "select", multiple: true, options: {} });
+    expect(fieldNode({ name: "P", type: "date", multiple: false }, undefined)).toEqual({ type: "date" });
   });
 });

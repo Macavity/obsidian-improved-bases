@@ -1,5 +1,5 @@
 import { Modal, normalizePath, Notice, parseYaml, TFile } from "obsidian";
-import type { Plugin } from "obsidian";
+import type { MetadataCache, Plugin } from "obsidian";
 import type { RawFields } from "../schema/SchemaWriter";
 import { isColor } from "../schema/types";
 import type { Color } from "../schema/types";
@@ -12,6 +12,22 @@ export interface ImportPlan { fields: Record<string, Record<string, Color>>; ski
 
 const SEPARATOR = " - ";
 
+/** Pure: splits `<column> - <value>` at the first separator; null when either side is empty. */
+export function splitNoteName(basename: string): { column: string; value: string } | null {
+	const at = basename.indexOf(SEPARATOR);
+	if (at <= 0) return null;
+	const column = basename.slice(0, at).trim();
+	const value = basename.slice(at + SEPARATOR.length).trim();
+	return column && value ? { column, value } : null;
+}
+
+/** Color of a note's `Farbe` property; unknown or missing falls back to grey and is reported. */
+function colorOf(note: OptionNote, skipped: string[]): Color {
+	if (isColor(note.farbe)) return note.farbe;
+	skipped.push(`${note.basename}: missing or unknown color, using grey`);
+	return "grey";
+}
+
 /** Pure: maps `<column> - <value>` notes to select options of columns present in the members. */
 export function planImport(notes: OptionNote[], memberProps: Set<string>, formulaNames: string[]): ImportPlan {
 	const fields: Record<string, Record<string, Color>> = Object.create(null) as Record<string, Record<string, Color>>;
@@ -19,13 +35,12 @@ export function planImport(notes: OptionNote[], memberProps: Set<string>, formul
 	const skipped: string[] = [];
 
 	for (const note of notes) {
-		const at = note.basename.indexOf(SEPARATOR);
-		const column = at > 0 ? note.basename.slice(0, at).trim() : "";
-		const value = at > 0 ? note.basename.slice(at + SEPARATOR.length).trim() : "";
-		if (!column || !value) {
+		const parts = splitNoteName(note.basename);
+		if (!parts) {
 			skipped.push(`${note.basename}: name is not "<column> - <value>"`);
 			continue;
 		}
+		const { column, value } = parts;
 		if (isUnsafeKey(column) || isUnsafeKey(value)) {
 			skipped.push(`${note.basename}: reserved name`);
 			continue;
@@ -34,18 +49,21 @@ export function planImport(notes: OptionNote[], memberProps: Set<string>, formul
 		if (!memberProps.has(key)) continue;
 		const name = spelling.get(key) ?? column;
 		spelling.set(key, name);
-		if (!Object.hasOwn(fields, name)) fields[name] = Object.create(null) as Record<string, Color>;
-		const options = fields[name] as Record<string, Color>;
-		if (Object.hasOwn(options, value)) continue;
-		let color: Color = "grey";
-		if (isColor(note.farbe)) color = note.farbe;
-		else skipped.push(`${note.basename}: missing or unknown color, using grey`);
-		options[value] = color;
+		const options = (fields[name] ??= Object.create(null) as Record<string, Color>);
+		if (!Object.hasOwn(options, value)) options[value] = colorOf(note, skipped);
 	}
 
 	const pills = new Set(Object.keys(fields).map((n) => `${n.replace(/ /g, "_")}_pill`.toLowerCase()));
 	const obsoleteFormulas = formulaNames.filter((f) => pills.has(f.toLowerCase()));
 	return { fields, skipped, obsoleteFormulas };
+}
+
+/** The select field named `name` (created when missing); null when an existing field is not a select. */
+function ensureSelectField(fields: RawFields, name: string, multiple: boolean): RawFields[string] | null {
+	const existing = findOwnKey(fields, name);
+	const field = existing ? fields[existing] : undefined;
+	if (!field) return (fields[name] = { type: "select", multiple, options: {} });
+	return field.type === "select" ? field : null;
 }
 
 /**
@@ -60,18 +78,12 @@ export function importMutation(
 	return (fields) => {
 		for (const [name, options] of Object.entries(plan)) {
 			if (isUnsafeKey(name)) continue;
-			const existing = findOwnKey(fields, name);
-			let field = existing ? fields[existing] : undefined;
+			const field = ensureSelectField(fields, name, multiple.has(name));
 			if (!field) {
-				field = { type: "select", multiple: multiple.has(name), options: {} };
-				fields[name] = field;
-			}
-			if (field.type !== "select") {
 				onSkipped(name);
 				continue;
 			}
-			const raw = field.options;
-			const target: Record<string, unknown> = isRecord(raw) ? raw : {};
+			const target: Record<string, unknown> = isRecord(field.options) ? field.options : {};
 			field.options = target;
 			for (const [value, color] of Object.entries(options)) {
 				if (isUnsafeKey(value) || Object.hasOwn(target, value)) continue;
@@ -114,6 +126,39 @@ export function registerImportOptions(plugin: Plugin, env: WidgetEnv, getFolder:
 	});
 }
 
+/** Lowercased property names of the member notes, and those whose value is a list. */
+function collectMemberProps(cache: MetadataCache, members: TFile[]): { memberProps: Set<string>; listKeys: Set<string> } {
+	const memberProps = new Set<string>();
+	const listKeys = new Set<string>();
+	for (const file of members) {
+		for (const [key, value] of Object.entries(cache.getFileCache(file)?.frontmatter ?? {})) {
+			memberProps.add(key.toLowerCase());
+			if (Array.isArray(value)) listKeys.add(key.toLowerCase());
+		}
+	}
+	return { memberProps, listKeys };
+}
+
+/** Markdown notes directly inside `folder`, with their `Farbe` property. */
+function findOptionNotes(env: WidgetEnv, folder: string): { dir: string; notes: OptionNote[] } {
+	const cache = env.app.metadataCache;
+	const dir = normalizePath(folder.trim());
+	const notes = env.app.vault.getMarkdownFiles()
+		.filter((f) => f.path.startsWith(`${dir}/`) && f.parent?.path === dir)
+		.map((f) => ({ basename: f.basename, farbe: cache.getFileCache(f)?.frontmatter?.Farbe as unknown }));
+	return { dir, notes };
+}
+
+function showResult(plugin: Plugin, plan: ImportPlan, notSelect: Set<string>): void {
+	const written = Object.entries(plan.fields).filter(([n]) => !notSelect.has(n));
+	const skipped = [...plan.skipped, ...[...notSelect].map((n) => `${n}: existing field is not a select`)];
+	new ResultModal(plugin, written.length === 0 ? "Nothing to import" : "Option notes imported", [
+		{ title: "Fields", items: written.map(([n, o]) => `${n}: ${Object.keys(o).join(", ")}`) },
+		{ title: "Skipped", items: skipped },
+		{ title: "Formulas no longer needed", items: plan.obsoleteFormulas },
+	]).open();
+}
+
 async function run(plugin: Plugin, env: WidgetEnv, basePath: string, folder: string): Promise<void> {
 	try {
 		const members = env.membership.targetEntries(basePath);
@@ -121,41 +166,19 @@ async function run(plugin: Plugin, env: WidgetEnv, basePath: string, folder: str
 			new Notice("Activate this base as a schema base first");
 			return;
 		}
-		const cache = env.app.metadataCache;
-		const memberProps = new Set<string>();
-		const multiple = new Set<string>();
-		const listKeys = new Set<string>();
-		for (const file of members) {
-			for (const [key, value] of Object.entries(cache.getFileCache(file)?.frontmatter ?? {})) {
-				memberProps.add(key.toLowerCase());
-				if (Array.isArray(value)) listKeys.add(key.toLowerCase());
-			}
-		}
-		const dir = normalizePath(folder.trim());
-		const prefix = `${dir}/`;
-		const notes: OptionNote[] = env.app.vault.getMarkdownFiles()
-			.filter((f) => f.path.startsWith(prefix) && f.parent?.path === prefix.slice(0, -1))
-			.map((f) => ({ basename: f.basename, farbe: cache.getFileCache(f)?.frontmatter?.Farbe as unknown }));
-
+		const { memberProps, listKeys } = collectMemberProps(env.app.metadataCache, members);
+		const { dir, notes } = findOptionNotes(env, folder);
 		if (notes.length === 0) {
 			new Notice(`No option notes found in ${dir}`);
 			return;
 		}
-		const formulas = await readFormulaNames(env, basePath);
-		const plan = planImport(notes, memberProps, formulas);
-		for (const name of Object.keys(plan.fields)) if (listKeys.has(name.toLowerCase())) multiple.add(name);
-
+		const plan = planImport(notes, memberProps, await readFormulaNames(env, basePath));
+		const multiple = new Set(Object.keys(plan.fields).filter((name) => listKeys.has(name.toLowerCase())));
 		const notSelect = new Set<string>();
 		if (Object.keys(plan.fields).length > 0) {
 			await env.writer.update(basePath, importMutation(plan.fields, multiple, (n) => notSelect.add(n)));
 		}
-		const written = Object.entries(plan.fields).filter(([n]) => !notSelect.has(n));
-		const skipped = [...plan.skipped, ...[...notSelect].map((n) => `${n}: existing field is not a select`)];
-		new ResultModal(plugin, written.length === 0 ? "Nothing to import" : "Option notes imported", [
-			{ title: "Fields", items: written.map(([n, o]) => `${n}: ${Object.keys(o).join(", ")}`) },
-			{ title: "Skipped", items: skipped },
-			{ title: "Formulas no longer needed", items: plan.obsoleteFormulas },
-		]).open();
+		showResult(plugin, plan, notSelect);
 	} catch (e) {
 		console.error("Improved Bases: import failed", e);
 		new Notice("Import failed, see console");

@@ -8,6 +8,16 @@ const sig = (s: BaseSchema): string => JSON.stringify([...s.fields]);
 
 const QUIET_MS = 300;
 
+/** Paths to watch: every schema base plus every relation target. */
+function wantedPaths(schemas: BaseSchema[]): Set<string> {
+	const wanted = new Set<string>();
+	for (const s of schemas) {
+		wanted.add(s.basePath);
+		for (const { field } of s.fields.values()) if (field.type === "relation") wanted.add(field.base);
+	}
+	return wanted;
+}
+
 export interface MembershipDeps {
 	/** Obsidian's metadata cache; the latch waits until it has resolved. Omitted = treated as resolved. */
 	cache?: Pick<MetadataCache, "on" | "offref" | "resolvedLinks">;
@@ -148,11 +158,15 @@ export class Membership extends Events {
 
 	private sync(): void {
 		const schemas = this.registry.schemas();
-		const wanted = new Set<string>();
-		for (const s of schemas) {
-			wanted.add(s.basePath);
-			for (const { field } of s.fields.values()) if (field.type === "relation") wanted.add(field.base);
-		}
+		const wanted = wantedPaths(schemas);
+		this.pruneWatches(wanted);
+		const affected = this.affectedFields(schemas);
+		for (const path of wanted) if (!this.watches.has(path)) this.watch(path);
+		this.checkReady(affected);
+	}
+
+	/** Stops watching bases that no schema needs any more and forgets their results. */
+	private pruneWatches(wanted: Set<string>): void {
 		for (const [path, stop] of [...this.watches]) {
 			if (wanted.has(path)) continue;
 			stop();
@@ -160,9 +174,12 @@ export class Membership extends Events {
 			this.results.delete(path);
 			this.members.delete(path);
 		}
+	}
+
+	/** Field names of every schema base whose definition changed since the last sync; updates the snapshot. */
+	private affectedFields(schemas: BaseSchema[]): Set<string> {
 		const affected = new Set<string>();
-		const next = new Map<string, string>();
-		for (const s of schemas) next.set(s.basePath, sig(s));
+		const next = new Map(schemas.map((s) => [s.basePath, sig(s)]));
 		const nextSchemas = new Map(schemas.map((s) => [s.basePath, s]));
 		for (const path of new Set([...this.known.keys(), ...next.keys()])) {
 			if (this.known.get(path) === next.get(path)) continue;
@@ -171,8 +188,7 @@ export class Membership extends Events {
 		}
 		this.oldSchemas = nextSchemas;
 		this.known = next;
-		for (const path of wanted) if (!this.watches.has(path)) this.watch(path);
-		this.checkReady(affected);
+		return affected;
 	}
 
 	private watch(path: string): void {
