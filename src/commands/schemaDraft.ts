@@ -21,8 +21,6 @@ export interface FieldDraft {
 	nativeLabel: string | null;
 	/** Hand-written native entry, written back unchanged. */
 	pinned: Record<string, unknown> | null;
-	/** The original schema entry was a relation or select. */
-	hadCustomization: boolean;
 	removed: boolean;
 	multiple: boolean;
 	base?: string;
@@ -59,13 +57,13 @@ function collectNames(input: KnownFieldsInput, current: string[]): string[] {
 function toDraft(name: string, field: FieldSchema | undefined, label: string | null): FieldDraft {
 	const draft: FieldDraft = {
 		originalName: name, originalBase: null, name, type: "native", nativeLabel: label,
-		pinned: null, hadCustomization: false, removed: false, multiple: false, options: [],
+		pinned: null, removed: false, multiple: false, options: [],
 	};
 	if (!field) return draft;
 	if (field.type === "relation") {
-		Object.assign(draft, { type: "relation", base: field.base, originalBase: field.base, multiple: field.multiple, hadCustomization: true });
+		Object.assign(draft, { type: "relation", base: field.base, originalBase: field.base, multiple: field.multiple });
 	} else if (field.type === "select") {
-		Object.assign(draft, { type: "select", multiple: field.multiple, hadCustomization: true, options: field.options.map((o) => ({ value: o.value, color: o.color })) });
+		Object.assign(draft, { type: "select", multiple: field.multiple, options: field.options.map((o) => ({ value: o.value, color: o.color })) });
 	} else {
 		draft.pinned = { type: field.type };
 	}
@@ -84,16 +82,24 @@ export function knownFieldDrafts(input: KnownFieldsInput): FieldDraft[] {
 
 const isRenamed = (x: FieldDraft): boolean => !x.removed && x.originalName !== null && x.originalName.toLowerCase() !== x.name.toLowerCase();
 
-/** Name errors for one draft; `seen` and `vacated` hold lowercased names of the whole list. */
-function validateName(draft: FieldDraft, seen: Set<string>, vacated: Set<string>): string[] {
+/** Lowercased names of the whole list: `seen` so far, `vacated` by renames, held by `removed` drafts. */
+interface NameSets { seen: Set<string>; vacated: Set<string>; removed: Set<string> }
+
+/** New or renamed; untouched fields (e.g. a reserved key from member properties) must not block saving. */
+const isNewName = (x: FieldDraft): boolean => x.originalName === null || x.originalName.toLowerCase() !== x.name.toLowerCase();
+
+/** Name errors for one draft. */
+function validateName(draft: FieldDraft, sets: NameSets): string[] {
 	const name = draft.name;
 	const errors: string[] = [];
 	if (name !== name.trim()) errors.push(`Field name '${name}' has surrounding whitespace`);
-	if (isUnsafeKey(name)) errors.push(`Field name '${name}' is reserved`);
+	if (isNewName(draft) && isUnsafeKey(name)) errors.push(`Field name '${name}' is reserved`);
 	const lower = name.toLowerCase();
-	if (seen.has(lower)) errors.push(`Duplicate field '${name}'`);
-	seen.add(lower);
-	if (isRenamed(draft) && vacated.has(lower)) errors.push(`Field '${name}': another field is renamed from this name`);
+	if (sets.seen.has(lower)) errors.push(`Duplicate field '${name}'`);
+	sets.seen.add(lower);
+	if (isRenamed(draft) && sets.vacated.has(lower)) errors.push(`Field '${name}': another field is renamed from this name`);
+	// Saving would rename/add into this name and then strip it as part of the removal.
+	if (sets.removed.has(lower)) errors.push(`Field '${name}': a removed field has this name, save the removal first`);
 	return errors;
 }
 
@@ -113,16 +119,19 @@ function validateOptions(name: string, options: OptionDraft[]): string[] {
 /** Human-readable validation errors; empty when drafts are valid. */
 export function validateDrafts(drafts: FieldDraft[], basePaths: string[]): string[] {
 	const errors: string[] = [];
-	const seen = new Set<string>();
-	// Names other fields are renamed away from; renaming onto one would swap values between fields.
-	const vacated = new Set(drafts.filter(isRenamed).map((x) => (x.originalName as string).toLowerCase()));
+	const sets: NameSets = {
+		seen: new Set<string>(),
+		// Names other fields are renamed away from; renaming onto one would swap values between fields.
+		vacated: new Set(drafts.filter(isRenamed).map((x) => (x.originalName as string).toLowerCase())),
+		removed: new Set(removals(drafts).map((n) => n.toLowerCase())),
+	};
 	for (const draft of drafts.filter((x) => !x.removed)) {
 		const name = draft.name;
 		if (!name.trim()) {
 			errors.push("Field name is empty");
 			continue;
 		}
-		errors.push(...validateName(draft, seen, vacated));
+		errors.push(...validateName(draft, sets));
 		if (!TYPES.includes(draft.type)) {
 			errors.push(`Field '${name}': unknown type '${String(draft.type)}'`);
 		} else if (draft.type === "relation" && !(draft.base && (basePaths.includes(draft.base) || draft.base === draft.originalBase))) {
@@ -139,21 +148,31 @@ export function validateDrafts(drafts: FieldDraft[], basePaths: string[]): strin
 export function draftsToEdits(drafts: FieldDraft[], originalNames: string[], addView: number): { edits: ColumnEdits; mutate: (f: RawFields) => void } {
 	const added = drafts.filter((x) => x.originalName === null && !x.removed && x.name.trim()).map((x) => x.name);
 	const edits: ColumnEdits = { add: added.length ? [{ view: addView, names: added }] : [], remove: removals(drafts), rename: renames(drafts) };
-	const live = drafts.filter((x) => !x.removed);
-	const mutate = (f: RawFields): void => {
-		const names = new Set(live.map((x) => x.name));
-		for (const original of originalNames) {
-			const key = findOwnKey(f, original);
-			if (key !== undefined && !names.has(key)) delete f[key];
-		}
-		for (const draft of live) {
-			if (!draft.name.trim() || isUnsafeKey(draft.name)) continue;
-			const value = draftToField(draft);
-			if (value) Object.defineProperty(f, draft.name, { value, writable: true, enumerable: true, configurable: true });
-			else if (Object.hasOwn(f, draft.name)) delete f[draft.name];
-		}
-	};
-	return { edits, mutate };
+	const live = drafts.filter((x) => !x.removed && x.name.trim());
+	return { edits, mutate: (f) => applyDrafts(f, live, originalNames) };
+}
+
+/** Schema key a live draft writes to; an unrenamed draft keeps the existing key's spelling. */
+function targetKey(f: RawFields, draft: FieldDraft): string {
+	const renamed = draft.originalName !== null && draft.originalName !== draft.name;
+	return renamed ? draft.name : findOwnKey(f, draft.name) ?? draft.name;
+}
+
+/** Deletes vacated schema keys, then writes every live draft under its target key. */
+function applyDrafts(f: RawFields, live: FieldDraft[], originalNames: string[]): void {
+	// Unsafe names still claim their key, so an untouched reserved entry survives.
+	const targets = live.map((draft) => ({ draft, key: targetKey(f, draft) }));
+	const kept = new Set(targets.map((t) => t.key));
+	for (const original of originalNames) {
+		const key = findOwnKey(f, original);
+		if (key !== undefined && !kept.has(key)) delete f[key];
+	}
+	for (const { draft, key } of targets) {
+		if (isUnsafeKey(draft.name)) continue;
+		const value = draftToField(draft);
+		if (value) Object.defineProperty(f, key, { value, writable: true, enumerable: true, configurable: true });
+		else if (Object.hasOwn(f, key)) delete f[key];
+	}
 }
 
 /** Raw schema value for one draft. */
