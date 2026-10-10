@@ -28,3 +28,10 @@ Append-only audit trail. Add one dated entry per generation or refresh run, reco
 - source_commit: 85f2855 (was f31ff83)
 - Coverage: fallow adoption (config, `pnpm quality`/`pnpm quality:audit`, Claude Code commit gate, CI workflow), merged eslint-disable check script, un-exported internals (`ConfigureFieldModal`, collector constants), new pure helpers `fieldNode()`, `splitNoteName()`, `wantedPaths()`; removed `tslib`, `jiti`, `@typescript-eslint/eslint-plugin`.
 - Pages: [Tooling](./modules/tooling.md), [Commands](./modules/commands.md), [Add a field type](./guides/add-a-field-type.md), [Overview](./OVERVIEW.md)
+
+## 2026-10-10: refresh (worktree vault)
+
+- Profile: internal/standard
+- source_commit: 2c6a55a (was 85f2855)
+- Coverage: shared test vault for git worktrees: `VAULT_PATH` resolves to the main checkout, `FIXTURES` to the current one; `vault-sync.mjs` mirrors fixtures, `vault:link-test` re-links, `smoke`/`perf` include the relink step; `IMPROVED_BASES_TEST_VAULT` override.
+- Pages: [Tooling](./modules/tooling.md), [Run tests and smoke checks](./guides/run-tests-and-smoke.md), [Overview](./OVERVIEW.md)
