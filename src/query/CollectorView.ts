@@ -8,9 +8,9 @@ export class BaseNotFoundError extends Error {
 	}
 }
 
-export const COLLECTOR_VIEW = "improved-bases-collector";
+const COLLECTOR_VIEW = "improved-bases-collector";
 /** Own icon id: styles.css hides the view-selector entry by this icon's class. */
-export const COLLECTOR_ICON = "improved-bases-collector";
+const COLLECTOR_ICON = "improved-bases-collector";
 const HOST_CLASS = "improved-bases-collector-host";
 const ICON_SVG =
 	'<circle cx="50" cy="50" r="38" fill="none" stroke="currentColor" stroke-width="8"/>' +

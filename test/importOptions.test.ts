@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { planImport, importMutation } from "../src/commands/importOptions";
+import { planImport, importMutation, splitNoteName } from "../src/commands/importOptions";
 import type { RawFields } from "../src/schema/SchemaWriter";
 
 describe("planImport", () => {
@@ -80,6 +80,17 @@ describe("prototype keys", () => {
     expect(skipped).toEqual(["Role"]);
     expect(Object.keys(fields)).toEqual(["Role"]);
     expect(Object.hasOwn(Object.prototype, "B")).toBe(false);
+  });
+});
+
+describe("splitNoteName", () => {
+  it("splits at the first separator and trims", () => {
+    expect(splitNoteName(" Prio - Hoch - Sehr ")).toEqual({ column: "Prio", value: "Hoch - Sehr" });
+  });
+  it("returns null without separator or with an empty side", () => {
+    expect(splitNoteName("Prio")).toBeNull();
+    expect(splitNoteName(" - Hoch")).toBeNull();
+    expect(splitNoteName("Prio - ")).toBeNull();
   });
 });
 

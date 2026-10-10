@@ -16,21 +16,23 @@ export interface FieldDraft {
 
 const TYPES: FieldSchema["type"][] = ["relation", "select", ...NATIVE_TYPES];
 
+/** Pure: the schema node for a draft; a select without options keeps the options of `prev` when that is a select. */
+export function fieldNode(draft: FieldDraft, prev: RawFields[string] | undefined): RawFields[string] {
+	if (draft.type === "relation") return { type: "relation", base: draft.base ?? "", multiple: draft.multiple };
+	if (draft.type === "select") {
+		const existing = prev?.type === "select" ? (prev.options as Record<string, Color> | undefined) : undefined;
+		return { type: "select", multiple: draft.multiple, options: draft.options ?? existing ?? {} };
+	}
+	return { type: draft.type };
+}
+
 /** Pure: the field node written under `improved-bases.fields.<name>`; reuses an existing key case-insensitively. */
 export function draftToMutation(draft: FieldDraft): (f: RawFields) => void {
 	return (fields) => {
 		const typed = draft.name.trim();
 		if (!typed || isUnsafeKey(typed)) return;
 		const name = findOwnKey(fields, typed) ?? typed;
-		if (draft.type === "relation") {
-			fields[name] = { type: "relation", base: draft.base ?? "", multiple: draft.multiple };
-		} else if (draft.type === "select") {
-			const prev = Object.hasOwn(fields, name) ? fields[name] : undefined;
-			const existing = prev?.type === "select" ? (prev.options as Record<string, Color> | undefined) : undefined;
-			fields[name] = { type: "select", multiple: draft.multiple, options: draft.options ?? existing ?? {} };
-		} else {
-			fields[name] = { type: draft.type };
-		}
+		fields[name] = fieldNode(draft, Object.hasOwn(fields, name) ? fields[name] : undefined);
 	};
 }
 
@@ -92,7 +94,7 @@ export function buildDraft(base: FieldDraft, optionsText: string, existed: boole
 	return { draft, errors };
 }
 
-export class ConfigureFieldModal extends Modal {
+class ConfigureFieldModal extends Modal {
 	private draft: FieldDraft = { name: "", type: "text", multiple: false };
 	private optionsText = "";
 	private body: HTMLElement | null = null;

@@ -6,6 +6,9 @@ Obsidian plugin (id `improved-bases`). Package manager: pnpm.
 - `pnpm build` – typecheck + production build
 - `pnpm dev` – watch build
 - `pnpm lint` / `pnpm lint:fix`
+- `pnpm quality` – fallow full-repo analysis (dead code, dupes, complexity); must pass before a PR
+- `pnpm quality:audit` – fallow audit of changed files vs `main`; also runs in CI and in the commit/push gate
+- `pnpm check` – typecheck + lint + test + quality
 
 ## Skills
 Obsidian knowledge lives in `.claude/skills/` (`obsidian-dev`, `obsidian-ops`, `obsidian-ref`, `project`). These are maintained by hand; there is no generator.

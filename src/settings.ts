@@ -1,5 +1,5 @@
 import { App, PluginSettingTab, SettingDefinitionItem } from "obsidian";
-import ImprovedBasesPlugin from "./main";
+import type ImprovedBasesPlugin from "./main";
 
 export interface ImprovedBasesSettings {
 	widgetsEnabled: boolean;
