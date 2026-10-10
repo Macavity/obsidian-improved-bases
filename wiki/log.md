@@ -56,3 +56,10 @@ Append-only audit trail. Add one dated entry per generation or refresh run, reco
 - source_commit: 0c710b9 (was f26dfc8)
 - Coverage: merge of main's fallow adoption into the schema settings branch; Istanbul coverage from `pnpm test` feeds fallow CRAP scores; new unit tests for the settings modal, save handler, widget toggle, collector mount, CLI detection and both widgets; `buildSchemaSettings()` split from the modal opener; `Membership.schemaBasesOf()` removed; smoke compares `Verwaist.base` semantically.
 - Pages: [Tooling](./modules/tooling.md), [Commands](./modules/commands.md), [Overview](./OVERVIEW.md)
+
+## 2026-10-10: refresh (rename semantics)
+
+- Profile: internal/standard
+- source_commit: 8e51900 (was 0c710b9)
+- Coverage: `renameKey()` matches exact keys; `migrateRenames()` prefilters from frontmatter on disk; `membersKnown()` replaces `canRename`; saved relation targets stay valid in validation.
+- Pages: [Commands](./modules/commands.md), [Schema edit](./flows/schema-edit.md), [Overview](./OVERVIEW.md)
