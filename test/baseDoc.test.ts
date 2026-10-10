@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readBaseColumns, referencesName, propertyName, EMPTY_EDITS } from "../src/schema/baseDoc";
+import { readBaseColumns, referencesName, propertyName, EMPTY_EDITS, updateBaseSource } from "../src/schema/baseDoc";
 
 const src = `filters:
   and:
@@ -72,5 +72,49 @@ describe("EMPTY_EDITS", () => {
 	it("is frozen and empty", () => {
 		expect(EMPTY_EDITS).toEqual({ add: [], remove: [], rename: [] });
 		expect(Object.isFrozen(EMPTY_EDITS)).toBe(true);
+	});
+});
+
+const noop = (): void => {};
+describe("updateBaseSource", () => {
+	it("adds to the chosen view and creates order when missing", () => {
+		const out = updateBaseSource(src, { ...EMPTY_EDITS, add: [{ view: 1, names: ["Neu"] }] }, noop);
+		expect(out).toMatch(/name: Karten[\s\S]*order:\n {6}- Status\n {6}- Neu\n/);
+		const bare = updateBaseSource("views:\n  - type: table\n", { ...EMPTY_EDITS, add: [{ view: 0, names: ["Neu"] }] }, noop);
+		expect(bare).toBe("views:\n  - type: table\n    order:\n      - file.name\n      - Neu\n");
+	});
+	it("skips names already in the order and rejects invalid views", () => {
+		expect(updateBaseSource(src, { ...EMPTY_EDITS, add: [{ view: 1, names: ["status"] }] }, noop)).toBe(src);
+		expect(() => updateBaseSource(src, { ...EMPTY_EDITS, add: [{ view: 5, names: ["X"] }] }, noop)).toThrow(/view/);
+	});
+	it("removes from every view, properties, summaries, sort and groupBy", () => {
+		const out = updateBaseSource(src, { ...EMPTY_EDITS, remove: ["status"] }, noop);
+		expect(out).not.toMatch(/- (note\.)?Status\n/);
+		expect(out).not.toContain("note.Status:");
+		expect(out).not.toContain("Status: Average");
+		expect(out).not.toContain("groupBy");
+		expect(out).toMatch(/sort:\n {6}- property: Team\n {8}direction: DESC\n/);
+		expect(out).toContain('Status != "archived"'); // expressions untouched
+	});
+	it("renames keeping the note. prefix and comments", () => {
+		const out = updateBaseSource(`# c\n${src}`, { ...EMPTY_EDITS, rename: [{ from: "Status", to: "Stand" }] }, noop);
+		expect(out.startsWith("# c\n")).toBe(true);
+		expect(out).toContain("- note.Stand\n");
+		expect(out).toContain("- Stand\n");
+		expect(out).toContain("note.Stand:\n");
+		expect(out).toContain("Stand: Average");
+		expect(out).toContain("- property: note.Stand\n");
+		expect(out).toMatch(/groupBy:\n {6}property: Stand\n/);
+		expect(out).not.toMatch(/Status(?!\s*!=|"\])/); // only expression strings still mention Status
+	});
+	it("returns the identical string without changes", () => {
+		expect(updateBaseSource(src, EMPTY_EDITS, noop)).toBe(src);
+	});
+	it("combines column edits with the schema mutation in one pass", () => {
+		const out = updateBaseSource(src, { ...EMPTY_EDITS, rename: [{ from: "Status", to: "Stand" }] }, (f) => {
+			f.Stand = { type: "select", multiple: false, options: { A: "red" } };
+		});
+		expect(out).toMatch(/improved-bases:\n {2}fields:\n {4}Stand:\n {6}type: select/);
+		expect(out).toContain("- note.Stand\n");
 	});
 });

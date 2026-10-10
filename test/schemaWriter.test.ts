@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { activateSchemaSource, resetSchemaSource, updateSchemaSource } from "../src/schema/SchemaWriter";
+import { TFile, type App } from "obsidian";
+import { SchemaWriter, activateSchemaSource, resetSchemaSource, updateSchemaSource } from "../src/schema/SchemaWriter";
+import { EMPTY_EDITS } from "../src/schema/baseDoc";
 
 const src = `# keep me
 filters:
@@ -67,5 +69,22 @@ describe("resetSchemaSource", () => {
     const out = resetSchemaSource(updateSchemaSource(src, (f) => { f.Role = { type: "text" }; }));
     expect(out).not.toContain("Role:");
     expect(out).toContain("filters:");
+  });
+});
+
+describe("SchemaWriter.updateBase", () => {
+  it("applies column edits and the schema mutation through vault.process", async () => {
+    const file = Object.assign(new TFile(), { path: "B.base" });
+    let data = "views:\n  - type: table\n    order:\n      - Role\n";
+    const app = {
+      vault: {
+        getAbstractFileByPath: (p: string) => (p === file.path ? file : null),
+        process: async (_f: TFile, fn: (d: string) => string) => { data = fn(data); return data; },
+      },
+    } as unknown as App;
+    await new SchemaWriter(app).updateBase("B.base", { ...EMPTY_EDITS, rename: [{ from: "Role", to: "Job" }] }, (f) => { f.Job = { type: "text" }; });
+    expect(data).toContain("- Job\n");
+    expect(data).toMatch(/fields:\n {4}Job:/);
+    await expect(new SchemaWriter(app).updateBase("X.base", EMPTY_EDITS, () => {})).rejects.toThrow(/X.base/);
   });
 });
