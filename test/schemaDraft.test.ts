@@ -58,4 +58,23 @@ describe("schemaDraft", () => {
 		expect(renameKey(p, "a", "__proto__")).toBe("conflict");
 		expect(Object.getPrototypeOf(p)).toBe(Object.prototype);
 	});
+	it("rejects names with surrounding whitespace", () => {
+		expect(validateDrafts([d({ name: "Role " })], []).join()).toMatch(/whitespace/i);
+		expect(validateDrafts([d({ name: " Role" })], []).join()).toMatch(/whitespace/i);
+	});
+	it("rejects swapped and chained renames", () => {
+		expect(validateDrafts([d({ originalName: "A", name: "B" }), d({ originalName: "B", name: "A" })], []).join()).toMatch(/renamed from/i);
+		expect(validateDrafts([d({ originalName: "A", name: "b" }), d({ originalName: "B", name: "C" })], []).join()).toMatch(/renamed from/i);
+		expect(validateDrafts([d({ originalName: "a", name: "A" }), d({ originalName: "B", name: "B" })], [])).toEqual([]);
+	});
+	it("renames frontmatter keys case-insensitively", () => {
+		const fm: Record<string, unknown> = { role: "x" };
+		expect(renameKey(fm, "Role", "Rolle")).toBe("renamed");
+		expect(fm).toEqual({ Rolle: "x" });
+		expect(renameKey({ role: 1, ROLLE: 2 }, "Role", "Rolle")).toBe("conflict");
+		const same: Record<string, unknown> = { role: 1 };
+		expect(renameKey(same, "role", "Role")).toBe("renamed");
+		expect(fm).toEqual({ Rolle: "x" });
+		expect(same).toEqual({ Role: 1 });
+	});
 });

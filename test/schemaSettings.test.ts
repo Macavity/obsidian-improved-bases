@@ -22,17 +22,18 @@ describe("schemaState", () => {
 });
 
 describe("migrateRenames", () => {
-  it("migrates sequentially and counts outcomes", async () => {
+  it("migrates sequentially, skips notes without the key and counts outcomes per note", async () => {
     const calls: string[] = [];
     const resolvers: (() => void)[] = [];
-    const fms: Record<string, Record<string, unknown>> = { "a.md": { Role: 1 }, "b.md": { Role: 1, Rolle: 2 }, "c.md": {}, "d.md": {} };
+    const fms: Record<string, Record<string, unknown>> = { "a.md": { role: 1 }, "b.md": { Role: 1, Rolle: 2 }, "c.md": {}, "d.md": { Role: 1 } };
     const app = {
+      metadataCache: { getFileCache: (f: { path: string }) => ({ frontmatter: fms[f.path] }) },
       fileManager: {
         processFrontMatter: (f: { path: string }, fn: (fm: Record<string, unknown>) => void) =>
           new Promise<void>((resolve, reject) => {
             calls.push(f.path);
-            if (f.path === "d.md") return reject(new Error("boom"));
             fn(fms[f.path] as Record<string, unknown>);
+            if (f.path === "d.md") return reject(new Error("boom")); // write fails after the callback ran
             resolvers.push(resolve);
           }),
       },
@@ -48,11 +49,8 @@ describe("migrateRenames", () => {
     await tick();
     expect(calls).toEqual(["a.md", "b.md"]);
     resolvers[1]?.();
-    await tick();
-    expect(calls).toEqual(["a.md", "b.md", "c.md"]);
-    resolvers[2]?.();
     expect(await done).toEqual({ renamed: 1, conflict: 1, failed: 1 });
-    expect(calls).toEqual(["a.md", "b.md", "c.md", "d.md"]);
+    expect(calls).toEqual(["a.md", "b.md", "d.md"]); // c.md has no such key
     expect(fms["a.md"]).toEqual({ Rolle: 1 });
     expect(fms["b.md"]).toEqual({ Role: 1, Rolle: 2 });
   });
@@ -65,5 +63,8 @@ describe("renameSummary", () => {
   });
   it("lists skipped and failed", () => {
     expect(renameSummary(pairs, { renamed: 1, conflict: 1, failed: 2 })).toBe("Renamed Role → Rolle in 1 note, 1 skipped (both keys present), 2 failed");
+  });
+  it("reports unknown members", () => {
+    expect(renameSummary(pairs, null)).toBe("Properties not renamed: base members unknown");
   });
 });

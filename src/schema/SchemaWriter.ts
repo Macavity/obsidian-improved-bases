@@ -1,4 +1,4 @@
-import { parseDocument } from "yaml";
+import { isMap, parseDocument, type Pair } from "yaml";
 import type { App } from "obsidian";
 import { TFile } from "obsidian";
 import { SCHEMA_KEY } from "./types";
@@ -28,6 +28,13 @@ export function updateSchemaSource(source: string, mutate: (fields: RawFields) =
 	}
 	for (const [name, value] of Object.entries(after)) {
 		if (!same(before[name], value)) doc.setIn([SCHEMA_KEY, "fields", name], value);
+	}
+	// `setIn` appends; restore the caller's order so renamed fields keep their place.
+	const map = doc.getIn([SCHEMA_KEY, "fields"]);
+	if (isMap(map)) {
+		const order = Object.keys(after);
+		const index = (p: Pair): number => order.indexOf(String((p.key as { value?: unknown }).value ?? p.key));
+		map.items.sort((a, b) => index(a) - index(b));
 	}
 	return doc.toString();
 }

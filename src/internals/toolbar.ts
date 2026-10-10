@@ -1,8 +1,7 @@
 import { Notice, setIcon, type App, type EventRef, type TFile } from "obsidian";
 
-export const TOOLBAR_MARK = "has-improved-bases";
 const ITEM_CLASS = "improved-bases-toolbar-item";
-const SELECTOR = `.bases-toolbar:not(.${TOOLBAR_MARK})`;
+const SELECTOR = ".bases-toolbar";
 
 interface LeafView {
 	containerEl?: HTMLElement;
@@ -29,11 +28,11 @@ export function resolveBasePath(app: App, el: Element): string | null {
 	return null;
 }
 
-/** Adds a "Schema" button to every Bases toolbar; the returned function removes all traces. */
+/** Adds a "Schema" button to every Bases toolbar backed by a file; the returned function removes all traces. */
 export function installSchemaButton(app: App, onOpen: (basePath: string) => void): () => void {
 	const inject = (toolbar: Element): void => {
-		if (toolbar.classList.contains(TOOLBAR_MARK)) return;
-		toolbar.classList.add(TOOLBAR_MARK);
+		// Code-block bases have no file; checking for the button (not a marker) survives Bases re-rendering the toolbar.
+		if (toolbar.closest(".block-language-base") || toolbar.querySelector(`.${ITEM_CLASS}`)) return;
 		const button = toolbar.createEl("button", { cls: `bases-toolbar-item ${ITEM_CLASS}` });
 		setIcon(button.createSpan(), "lucide-shapes");
 		button.createSpan({ text: "Schema" });
@@ -64,6 +63,5 @@ export function installSchemaButton(app: App, onOpen: (basePath: string) => void
 		observer.disconnect();
 		app.workspace.offref(ref);
 		document.querySelectorAll(`.${ITEM_CLASS}`).forEach((b) => b.remove());
-		document.querySelectorAll(`.${TOOLBAR_MARK}`).forEach((t) => t.classList.remove(TOOLBAR_MARK));
 	};
 }

@@ -13,7 +13,7 @@ export interface SchemaSettingsInput {
 	basePaths: string[];
 	overlays: OverlayRegistry;
 	/** False while base members are unknown; renames are refused then. */
-	canRename: boolean;
+	canRename: () => boolean;
 }
 
 interface Handlers {
@@ -291,8 +291,9 @@ export class SchemaSettingsModal extends Modal {
 	}
 
 	private async save(button: ButtonComponent): Promise<void> {
+		for (const draft of this.drafts) draft.name = draft.name.trim();
 		const errors = validateDrafts(this.drafts, this.input.basePaths);
-		if (renames(this.drafts).length > 0 && !this.input.canRename) {
+		if (renames(this.drafts).length > 0 && !this.input.canRename()) {
 			errors.push("Base members are still loading, try again in a moment");
 		}
 		if (errors.length) {

@@ -4,6 +4,7 @@ import type { SchemaRegistry } from "../schema/SchemaRegistry";
 import type { WidgetEnv } from "../widgets/types";
 import { SchemaSettingsModal, type SchemaSettingsInput } from "./SchemaSettingsModal";
 import { draftsToMutation, fieldsToDrafts, renameKey, renames, type FieldDraft } from "./schemaDraft";
+import { findOwnKey } from "../schema/keys";
 
 type Pairs = { from: string; to: string }[];
 type Counts = { renamed: number; conflict: number; failed: number };
@@ -17,18 +18,26 @@ export function schemaState(registry: SchemaRegistry, basePath: string): SchemaS
 	return { kind: "fields", drafts: [] };
 }
 
-/** Renames frontmatter keys in the given notes, one file at a time. */
+/** Renames frontmatter keys in the notes that have one of them, one file at a time; counts are per note. */
 export async function migrateRenames(app: App, files: TFile[], pairs: Pairs): Promise<Counts> {
 	const counts: Counts = { renamed: 0, conflict: 0, failed: 0 };
-	for (const file of files) {
+	const affected = files.filter((file) => {
+		const fm = app.metadataCache.getFileCache(file)?.frontmatter;
+		return fm !== undefined && pairs.some((p) => findOwnKey(fm, p.from) !== undefined);
+	});
+	for (const file of affected) {
+		let renamed = false;
+		let conflict = false;
 		try {
 			await app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
 				for (const { from, to } of pairs) {
 					const result = renameKey(fm, from, to);
-					if (result === "renamed") counts.renamed++;
-					else if (result === "conflict") counts.conflict++;
+					if (result === "renamed") renamed = true;
+					else if (result === "conflict") conflict = true;
 				}
 			});
+			if (renamed) counts.renamed++;
+			if (conflict) counts.conflict++;
 		} catch (e) {
 			console.error(`Improved Bases: renaming properties in ${file.path} failed`, e);
 			counts.failed++;
@@ -37,8 +46,10 @@ export async function migrateRenames(app: App, files: TFile[], pairs: Pairs): Pr
 	return counts;
 }
 
-export function renameSummary(pairs: Pairs, counts: Counts): string {
+/** Notice text for a rename; `counts` is null when the base members were unknown. */
+export function renameSummary(pairs: Pairs, counts: Counts | null): string {
 	if (!pairs.length) return "";
+	if (counts === null) return "Properties not renamed: base members unknown";
 	const label = pairs.map((p) => `${p.from} → ${p.to}`).join(", ");
 	const parts = [`Renamed ${label} in ${counts.renamed} ${counts.renamed === 1 ? "note" : "notes"}`];
 	if (counts.conflict > 0) parts.push(`${counts.conflict} skipped (both keys present)`);
@@ -66,7 +77,7 @@ export function openSchemaSettings(plugin: Plugin, env: WidgetEnv, registry: Sch
 		propertyNames: [...names].sort(),
 		basePaths,
 		overlays: env.overlays,
-		canRename: env.membership.ready,
+		canRename: () => env.membership.ready,
 	};
 	const onSave = async (drafts: FieldDraft[]): Promise<void> => {
 		if (!registry.schemas().some((s) => s.basePath === basePath) && !registry.errors().has(basePath)) {
@@ -78,7 +89,8 @@ export function openSchemaSettings(plugin: Plugin, env: WidgetEnv, registry: Sch
 			new Notice("Schema saved");
 			return;
 		}
-		const counts = await migrateRenames(app, env.membership.targetEntries(basePath) ?? [], pairs);
+		const members = env.membership.targetEntries(basePath);
+		const counts = members ? await migrateRenames(app, members, pairs) : null;
 		new Notice(`Schema saved\n${renameSummary(pairs, counts)}`);
 	};
 	const onReset = (): Promise<void> => env.writer.reset(basePath);

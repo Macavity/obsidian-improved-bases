@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type { App } from "obsidian";
-import { installSchemaButton, resolveBasePath, TOOLBAR_MARK } from "../src/internals/toolbar";
+import { installSchemaButton, resolveBasePath } from "../src/internals/toolbar";
 
 function div(parent: HTMLElement, cls: string, attr: Record<string, string> = {}): HTMLElement {
 	const el = document.createElement("div");
@@ -76,6 +76,22 @@ describe("installSchemaButton", () => {
 		off();
 		expect((a.workspace as unknown as { offref: ReturnType<typeof vi.fn> }).offref).toHaveBeenCalled();
 		expect(document.querySelectorAll(".improved-bases-toolbar-item")).toHaveLength(0);
-		expect(document.querySelectorAll(`.${TOOLBAR_MARK}`)).toHaveLength(0);
+	});
+	it("skips code-block bases", () => {
+		document.body.innerHTML = "";
+		const t = toolbar(div(document.body, "block-language-base"));
+		const off = installSchemaButton(app([]), vi.fn());
+		expect(t.querySelectorAll(".improved-bases-toolbar-item")).toHaveLength(0);
+		off();
+	});
+	it("re-injects after Bases emptied the toolbar", () => {
+		document.body.innerHTML = "";
+		const t = toolbar(div(document.body, "workspace-leaf-content"));
+		const a = app([]);
+		const off = installSchemaButton(a, vi.fn());
+		t.innerHTML = "";
+		(a.workspace as unknown as { triggerLayout(): void }).triggerLayout();
+		expect(t.querySelectorAll(".improved-bases-toolbar-item")).toHaveLength(1);
+		off();
 	});
 });

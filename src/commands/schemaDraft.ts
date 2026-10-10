@@ -37,16 +37,26 @@ export function fieldsToDrafts(fields: ReadonlyMap<string, { name: string; field
 export function validateDrafts(drafts: FieldDraft[], basePaths: string[]): string[] {
 	const errors: string[] = [];
 	const seen = new Set<string>();
+	// Names other fields are renamed away from; renaming onto one would swap values between fields.
+	const vacated = new Set(
+		drafts
+			.filter((x) => x.originalName !== null && x.originalName.toLowerCase() !== x.name.toLowerCase())
+			.map((x) => (x.originalName as string).toLowerCase()),
+	);
 	for (const draft of drafts) {
 		const name = draft.name;
 		if (!name.trim()) {
 			errors.push("Field name is empty");
 			continue;
 		}
+		if (name !== name.trim()) errors.push(`Field name '${name}' has surrounding whitespace`);
 		if (isUnsafeKey(name)) errors.push(`Field name '${name}' is reserved`);
 		const lower = name.toLowerCase();
 		if (seen.has(lower)) errors.push(`Duplicate field '${name}'`);
 		seen.add(lower);
+		if (draft.originalName !== null && draft.originalName.toLowerCase() !== lower && vacated.has(lower)) {
+			errors.push(`Field '${name}': another field is renamed from this name`);
+		}
 		if (!TYPES.includes(draft.type)) {
 			errors.push(`Field '${name}': unknown type '${String(draft.type)}'`);
 			continue;
@@ -100,13 +110,16 @@ export function renames(drafts: FieldDraft[]): { from: string; to: string }[] {
 		.map((x) => ({ from: x.originalName as string, to: x.name }));
 }
 
-/** Moves a frontmatter value from `from` to `to` without touching prototypes. */
+/** Moves a frontmatter value from `from` (any case) to `to` without touching prototypes. */
 export function renameKey(frontmatter: Record<string, unknown>, from: string, to: string): "renamed" | "missing" | "conflict" {
-	if (!Object.hasOwn(frontmatter, from)) return "missing";
+	// Keys match case-insensitively, as the plugin resolves properties that way.
+	const key = findOwnKey(frontmatter, from);
+	if (key === undefined) return "missing";
 	if (isUnsafeKey(to)) return "conflict";
-	if (to === from) return "renamed";
-	if (Object.hasOwn(frontmatter, to)) return "conflict";
-	Object.defineProperty(frontmatter, to, { value: frontmatter[from], writable: true, enumerable: true, configurable: true });
-	delete frontmatter[from];
+	if (key === to) return "missing"; // already in the target form, nothing to move
+	const existing = findOwnKey(frontmatter, to);
+	if (existing !== undefined && existing !== key) return "conflict";
+	Object.defineProperty(frontmatter, to, { value: frontmatter[key], writable: true, enumerable: true, configurable: true });
+	delete frontmatter[key];
 	return "renamed";
 }

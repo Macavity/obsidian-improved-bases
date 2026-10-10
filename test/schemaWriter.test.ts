@@ -27,6 +27,16 @@ describe("updateSchemaSource", () => {
     expect(second).toContain("B: grey");
     expect(second.replace(/\n\s+B: grey/, "")).toBe(first);
   });
+  it("keeps field order from the mutated object", () => {
+    const first = updateSchemaSource(src, (f) => { f.A = { type: "text" }; f.B = { type: "text" }; f.C = { type: "text" }; });
+    const second = updateSchemaSource(first, (f) => {
+      const next = Object.fromEntries(Object.entries(f).map(([k, v]) => (k === "B" ? ["Bee", v] : [k, v])));
+      for (const k of Object.keys(f)) delete f[k];
+      Object.assign(f, next);
+    });
+    const block = second.slice(second.indexOf("fields:"));
+    expect(block.match(/^ {4}\w+:/gm)).toEqual(["    A:", "    Bee:", "    C:"]);
+  });
   it("removes a field", () => {
     const first = updateSchemaSource(src, (f) => { f.Role = { type: "select" }; f.Team = { type: "relation" }; });
     const second = updateSchemaSource(first, (f) => { delete f.Team; });
