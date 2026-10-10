@@ -2,6 +2,9 @@ import { Notice, setIcon, type App, type EventRef, type TFile } from "obsidian";
 
 const ITEM_CLASS = "improved-bases-toolbar-item";
 const SELECTOR = ".bases-toolbar";
+// Probed live (Obsidian 1.14.4, installer 1.12.7, 2026-10-10): the view switcher is
+// `.bases-toolbar-item.bases-toolbar-views-menu > .text-icon-button > .text-button-label`, its text is the active view name.
+const VIEW_NAME_SELECTOR = ".bases-toolbar-views-menu .text-button-label";
 
 interface LeafView {
 	containerEl?: HTMLElement;
@@ -9,8 +12,15 @@ interface LeafView {
 	file?: { path: string; extension: string } | null;
 }
 
-/** Path of the `.base` file backing the toolbar at `el`, or null (e.g. code-block bases). */
-export function resolveBasePath(app: App, el: Element): string | null {
+/** Path of the `.base` file backing the toolbar at `el` plus the active view name (null if not shown), or null (e.g. code-block bases). */
+export function resolveBase(app: App, el: Element): { path: string; viewName: string | null } | null {
+	const path = resolvePath(app, el);
+	if (!path) return null;
+	const viewName = el.querySelector(VIEW_NAME_SELECTOR)?.textContent?.trim() || null;
+	return { path, viewName };
+}
+
+function resolvePath(app: App, el: Element): string | null {
 	let view: LeafView | null = null;
 	app.workspace.iterateAllLeaves((leaf) => {
 		const v = (leaf as unknown as { view?: LeafView }).view;
@@ -29,7 +39,7 @@ export function resolveBasePath(app: App, el: Element): string | null {
 }
 
 /** Adds a "Schema" button to every Bases toolbar backed by a file; the returned function removes all traces. */
-export function installSchemaButton(app: App, onOpen: (basePath: string) => void): () => void {
+export function installSchemaButton(app: App, onOpen: (basePath: string, viewName: string | null) => void): () => void {
 	const inject = (toolbar: Element): void => {
 		// Code-block bases have no file; checking for the button (not a marker) survives Bases re-rendering the toolbar.
 		if (toolbar.closest(".block-language-base") || toolbar.querySelector(`.${ITEM_CLASS}`)) return;
@@ -39,8 +49,8 @@ export function installSchemaButton(app: App, onOpen: (basePath: string) => void
 		setIcon(button.createSpan({ cls: "text-button-icon" }), "lucide-shapes");
 		button.createSpan({ cls: "text-button-label", text: "Schema" });
 		const open = (): void => {
-			const path = resolveBasePath(app, toolbar);
-			if (path) onOpen(path);
+			const base = resolveBase(app, toolbar);
+			if (base) onOpen(base.path, base.viewName);
 			else new Notice("Could not determine the base file");
 		};
 		button.addEventListener("click", open);
