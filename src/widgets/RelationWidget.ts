@@ -104,7 +104,8 @@ export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, fiel
 	};
 
 	root.addEventListener("click", (evt) => {
-		if (evt.target instanceof Element && evt.target.closest("a")) return;
+		// Obsidian renders wikilinks as `span.internal-link`, markdown links as `a`.
+		if (evt.target instanceof Element && evt.target.closest("a, .internal-link")) return;
 		openPicker();
 	});
 	root.addEventListener("keydown", (evt) => {

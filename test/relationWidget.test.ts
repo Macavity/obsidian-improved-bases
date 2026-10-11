@@ -68,8 +68,9 @@ describe("RelationWidget", () => {
 		root.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 		root.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
 		expect(EntryPicker).toHaveBeenCalledTimes(3);
-		const a = root.querySelector<HTMLElement>(".improved-bases-chip-body")!.createEl("a");
-		a.click();
+		const body = root.querySelector<HTMLElement>(".improved-bases-chip-body")!;
+		body.createEl("a").click();
+		body.createSpan({ cls: "internal-link" }).click();
 		expect(EntryPicker).toHaveBeenCalledTimes(3);
 	});
 	it("builds items with active entries first and toggles them", () => {
