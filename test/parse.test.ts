@@ -28,6 +28,12 @@ describe("parseSchema", () => {
     expect(withIcon.schema?.fields.get("team")?.field).toEqual({ type: "relation", base: "T.base", multiple: false, icon: "👥" });
     const none = parseSchema("A.base", { "improved-bases": { fields: { Team: { type: "relation", base: "T.base" } } } });
     expect(none.schema?.fields.get("team")?.field).not.toHaveProperty("icon");
+    // A blank, null or non-string icon is cosmetic: ignored, the field stays valid.
+    for (const icon of ["", "  ", null, 5]) {
+      const lenient = parseSchema("A.base", { "improved-bases": { fields: { Team: { type: "relation", base: "T.base", icon } } } });
+      expect(lenient.errors).toEqual([]);
+      expect(lenient.schema?.fields.get("team")?.field).toEqual({ type: "relation", base: "T.base", multiple: false });
+    }
   });
   it.each([
     [{ Role: { type: "select", options: { A: "purple" } } }, /color/i],
@@ -42,9 +48,6 @@ describe("parseSchema", () => {
     [{ Team: { type: "relation", base: 5 } }, /base/i],
     [{ Team: { type: "relation", base: "Teams.md" } }, /base/i],
     [{ Team: { type: "relation" } }, /base/i],
-    [{ Team: { type: "relation", base: "T.base", icon: "" } }, /icon/i],
-    [{ Team: { type: "relation", base: "T.base", icon: "  " } }, /icon/i],
-    [{ Team: { type: "relation", base: "T.base", icon: 5 } }, /icon/i],
     [{ X: { type: "rollup" } }, /type/i],
     [{ X: "text" }, /field/i],
     [{ team: { type: "text" }, Team: { type: "text" } }, /duplicate/i],

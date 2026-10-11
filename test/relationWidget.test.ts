@@ -21,8 +21,8 @@ function setup(value: unknown, opts: { multiple?: boolean; members?: TFile[] | n
 		vault: { getAbstractFileByPath: (p: string) => (opts.baseExists === false ? null : Object.assign(new TFile(), { path: p })) },
 		metadataCache: {
 			getFirstLinkpathDest: (link: string) =>
-					Object.values(files).find((f) => f.path === `${link}.md` || f.path.endsWith(`/${link}.md`)) ?? null,
-				getFileCache: (f: TFile) => (opts.icons?.[f.path] ? { frontmatter: { icon: opts.icons[f.path] } } : null),
+				Object.values(files).find((f) => f.path === `${link}.md` || f.path.endsWith(`/${link}.md`)) ?? null,
+			getFileCache: (f: TFile) => (opts.icons?.[f.path] ? { frontmatter: { icon: opts.icons[f.path] } } : null),
 			fileToLinktext: (f: TFile) => f.path.replace(/\.md$/, ""),
 		},
 		renderContext: {},
@@ -70,8 +70,19 @@ describe("RelationWidget", () => {
 		expect(EntryPicker).toHaveBeenCalledTimes(3);
 		const body = root.querySelector<HTMLElement>(".improved-bases-chip-body")!;
 		body.createEl("a").click();
-		body.createSpan({ cls: "internal-link" }).click();
+		const link = body.createSpan({ cls: "internal-link" });
+		link.click();
+		link.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 		expect(EntryPicker).toHaveBeenCalledTimes(3);
+		expect(root.getAttribute("aria-haspopup")).toBe("dialog");
+	});
+	it("lists a duplicated link once and removes both copies on toggle", () => {
+		const { onChange } = setup(["[[A]]", "[[A]]"]);
+		document.querySelector<HTMLElement>(".improved-bases-relation")!.click();
+		const [, items, , onToggle] = vi.mocked(EntryPicker).mock.calls[0]! as unknown as [App, PickerItem[], unknown, (i: PickerItem) => void];
+		expect(items.map((i) => i.raw)).toEqual(["[[A]]"]);
+		onToggle(items[0]!);
+		expect(onChange).toHaveBeenLastCalledWith([]);
 	});
 	it("builds items with active entries first and toggles them", () => {
 		const { onChange } = setup(["[[Other/B]]", "plain"], { members: [tfile("Teams/A.md"), tfile("Other/B.md")] });

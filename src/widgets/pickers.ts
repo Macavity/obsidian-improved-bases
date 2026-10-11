@@ -61,8 +61,9 @@ export class EntryPicker extends FuzzySuggestModal<PickerItem> {
 
 	selectSuggestion(match: FuzzyMatch<PickerItem>): void {
 		this.onToggle(match.item);
+		const byRaw = new Map(this.items.map((i) => [i.raw, i]));
 		for (const row of Array.from(this.resultContainerEl.querySelectorAll<HTMLElement>(".improved-bases-entry"))) {
-			const item = this.items.find((i) => i.raw === row.dataset.raw);
+			const item = byRaw.get(row.dataset.raw ?? "");
 			const check = row.querySelector<HTMLInputElement>("input.improved-bases-entry-check");
 			if (item && check) check.checked = item.active;
 		}

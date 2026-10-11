@@ -16,7 +16,8 @@ export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, fiel
 
 	const root = el.createDiv({
 		cls: "improved-bases-relation",
-		attr: { "data-improved-bases": "relation", tabindex: "0", role: "button", "aria-label": "Edit relations" },
+		// No aria-label: the chip links are the accessible name; the popup is announced via aria-haspopup.
+		attr: { "data-improved-bases": "relation", tabindex: "0", role: "button", "aria-haspopup": "dialog" },
 	});
 	if (mismatch) root.addClass("is-mismatch");
 
@@ -32,15 +33,21 @@ export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, fiel
 		return target ? app.metadataCache.getFirstLinkpathDest(target, ctx.sourcePath) : null;
 	};
 
-	const isForeign = (dest: TFile | null): boolean => {
+	/** Paths of the target base entries, or null while the query result is unknown. */
+	const targetPaths = (): Set<string> | null => {
 		const entries = membership.targetEntries(field.base);
-		return !!entries && !(dest && entries.some((f) => f.path === dest.path));
+		return entries ? new Set(entries.map((f) => f.path)) : null;
 	};
 
+	const isForeign = (inTarget: Set<string> | null, dest: TFile | null): boolean =>
+		!!inTarget && !(dest && inTarget.has(dest.path));
+
 	const buildItems = (): PickerItem[] => {
-		const active = links.map((raw): PickerItem => {
+		const inTarget = targetPaths();
+		// A link stored twice is listed once; a toggle then removes both copies.
+		const active = [...new Set(links)].map((raw): PickerItem => {
 			const file = resolve(raw);
-			return { raw, file, label: file?.basename ?? raw, active: true, foreign: isForeign(file) };
+			return { raw, file, label: file?.basename ?? raw, active: true, foreign: isForeign(inTarget, file) };
 		});
 		const activePaths = new Set(active.flatMap((i) => (i.file ? [i.file.path] : [])));
 		const rest = (membership.targetEntries(field.base) ?? [])
@@ -88,10 +95,11 @@ export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, fiel
 
 	const render = (): void => {
 		root.empty();
+		const inTarget = targetPaths();
 		for (const raw of links) {
 			const chip = root.createSpan({ cls: "improved-bases-chip" });
 			const dest = resolve(raw);
-			if (isForeign(dest)) {
+			if (isForeign(inTarget, dest)) {
 				chip.addClass("is-foreign");
 				chip.setAttribute("title", NOT_IN_TARGET);
 			}
@@ -109,7 +117,8 @@ export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, fiel
 		openPicker();
 	});
 	root.addEventListener("keydown", (evt) => {
-		if (evt.key !== "Enter" && evt.key !== " ") return;
+		// Keys from a focused link inside the field belong to the link.
+		if (evt.target !== root || (evt.key !== "Enter" && evt.key !== " ")) return;
 		evt.preventDefault();
 		openPicker();
 	});

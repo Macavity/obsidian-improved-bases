@@ -299,7 +299,7 @@ OPEN_ACTIVE("Verwaist.base");
 await waitFor(() => cells("Verwaist.base").some((c) => c.plugin), 10000);
 run("Verwaist.base",
 	`${ESC} document.querySelectorAll('.notice').forEach((n) => n.remove()); const cell = [...el.querySelectorAll('.bases-td[data-property="note.team" i]')][0]; ` +
-		`cell.querySelector('.improved-bases-add').click(); await sleep(800); return JSON.stringify(1);`);
+		`cell.querySelector('.improved-bases-relation').click(); await sleep(800); return JSON.stringify(1);`);
 await waitFor(() => evalJs("[...document.querySelectorAll('.notice')].some((n) => n.textContent.includes('Target base not found'))") === "true", 5000);
 run("Verwaist.base", `${ESC} return JSON.stringify(1);`);
 await waitFor(() => evalJs("document.querySelectorAll('.modal-container').length") === "0", 5000);
