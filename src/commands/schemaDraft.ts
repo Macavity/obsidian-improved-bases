@@ -29,6 +29,46 @@ export interface FieldDraft {
 	options: OptionDraft[];
 }
 
+/** Another schema base's definition of the same field name, with the number of this base's members that are also in it. */
+export interface OtherDefinition { basePath: string; field: FieldSchema; shared: number }
+
+/** The shape a draft would write, for comparing with other bases' definitions; null when the draft defines nothing. */
+function draftShape(draft: FieldDraft): { type: string; multiple: boolean; base: string | null } | null {
+	if (draft.type === "relation") return { type: "relation", multiple: draft.multiple, base: draft.base ?? null };
+	if (draft.type === "select") return { type: "select", multiple: draft.multiple, base: null };
+	const pinned = draft.pinned?.type;
+	return typeof pinned === "string" ? { type: pinned, multiple: false, base: null } : null;
+}
+
+function fieldShape(field: FieldSchema): { type: string; multiple: boolean; base: string | null } {
+	if (field.type === "relation") return { type: "relation", multiple: field.multiple, base: field.base };
+	if (field.type === "select") return { type: "select", multiple: field.multiple, base: null };
+	return { type: field.type, multiple: false, base: null };
+}
+
+function describe(field: FieldSchema): string {
+	const shape = fieldShape(field);
+	const parts = [shape.type === "relation" ? `relation to ${shape.base}` : shape.type];
+	if (shape.multiple) parts.push("(multiple)");
+	return parts.join(" ");
+}
+
+/**
+ * Advises (never blocks) when another base defines the same field with a different type, `multiple` or target.
+ * Select options, colors and icons do not count. Null without a conflict.
+ */
+export function conflictHint(draft: FieldDraft, others: OtherDefinition[]): string | null {
+	const mine = draftShape(draft);
+	if (!mine) return null;
+	const conflicts = others.filter((o) => {
+		const theirs = fieldShape(o.field);
+		return theirs.type !== mine.type || theirs.multiple !== mine.multiple || theirs.base !== mine.base;
+	});
+	if (!conflicts.length) return null;
+	const overlap = (n: number): string => (n === 0 ? "no note is in both bases yet" : n === 1 ? "1 note is in both bases" : `${n} notes are in both bases`);
+	return conflicts.map((o) => `Also defined in ${o.basePath} as ${describe(o.field)}; ${overlap(o.shared)}.`).join(" ");
+}
+
 export interface KnownFieldsInput {
 	columns: BaseColumns;
 	schemaFields: BaseSchema["fields"] | null;

@@ -1,6 +1,7 @@
 import type { App, EventRef } from "obsidian";
 import { around } from "monkey-around";
-import type { FieldSchema, NativeType, RelationField, SelectField } from "../schema/types";
+import type { Resolution } from "../schema/Membership";
+import type { NativeType, RelationField, SelectField } from "../schema/types";
 import { renderConflictMarker } from "../widgets/conflictMarker";
 import { baseContextOf } from "./baseContext";
 import type { PluginWidget, PropertyRenderContext, WidgetEnv, WidgetHandle } from "../widgets/types";
@@ -55,9 +56,11 @@ export function installTypeInfoPatch(app: App, env: WidgetEnv, widgets: PluginWi
 		}
 	};
 
-	const renderField = (el: HTMLElement, value: unknown, ctx: PropertyRenderContext, field: FieldSchema, mtm: MetadataTypeManager): unknown => {
-		if (field.type === "relation") return widgets.relation(el, value, ctx, field, env);
-		if (field.type === "select") return widgets.select(el, value, ctx, field, env);
+	const renderField = (el: HTMLElement, value: unknown, ctx: PropertyRenderContext, res: Resolution, mtm: MetadataTypeManager): unknown => {
+		const { field } = res;
+		const source = { basePath: res.basePath, name: res.name };
+		if (field.type === "relation") return widgets.relation(el, value, ctx, field, env, source);
+		if (field.type === "select") return widgets.select(el, value, ctx, field, env, source);
 		const native = mtm.registeredTypeWidgets[NATIVE_WIDGET[field.type]];
 		return native ? native.render(el, value, ctx) : undefined;
 	};
@@ -73,7 +76,7 @@ export function installTypeInfoPatch(app: App, env: WidgetEnv, widgets: PluginWi
 		const context = baseContextOf(app, el);
 		const res = membership.resolveWithBase(ctx.sourcePath, ctx.key, context);
 		if (!res) return undefined;
-		let handle = renderField(el, value, ctx, res.field, mtm);
+		let handle = renderField(el, value, ctx, res, mtm);
 		if (handle === undefined) return undefined;
 		if (res.others.length) renderConflictMarker(el, res, res.name, context);
 		if (!el.isConnected && res.others.length) {
@@ -86,7 +89,7 @@ export function installTypeInfoPatch(app: App, env: WidgetEnv, widgets: PluginWi
 				if (next.basePath !== res.basePath) {
 					el.empty();
 					el.removeClass("improved-bases-has-conflict");
-					const rerendered = renderField(el, value, ctx, next.field, mtm);
+					const rerendered = renderField(el, value, ctx, next, mtm);
 					if (rerendered !== undefined) handle = rerendered;
 				} else {
 					el.querySelector(".improved-bases-conflict")?.remove();

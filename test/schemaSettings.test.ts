@@ -194,6 +194,23 @@ describe("buildSchemaSettings", () => {
     expect(input.views).toEqual(["A", "B"]);
     expect(input.defaultViewIndex).toBe(1);
   });
+  it("lists the other bases' definitions of a field with the member overlap", async () => {
+    const t = setup();
+    const other = { basePath: "Z.base", fields: new Map([["team", { name: "Team", field: { type: "text" as const } }]]) };
+    const reg = { schemas: () => [other], errors: () => new Map() } as unknown as SchemaRegistry;
+    const shared = mdFile("a.md", { Status: "x" });
+    const byBase: Record<string, TFile[]> = { "M.base": [shared, mdFile("b.md", {})], "Z.base": [shared, mdFile("z.md", {})] };
+    (t.membership as { targetEntries: (p: string) => TFile[] | null }).targetEntries = (p) => byBase[p] ?? null;
+    const { input } = await buildSchemaSettings({ app: t.app } as unknown as Plugin, t.env, reg, "M.base", null);
+    expect(input.otherDefinitions("TEAM")).toEqual([{ basePath: "Z.base", field: { type: "text" }, shared: 1 }]);
+    expect(input.otherDefinitions("Other")).toEqual([]);
+    // This base's own definition is not "other"; unknown members count as 0.
+    const own = { basePath: "M.base", fields: new Map([["team", { name: "Team", field: { type: "text" as const } }]]) };
+    const reg2 = { schemas: () => [own, other], errors: () => new Map() } as unknown as SchemaRegistry;
+    t.membership.targetEntries = () => null;
+    const r2 = await buildSchemaSettings({ app: t.app } as unknown as Plugin, t.env, reg2, "M.base", null);
+    expect(r2.input.otherDefinitions("team")).toEqual([{ basePath: "Z.base", field: { type: "text" }, shared: 0 }]);
+  });
   it("collects property names and other bases", async () => {
     const { input } = await build();
     expect(input.propertyNames).toEqual(["Old", "Other", "Status"]);

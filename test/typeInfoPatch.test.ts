@@ -81,6 +81,7 @@ describe("typeInfoPatch", () => {
     info.inferred.render(cell, null, ctx("cora.md"));
     expect(resolveWithBase).toHaveBeenLastCalledWith("cora.md", "Team", "Mitarbeiter.base");
     expect(relation).toHaveBeenCalledTimes(1);
+    expect((relation.mock.calls as unknown[][])[0]?.[5]).toEqual({ basePath: "Mitarbeiter.base", name: "Team" });
     const marker = cell.querySelector<HTMLElement>(".improved-bases-conflict");
     expect(marker?.getAttribute("aria-label")).toContain("Meetings.base");
     expect(cell.classList.contains("improved-bases-has-conflict")).toBe(true);

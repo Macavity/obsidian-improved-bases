@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parse } from "yaml";
-import { draftsToEdits, knownFieldDrafts, removals, renameKey, renames, TYPES, validateDrafts, type FieldDraft } from "../src/commands/schemaDraft";
+import { conflictHint, draftsToEdits, knownFieldDrafts, removals, renameKey, renames, TYPES, validateDrafts, type FieldDraft, type OtherDefinition } from "../src/commands/schemaDraft";
 import { updateSchemaSource } from "../src/schema/SchemaWriter";
 import type { BaseColumns, RawFields } from "../src/schema/baseDoc";
 import { parseSchema } from "../src/schema/parse";
@@ -155,5 +155,23 @@ describe("schemaDraft", () => {
 	});
 	it("skips removed drafts in validation", () => {
 		expect(validateDrafts([d({ name: "", removed: true, originalName: "X" })], [])).toEqual([]);
+	});
+	it("hints at conflicting definitions in other bases, with the overlap count", () => {
+		const relation = d({ name: "Team", type: "relation", base: "Teams.base", multiple: true });
+		const others: OtherDefinition[] = [{ basePath: "Meetings.base", field: { type: "text" }, shared: 1 }];
+		expect(conflictHint(relation, others)).toBe("Also defined in Meetings.base as text; 1 note is in both bases.");
+		expect(conflictHint(relation, [{ basePath: "Meetings.base", field: { type: "text" }, shared: 0 }])).toBe("Also defined in Meetings.base as text; no note is in both bases yet.");
+		expect(conflictHint(relation, [{ basePath: "Meetings.base", field: { type: "text" }, shared: 3 }, { basePath: "X.base", field: { type: "relation", base: "Other.base", multiple: true }, shared: 0 }]))
+			.toBe("Also defined in Meetings.base as text; 3 notes are in both bases. Also defined in X.base as relation to Other.base (multiple); no note is in both bases yet.");
+		// Compatible: same type, multiple and target; select options, colors and icons do not count.
+		expect(conflictHint(relation, [{ basePath: "X.base", field: { type: "relation", base: "Teams.base", multiple: true, icon: "x" }, shared: 2 }])).toBeNull();
+		const select = d({ name: "Status", type: "select", multiple: false, options: [{ value: "A", color: "red" }] });
+		expect(conflictHint(select, [{ basePath: "X.base", field: { type: "select", multiple: false, options: [{ value: "B", color: "blue" }] }, shared: 2 }])).toBeNull();
+		expect(conflictHint(select, [{ basePath: "X.base", field: { type: "select", multiple: true, options: [] }, shared: 2 }])).toBe("Also defined in X.base as select (multiple); 2 notes are in both bases.");
+		// Native drafts: a pinned type compares, an unpinned one is not defined here.
+		expect(conflictHint(d({ name: "Team", type: "native", pinned: { type: "text" } }), others)).toBeNull();
+		expect(conflictHint(d({ name: "Team", type: "native", pinned: { type: "list" } }), others)).toBe("Also defined in Meetings.base as text; 1 note is in both bases.");
+		expect(conflictHint(d({ name: "Team", type: "native" }), others)).toBeNull();
+		expect(conflictHint(relation, [])).toBeNull();
 	});
 });

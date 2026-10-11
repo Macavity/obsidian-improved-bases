@@ -10,7 +10,7 @@ tags:
 
 ## Summary
 
-`src/widgets/` renders the two plugin property widgets inside whatever element Obsidian hands to the [hull](../concepts/hull-widget.md): a table cell, a properties-panel row, or the sidebar. Both widgets are plain functions of type `PluginWidget<F>` (`(el, value, ctx, field, env) => WidgetHandle`) and never import Obsidian internals; everything they need arrives through `WidgetEnv`.
+`src/widgets/` renders the two plugin property widgets inside whatever element Obsidian hands to the [hull](../concepts/hull-widget.md): a table cell, a properties-panel row, or the sidebar. Both widgets are plain functions of type `PluginWidget<F>` (`(el, value, ctx, field, env, source?) => WidgetHandle`) and never import Obsidian internals; everything they need arrives through `WidgetEnv`. `source` (`SchemaSource`: the base the displayed definition came from and the field's spelling there) is passed by the patch so that schema writes of the select widget go to the base whose definition is shown; without it the widget resolves the first base by path itself.
 
 ## Responsibilities
 

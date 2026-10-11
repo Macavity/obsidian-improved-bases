@@ -48,10 +48,18 @@ export interface WidgetEnv {
 	app: App;
 }
 
+/** The schema base a rendered field was taken from and the field's spelling there; schema writes go to this base. */
+export interface SchemaSource {
+	basePath: string;
+	name: string;
+}
+
 export type PluginWidget<F extends FieldSchema> = (
 	el: HTMLElement,
 	value: unknown,
 	ctx: PropertyRenderContext,
 	field: F,
 	env: WidgetEnv,
+	/** Omitted only by callers outside the patch; the widget then resolves the source itself (first base by path). */
+	source?: SchemaSource,
 ) => WidgetHandle;
