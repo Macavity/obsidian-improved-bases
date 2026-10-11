@@ -332,7 +332,7 @@ export class SchemaSettingsModal extends Modal {
 			});
 			new Setting(el)
 				.setName("Entry icon")
-				.setDesc("Emoji shown for entries without an icon property (system emoji picker: ⌃⌘Space on macOS, Win+. on Windows)")
+				.setDesc("Emoji for entries without an icon property. The system emoji picker opens with ctrl+cmd+space on macOS and with the Windows key + period on Windows.")
 				.addText((t) => {
 					t.inputEl.addClass("improved-bases-field-icon");
 					t.inputEl.placeholder = "📄";
