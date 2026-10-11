@@ -15,11 +15,15 @@
 }
 
 /* Relation widget */
+/* Fills the cell so the whole field is a click target; chips stay on one line and overflow to the side. */
 .improved-bases-relation {
 	display: flex;
-	flex-wrap: wrap;
+	flex-wrap: nowrap;
 	align-items: center;
 	gap: var(--size-2-2);
+	width: 100%;
+	min-width: 0;
+	overflow: hidden;
 	cursor: pointer;
 	min-height: var(--input-height);
 	border-radius: var(--radius-s);
@@ -30,8 +34,10 @@
 }
 .improved-bases-chip {
 	display: inline-flex;
+	flex: 0 0 auto;
 	align-items: center;
 	gap: var(--size-2-1);
+	white-space: nowrap;
 	border-radius: var(--radius-s);
 }
 .improved-bases-chip.is-foreign {

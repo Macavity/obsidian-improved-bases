@@ -59,7 +59,7 @@ describe("RelationWidget", () => {
 		expect(chips()[0]?.classList.contains("is-foreign")).toBe(false);
 		expect(el.querySelector(".is-mismatch")).not.toBeNull();
 	});
-	it("opens the picker on field click, Enter and Space, but not on link clicks", () => {
+	it("opens the picker on field click, Enter and Space, and on plain link clicks", () => {
 		const { el, handle } = setup(["[[A]]"]);
 		const root = el.querySelector<HTMLElement>(".improved-bases-relation")!;
 		handle.focus();
@@ -69,11 +69,24 @@ describe("RelationWidget", () => {
 		root.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
 		expect(EntryPicker).toHaveBeenCalledTimes(3);
 		const body = root.querySelector<HTMLElement>(".improved-bases-chip-body")!;
-		body.createEl("a").click();
 		const link = body.createSpan({ cls: "internal-link" });
-		link.click();
+		const seenByLink = vi.fn();
+		link.addEventListener("click", seenByLink);
+		// A plain click on a link opens the picker and never reaches the link's own handler.
+		const plain = new MouseEvent("click", { bubbles: true, cancelable: true });
+		link.dispatchEvent(plain);
+		expect(EntryPicker).toHaveBeenCalledTimes(4);
+		expect(plain.defaultPrevented).toBe(true);
+		expect(seenByLink).not.toHaveBeenCalled();
+		// Modifier clicks keep the link's native behavior (open in a new tab).
+		link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, metaKey: true }));
+		link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, ctrlKey: true }));
+		link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 1 }));
+		expect(EntryPicker).toHaveBeenCalledTimes(4);
+		expect(seenByLink).toHaveBeenCalledTimes(3);
+		// Enter on a focused link belongs to the link.
 		link.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-		expect(EntryPicker).toHaveBeenCalledTimes(3);
+		expect(EntryPicker).toHaveBeenCalledTimes(4);
 		expect(root.getAttribute("aria-haspopup")).toBe("dialog");
 	});
 	it("lists a duplicated link once and removes both copies on toggle", () => {
