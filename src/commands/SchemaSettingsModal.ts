@@ -143,7 +143,7 @@ export class SchemaSettingsModal extends Modal {
 		add.addEventListener("click", () => {
 			const draft: FieldDraft = {
 				originalName: null, originalBase: null, name: "", type: "native", nativeLabel: null,
-				pinned: null, removed: false, multiple: false, options: [],
+				pinned: null, removed: false, multiple: false, icon: "", options: [],
 			};
 			this.drafts.push(draft);
 			this.expanded.add(draft);

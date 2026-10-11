@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { KNOWN_ICONS, TFile, type App } from "obsidian";
+import { TFile, type App } from "obsidian";
+import { KNOWN_ICONS } from "./__mocks__/obsidian";
 import { DEFAULT_ICON, entryIcon, renderIcon } from "../src/widgets/icons";
 
 const appWith = (fm: Record<string, unknown> | undefined) =>

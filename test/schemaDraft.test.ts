@@ -5,8 +5,9 @@ import { updateSchemaSource } from "../src/schema/SchemaWriter";
 import type { BaseColumns, RawFields } from "../src/schema/baseDoc";
 import { parseSchema } from "../src/schema/parse";
 
-const d = (p: Partial<FieldDraft>): FieldDraft => ({ originalName: null, originalBase: null, name: "X", type: "native", nativeLabel: null, pinned: null, removed: false, multiple: false, options: [], ...p });
+const d = (p: Partial<FieldDraft>): FieldDraft => ({ originalName: null, originalBase: null, name: "X", type: "native", nativeLabel: null, pinned: null, removed: false, multiple: false, icon: "", options: [], ...p });
 const mutation = (drafts: FieldDraft[], originals: string[]) => draftsToEdits(drafts, originals, 0).mutate;
+const leadOf = (src: string): unknown => (parse(src) as { "improved-bases": { fields: Record<string, unknown> } })["improved-bases"].fields.Lead;
 const none: BaseColumns = { views: [], orderByView: [], configured: [], expressions: [] };
 
 describe("schemaDraft", () => {
@@ -15,6 +16,14 @@ describe("schemaDraft", () => {
 		expect(knownFieldDrafts({ columns: none, schemaFields: fields, memberKeys: [], nativeLabel: () => null, currentView: 0 })).toEqual([d({ originalName: "Role", name: "Role", type: "select", multiple: true, options: [{ value: "A", color: "red" }] })]);
 		const rel = new Map([["lead", { name: "Lead", field: { type: "relation" as const, base: "M.base", multiple: false } }]]);
 		expect(knownFieldDrafts({ columns: none, schemaFields: rel, memberKeys: [], nativeLabel: () => null, currentView: 0 })).toEqual([d({ originalName: "Lead", originalBase: "M.base", name: "Lead", type: "relation", base: "M.base" })]);
+	});
+	it("round-trips the relation icon and drops it when empty", () => {
+		const rel = new Map([["lead", { name: "Lead", field: { type: "relation" as const, base: "M.base", multiple: false, icon: "👤" } }]]);
+		expect(knownFieldDrafts({ columns: none, schemaFields: rel, memberKeys: [], nativeLabel: () => null, currentView: 0 })[0]?.icon).toBe("👤");
+		const withIcon = updateSchemaSource("improved-bases:\n  fields: {}\n", mutation([d({ name: "Lead", type: "relation", base: "M.base", icon: " 👤 " })], []));
+		expect(leadOf(withIcon)).toEqual({ type: "relation", base: "M.base", multiple: false, icon: "👤" });
+		const cleared = updateSchemaSource(withIcon, mutation([d({ originalName: "Lead", name: "Lead", type: "relation", base: "M.base", icon: "  " })], ["Lead"]));
+		expect(leadOf(cleared)).not.toHaveProperty("icon");
 	});
 	it("validates names, duplicates, bases, options", () => {
 		expect(validateDrafts([d({ name: "" })], [])).toHaveLength(1);

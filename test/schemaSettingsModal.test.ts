@@ -6,7 +6,7 @@ import { OverlayRegistry } from "../src/widgets/types";
 
 const d = (p: Partial<FieldDraft>): FieldDraft => ({
 	originalName: null, originalBase: null, name: "X", type: "native", nativeLabel: null,
-	pinned: null, removed: false, multiple: false, options: [], ...p,
+	pinned: null, removed: false, multiple: false, icon: "", options: [], ...p,
 });
 const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 

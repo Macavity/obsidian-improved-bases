@@ -23,6 +23,8 @@ export interface FieldDraft {
 	pinned: Record<string, unknown> | null;
 	removed: boolean;
 	multiple: boolean;
+	/** Default icon for relation chips; "" = none. */
+	icon: string;
 	base?: string;
 	options: OptionDraft[];
 }
@@ -57,11 +59,11 @@ function collectNames(input: KnownFieldsInput, current: string[]): string[] {
 function toDraft(name: string, field: FieldSchema | undefined, label: string | null): FieldDraft {
 	const draft: FieldDraft = {
 		originalName: name, originalBase: null, name, type: "native", nativeLabel: label,
-		pinned: null, removed: false, multiple: false, options: [],
+		pinned: null, removed: false, multiple: false, icon: "", options: [],
 	};
 	if (!field) return draft;
 	if (field.type === "relation") {
-		Object.assign(draft, { type: "relation", base: field.base, originalBase: field.base, multiple: field.multiple });
+		Object.assign(draft, { type: "relation", base: field.base, originalBase: field.base, multiple: field.multiple, icon: field.icon ?? "" });
 	} else if (field.type === "select") {
 		Object.assign(draft, { type: "select", multiple: field.multiple, options: field.options.map((o) => ({ value: o.value, color: o.color })) });
 	} else {
@@ -178,7 +180,10 @@ function applyDrafts(f: RawFields, live: FieldDraft[], originalNames: string[]):
 /** Raw schema value for one draft. */
 function draftToField(draft: FieldDraft): Record<string, unknown> | null {
 	if (draft.type === "native") return draft.pinned;
-	if (draft.type === "relation") return { type: "relation", base: draft.base, multiple: draft.multiple };
+	if (draft.type === "relation") {
+		const icon = draft.icon.trim();
+		return { type: "relation", base: draft.base, multiple: draft.multiple, ...(icon ? { icon } : {}) };
+	}
 	const options = Object.create(null) as Record<string, unknown>;
 	for (const o of draft.options) setOption(options, o.value, o.color);
 	return { type: "select", multiple: draft.multiple, options };
