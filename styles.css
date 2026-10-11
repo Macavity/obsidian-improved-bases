@@ -20,17 +20,43 @@
 	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--size-2-2);
+	cursor: pointer;
+	min-height: var(--input-height);
+	border-radius: var(--radius-s);
+}
+.improved-bases-relation:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
 }
 .improved-bases-chip {
 	display: inline-flex;
 	align-items: center;
 	gap: var(--size-2-1);
-	padding: 0 var(--size-2-3);
 	border-radius: var(--radius-s);
-	background-color: var(--background-modifier-hover);
 }
 .improved-bases-chip.is-foreign {
-	outline: 1px dashed var(--text-warning);
+	text-decoration: underline dashed var(--text-warning);
+}
+.improved-bases-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: var(--icon-s);
+	height: var(--icon-s);
+	--icon-size: var(--icon-s);
+}
+.improved-bases-icon.is-text {
+	font-size: var(--font-ui-small);
+	line-height: 1;
+}
+.improved-bases-entry {
+	display: flex;
+	align-items: center;
+	gap: var(--size-2-2);
+}
+.improved-bases-entry-check {
+	pointer-events: none;
+	margin: 0;
 }
 .improved-bases-relation.is-mismatch {
 	opacity: 0.8;
