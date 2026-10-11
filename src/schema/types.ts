@@ -2,7 +2,7 @@ export const COLORS = ["red", "orange", "yellow", "green", "lime", "cyan", "blue
 export type Color = typeof COLORS[number];
 export const isColor = (v: unknown): v is Color => typeof v === "string" && (COLORS as readonly string[]).includes(v);
 export type NativeType = "text" | "list" | "number" | "checkbox" | "date" | "datetime";
-export interface RelationField { type: "relation"; base: string; multiple: boolean }
+export interface RelationField { type: "relation"; base: string; multiple: boolean; icon?: string }
 export interface SelectOption { value: string; color: Color }
 export interface SelectField { type: "select"; multiple: boolean; options: SelectOption[] }
 export interface NativeField { type: NativeType }

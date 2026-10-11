@@ -17,7 +17,13 @@ function parseRelation(name: string, raw: Record<string, unknown>, multiple: boo
 		errors.push(`field "${name}": base must be a vault-relative path ending in .base (no "..", no absolute path)`);
 		return null;
 	}
-	return { type: "relation", base: raw.base, multiple };
+	if (raw.icon === undefined) return { type: "relation", base: raw.base, multiple };
+	const icon = typeof raw.icon === "string" ? raw.icon.trim() : "";
+	if (!icon) {
+		errors.push(`field "${name}": icon must be a non-empty string`);
+		return null;
+	}
+	return { type: "relation", base: raw.base, multiple, icon };
 }
 
 function parseOptions(name: string, raw: unknown, errors: string[]): SelectOption[] | null {

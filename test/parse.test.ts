@@ -23,6 +23,12 @@ describe("parseSchema", () => {
       options: [{ value: "Developer", color: "blue" }, { value: "Product Owner", color: "orange" }] });
     expect(schema!.fields.get("notes")!.field).toEqual({ type: "text" });
   });
+  it("parses the optional relation icon", () => {
+    const withIcon = parseSchema("A.base", { "improved-bases": { fields: { Team: { type: "relation", base: "T.base", icon: " 👥 " } } } });
+    expect(withIcon.schema?.fields.get("team")?.field).toEqual({ type: "relation", base: "T.base", multiple: false, icon: "👥" });
+    const none = parseSchema("A.base", { "improved-bases": { fields: { Team: { type: "relation", base: "T.base" } } } });
+    expect(none.schema?.fields.get("team")?.field).not.toHaveProperty("icon");
+  });
   it.each([
     [{ Role: { type: "select", options: { A: "purple" } } }, /color/i],
     [{ Role: { type: "select", options: { A: 5 } } }, /color/i],
@@ -36,6 +42,9 @@ describe("parseSchema", () => {
     [{ Team: { type: "relation", base: 5 } }, /base/i],
     [{ Team: { type: "relation", base: "Teams.md" } }, /base/i],
     [{ Team: { type: "relation" } }, /base/i],
+    [{ Team: { type: "relation", base: "T.base", icon: "" } }, /icon/i],
+    [{ Team: { type: "relation", base: "T.base", icon: "  " } }, /icon/i],
+    [{ Team: { type: "relation", base: "T.base", icon: 5 } }, /icon/i],
     [{ X: { type: "rollup" } }, /type/i],
     [{ X: "text" }, /field/i],
     [{ team: { type: "text" }, Team: { type: "text" } }, /duplicate/i],
