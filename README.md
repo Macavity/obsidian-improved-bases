@@ -65,7 +65,7 @@ Values that do not fit the schema (a link outside the target base, a list where 
 
 ### Relations
 
-A relation shows its entries as plain links, each with an icon: the `icon` property of the linked note (an emoji, as written by icon plugins) if it has one, else the field's `icon`, else `📄`. Entries sit side by side on one line; what does not fit is cut off at the edge. Clicking the field, on an entry or beside it, opens a picker over all entries of the target base with a filter box: active entries come first with a checked box, the rest below. Clicking a row toggles it and keeps the picker open; every toggle is saved immediately. With `multiple: false` the rows act like radio buttons, and unchecking the active one clears the field. To open a linked note, Cmd/Ctrl-click or middle-click it (new tab); hovering shows the preview as usual.
+A relation shows its entries as plain links, each with an icon: the `icon` property of the linked note (an emoji, as written by icon plugins) if it has one, else the field's `icon`, else `📄`. Entries sit side by side on one line; what does not fit is cut off at the edge. Clicking the field beside the entries opens a picker over all entries of the target base with a filter box: active entries come first with a checked box, the rest below. Clicking a row toggles it and keeps the picker open; every toggle is saved immediately. With `multiple: false` the rows act like radio buttons, and unchecking the active one clears the field. Clicking an entry opens the linked note as usual (hover for a preview); the field is also focusable and opens the picker with Enter or Space.
 
 ## Schema settings
 

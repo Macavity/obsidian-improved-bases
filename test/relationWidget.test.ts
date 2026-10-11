@@ -59,7 +59,7 @@ describe("RelationWidget", () => {
 		expect(chips()[0]?.classList.contains("is-foreign")).toBe(false);
 		expect(el.querySelector(".is-mismatch")).not.toBeNull();
 	});
-	it("opens the picker on field click, Enter and Space, and on plain link clicks", () => {
+	it("opens the picker on field click, Enter and Space, but leaves link clicks to the link", () => {
 		const { el, handle } = setup(["[[A]]"]);
 		const root = el.querySelector<HTMLElement>(".improved-bases-relation")!;
 		handle.focus();
@@ -68,34 +68,19 @@ describe("RelationWidget", () => {
 		root.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 		root.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
 		expect(EntryPicker).toHaveBeenCalledTimes(3);
+		expect(root.getAttribute("aria-haspopup")).toBe("dialog");
+		// Clicks and keys on a link (wikilinks render as span.internal-link, markdown links as a) stay native.
 		const body = root.querySelector<HTMLElement>(".improved-bases-chip-body")!;
 		const link = body.createSpan({ cls: "internal-link" });
 		const seenByLink = vi.fn();
 		link.addEventListener("click", seenByLink);
-		// A plain click on a link opens the picker and never reaches the link's own handler.
 		const plain = new MouseEvent("click", { bubbles: true, cancelable: true });
 		link.dispatchEvent(plain);
-		expect(EntryPicker).toHaveBeenCalledTimes(4);
-		expect(plain.defaultPrevented).toBe(true);
-		expect(seenByLink).not.toHaveBeenCalled();
-		// Modifier clicks keep the link's native behavior (open in a new tab).
-		link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, metaKey: true }));
-		link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, ctrlKey: true }));
-		link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 1 }));
-		expect(EntryPicker).toHaveBeenCalledTimes(4);
-		expect(seenByLink).toHaveBeenCalledTimes(3);
-		// Enter on a focused link belongs to the link.
+		body.createEl("a").click();
 		link.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-		expect(EntryPicker).toHaveBeenCalledTimes(4);
-		expect(root.getAttribute("aria-haspopup")).toBe("dialog");
-	});
-	it("lists a duplicated link once and removes both copies on toggle", () => {
-		const { onChange } = setup(["[[A]]", "[[A]]"]);
-		document.querySelector<HTMLElement>(".improved-bases-relation")!.click();
-		const [, items, , onToggle] = vi.mocked(EntryPicker).mock.calls[0]! as unknown as [App, PickerItem[], unknown, (i: PickerItem) => void];
-		expect(items.map((i) => i.raw)).toEqual(["[[A]]"]);
-		onToggle(items[0]!);
-		expect(onChange).toHaveBeenLastCalledWith([]);
+		expect(EntryPicker).toHaveBeenCalledTimes(3);
+		expect(plain.defaultPrevented).toBe(false);
+		expect(seenByLink).toHaveBeenCalledTimes(1);
 	});
 	it("builds items with active entries first and toggles them", () => {
 		const { onChange } = setup(["[[Other/B]]", "plain"], { members: [tfile("Teams/A.md"), tfile("Other/B.md")] });

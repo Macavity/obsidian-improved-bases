@@ -111,21 +111,12 @@ export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, fiel
 		}
 	};
 
-	// Capture phase: a plain click anywhere in the field, links included, opens the picker and never reaches the
-	// link's own handler. Modifier or middle clicks keep the link's native behavior (open in a new tab).
+	// A click in the field opens the picker; a click on a link keeps the link's own behavior (open, modifier = new tab).
 	// Obsidian renders wikilinks as `span.internal-link`, markdown links as `a`.
-	root.addEventListener(
-		"click",
-		(evt) => {
-			if (evt.button !== 0 || evt.metaKey || evt.ctrlKey || evt.shiftKey || evt.altKey) return;
-			if (evt.target instanceof Element && evt.target.closest("a, .internal-link")) {
-				evt.preventDefault();
-				evt.stopPropagation();
-			}
-			openPicker();
-		},
-		true,
-	);
+	root.addEventListener("click", (evt) => {
+		if (evt.target instanceof Element && evt.target.closest("a, .internal-link")) return;
+		openPicker();
+	});
 	root.addEventListener("keydown", (evt) => {
 		// Keys from a focused link inside the field belong to the link.
 		if (evt.target !== root || (evt.key !== "Enter" && evt.key !== " ")) return;
