@@ -321,4 +321,20 @@ describe("SchemaSettingsModal", () => {
 		expect(error()).toMatch(/still loading/);
 		expect(onSave).not.toHaveBeenCalled();
 	});
+
+	it("edits the relation icon", async () => {
+		const { el, q, onSave } = open({ kind: "fields", drafts: [d({ name: "Lead", type: "relation", base: "Teams.base", icon: "👤" }), d({ name: "S", type: "select" })] });
+		const summaries = () => Array.from(el.querySelectorAll<HTMLElement>(".improved-bases-field-summary"));
+		summaries()[1]?.click();
+		expect(el.querySelector(".improved-bases-field-icon")).toBeNull();
+		summaries()[0]?.click();
+		const input = q<HTMLInputElement>(".improved-bases-field-icon");
+		expect(input.value).toBe("👤");
+		expect(input.placeholder).toBe("📄");
+		input.value = "👥";
+		input.dispatchEvent(new Event("input"));
+		q<HTMLElement>(".improved-bases-save").click();
+		await tick();
+		expect(onSave).toHaveBeenCalledWith([expect.objectContaining({ name: "Lead", icon: "👥" }), expect.objectContaining({ name: "S", icon: "" })], 0);
+	});
 });

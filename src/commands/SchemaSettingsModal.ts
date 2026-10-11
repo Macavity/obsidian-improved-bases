@@ -330,6 +330,16 @@ export class SchemaSettingsModal extends Modal {
 					}).open();
 				});
 			});
+			new Setting(el)
+				.setName("Entry icon")
+				.setDesc("Emoji shown for entries without an icon property (system emoji picker: ⌃⌘Space on macOS, Win+. on Windows)")
+				.addText((t) => {
+					t.inputEl.addClass("improved-bases-field-icon");
+					t.inputEl.placeholder = "📄";
+					t.setValue(draft.icon).onChange((v) => {
+						draft.icon = v;
+					});
+				});
 		}
 		if (draft.type === "select") {
 			const setting = new Setting(el).setName("Options");
