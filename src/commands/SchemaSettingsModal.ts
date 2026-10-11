@@ -2,7 +2,7 @@ import { Modal, Setting, setIcon, type App, type ButtonComponent } from "obsidia
 import { referencesName } from "../schema/baseDoc";
 import { BasePicker, openColorMenu } from "../widgets/pickers";
 import type { OverlayRegistry } from "../widgets/types";
-import { removals, renames, TYPES, validateDrafts, type DraftType, type FieldDraft, type OptionDraft } from "./schemaDraft";
+import { conflictHint, removals, renames, TYPES, validateDrafts, type DraftType, type FieldDraft, type OptionDraft, type OtherDefinition } from "./schemaDraft";
 
 export interface SchemaSettingsInput {
 	basePath: string;
@@ -19,6 +19,8 @@ export interface SchemaSettingsInput {
 	defaultViewIndex: number;
 	/** Filter and formula expressions, to hint at references to a renamed field. */
 	expressions: string[];
+	/** Other schema bases' definitions of a field name (case-insensitive), for the conflict hint. */
+	otherDefinitions: (name: string) => OtherDefinition[];
 }
 
 export interface SchemaSettingsHandlers {
@@ -143,7 +145,7 @@ export class SchemaSettingsModal extends Modal {
 		add.addEventListener("click", () => {
 			const draft: FieldDraft = {
 				originalName: null, originalBase: null, name: "", type: "native", nativeLabel: null,
-				pinned: null, removed: false, multiple: false, options: [],
+				pinned: null, removed: false, multiple: false, icon: "", options: [],
 			};
 			this.drafts.push(draft);
 			this.expanded.add(draft);
@@ -276,6 +278,7 @@ export class SchemaSettingsModal extends Modal {
 				draft.name = v;
 				refresh();
 				this.updateHint(hint, draft);
+				this.updateConflict(conflict, draft);
 			});
 			if (this.focusNext === draft) {
 				this.focusNext = null;
@@ -285,17 +288,32 @@ export class SchemaSettingsModal extends Modal {
 		const hint = el.createDiv({ cls: "improved-bases-field-hint" });
 		this.updateHint(hint, draft);
 		const body = createDiv();
+		const conflict = createDiv({ cls: "improved-bases-field-hint improved-bases-field-conflict" });
+		const onBodyChange = (): void => {
+			refresh();
+			this.updateConflict(conflict, draft);
+		};
 		new Setting(el).setName("Type").addDropdown((d) => {
 			d.selectEl.addClass("improved-bases-field-type");
 			for (const type of TYPES) d.addOption(type, typeText(draft, type));
 			d.setValue(draft.type).onChange((v) => {
 				draft.type = v as DraftType;
 				refresh();
-				this.renderBody(body, draft, refresh);
+				this.renderBody(body, draft, onBodyChange);
+				this.updateConflict(conflict, draft);
 			});
 		});
 		el.appendChild(body);
-		this.renderBody(body, draft, refresh);
+		this.renderBody(body, draft, onBodyChange);
+		el.appendChild(conflict);
+		this.updateConflict(conflict, draft);
+	}
+
+	/** Advises about other bases defining this field differently; saving stays possible. */
+	private updateConflict(hint: HTMLElement, draft: FieldDraft): void {
+		const text = conflictHint(draft, this.input.otherDefinitions(draft.name));
+		hint.setText(text ?? "");
+		hint.hidden = text === null;
 	}
 
 	/** Warns that a renamed field is still referenced by filters or formulas. */
@@ -330,6 +348,16 @@ export class SchemaSettingsModal extends Modal {
 					}).open();
 				});
 			});
+			new Setting(el)
+				.setName("Entry icon")
+				.setDesc("Emoji for entries without an icon property. The system emoji picker opens with ctrl+cmd+space on macOS and with the Windows key + period on Windows.")
+				.addText((t) => {
+					t.inputEl.addClass("improved-bases-field-icon");
+					t.inputEl.placeholder = "📄";
+					t.setValue(draft.icon).onChange((v) => {
+						draft.icon = v;
+					});
+				});
 		}
 		if (draft.type === "select") {
 			const setting = new Setting(el).setName("Options");

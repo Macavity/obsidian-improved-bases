@@ -23,8 +23,50 @@ export interface FieldDraft {
 	pinned: Record<string, unknown> | null;
 	removed: boolean;
 	multiple: boolean;
+	/** Default icon for relation chips; "" = none. */
+	icon: string;
 	base?: string;
 	options: OptionDraft[];
+}
+
+/** Another schema base's definition of the same field name, with the number of this base's members that are also in it. */
+export interface OtherDefinition { basePath: string; field: FieldSchema; shared: number }
+
+/** The shape a draft would write, for comparing with other bases' definitions; null when the draft defines nothing. */
+function draftShape(draft: FieldDraft): { type: string; multiple: boolean; base: string | null } | null {
+	if (draft.type === "relation") return { type: "relation", multiple: draft.multiple, base: draft.base ?? null };
+	if (draft.type === "select") return { type: "select", multiple: draft.multiple, base: null };
+	const pinned = draft.pinned?.type;
+	return typeof pinned === "string" ? { type: pinned, multiple: false, base: null } : null;
+}
+
+function fieldShape(field: FieldSchema): { type: string; multiple: boolean; base: string | null } {
+	if (field.type === "relation") return { type: "relation", multiple: field.multiple, base: field.base };
+	if (field.type === "select") return { type: "select", multiple: field.multiple, base: null };
+	return { type: field.type, multiple: false, base: null };
+}
+
+function describe(field: FieldSchema): string {
+	const shape = fieldShape(field);
+	const parts = [shape.type === "relation" ? `relation to ${shape.base}` : shape.type];
+	if (shape.multiple) parts.push("(multiple)");
+	return parts.join(" ");
+}
+
+/**
+ * Advises (never blocks) when another base defines the same field with a different type, `multiple` or target.
+ * Select options, colors and icons do not count. Null without a conflict.
+ */
+export function conflictHint(draft: FieldDraft, others: OtherDefinition[]): string | null {
+	const mine = draftShape(draft);
+	if (!mine) return null;
+	const conflicts = others.filter((o) => {
+		const theirs = fieldShape(o.field);
+		return theirs.type !== mine.type || theirs.multiple !== mine.multiple || theirs.base !== mine.base;
+	});
+	if (!conflicts.length) return null;
+	const overlap = (n: number): string => (n === 0 ? "no note is in both bases yet" : n === 1 ? "1 note is in both bases" : `${n} notes are in both bases`);
+	return conflicts.map((o) => `Also defined in ${o.basePath} as ${describe(o.field)}; ${overlap(o.shared)}.`).join(" ");
 }
 
 export interface KnownFieldsInput {
@@ -57,11 +99,11 @@ function collectNames(input: KnownFieldsInput, current: string[]): string[] {
 function toDraft(name: string, field: FieldSchema | undefined, label: string | null): FieldDraft {
 	const draft: FieldDraft = {
 		originalName: name, originalBase: null, name, type: "native", nativeLabel: label,
-		pinned: null, removed: false, multiple: false, options: [],
+		pinned: null, removed: false, multiple: false, icon: "", options: [],
 	};
 	if (!field) return draft;
 	if (field.type === "relation") {
-		Object.assign(draft, { type: "relation", base: field.base, originalBase: field.base, multiple: field.multiple });
+		Object.assign(draft, { type: "relation", base: field.base, originalBase: field.base, multiple: field.multiple, icon: field.icon ?? "" });
 	} else if (field.type === "select") {
 		Object.assign(draft, { type: "select", multiple: field.multiple, options: field.options.map((o) => ({ value: o.value, color: o.color })) });
 	} else {
@@ -178,7 +220,10 @@ function applyDrafts(f: RawFields, live: FieldDraft[], originalNames: string[]):
 /** Raw schema value for one draft. */
 function draftToField(draft: FieldDraft): Record<string, unknown> | null {
 	if (draft.type === "native") return draft.pinned;
-	if (draft.type === "relation") return { type: "relation", base: draft.base, multiple: draft.multiple };
+	if (draft.type === "relation") {
+		const icon = draft.icon.trim();
+		return { type: "relation", base: draft.base, multiple: draft.multiple, ...(icon ? { icon } : {}) };
+	}
 	const options = Object.create(null) as Record<string, unknown>;
 	for (const o of draft.options) setOption(options, o.value, o.color);
 	return { type: "select", multiple: draft.multiple, options };

@@ -3,7 +3,8 @@ import { installSchemaButton } from "../internals/toolbar";
 import type { SchemaRegistry } from "../schema/SchemaRegistry";
 import type { WidgetEnv } from "../widgets/types";
 import { SchemaSettingsModal, type SchemaSettingsHandlers, type SchemaSettingsInput } from "./SchemaSettingsModal";
-import { draftsToEdits, knownFieldDrafts, removals, renameKey, renames, type FieldDraft } from "./schemaDraft";
+import { draftsToEdits, knownFieldDrafts, removals, renameKey, renames, type FieldDraft, type OtherDefinition } from "./schemaDraft";
+import type { Membership } from "../schema/Membership";
 import { readBaseColumns, referencesName, type BaseColumns } from "../schema/baseDoc";
 import { getMetadataTypeManager } from "../internals/detect";
 import { findOwnKey } from "../schema/keys";
@@ -159,6 +160,21 @@ function nativeLabelOf(app: App): (name: string) => string | null {
 }
 
 /** Dialog input and handlers for one base; the modal itself stays UI-only. */
+/** Other schema bases defining `name`, each with the number of this base's members that are also in it (0 while unknown). */
+function otherDefinitions(registry: SchemaRegistry, membership: Pick<Membership, "targetEntries">, basePath: string, name: string): OtherDefinition[] {
+	const key = name.toLowerCase();
+	const mine = new Set((membership.targetEntries(basePath) ?? []).map((f) => f.path));
+	const out: OtherDefinition[] = [];
+	for (const schema of registry.schemas()) {
+		if (schema.basePath === basePath) continue;
+		const f = schema.fields.get(key);
+		if (!f) continue;
+		const theirs = membership.targetEntries(schema.basePath) ?? [];
+		out.push({ basePath: schema.basePath, field: f.field, shared: theirs.filter((t) => mine.has(t.path)).length });
+	}
+	return out;
+}
+
 export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, registry: SchemaRegistry, basePath: string, viewName: string | null): Promise<{ input: SchemaSettingsInput; handlers: SchemaSettingsHandlers }> {
 	const app = plugin.app;
 	const file = app.vault.getAbstractFileByPath(basePath);
@@ -195,6 +211,7 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 		basePaths,
 		overlays: env.overlays,
 		membersKnown: () => env.membership.targetEntries(basePath) !== null,
+		otherDefinitions: (name) => otherDefinitions(registry, env.membership, basePath, name),
 		views,
 		defaultViewIndex,
 		expressions,

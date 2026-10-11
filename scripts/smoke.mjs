@@ -91,7 +91,7 @@ console.log(`membership.ready after enable: ${Date.now() - enabledAt} ms`);
 await waitFor(() => cells("Mitarbeiter.base").some((c) => c.plugin), 10000);
 console.log("TypeInfoPatch ok");
 
-// RelationWidget: picker, write format, remove, rename, panel parity, hover, foreign/mismatch markers.
+// RelationWidget: picker, write format, remove, rename, panel parity, hover, foreign marker, no marker for a scalar in a multiple field.
 // Console warnings can precede the result line in `eval` output; the result is the last line.
 const run = (path, body) => {
 	const out = evalJs(`(async () => { ${OPEN(path)} const sleep = (ms) => new Promise((r) => setTimeout(r, ms)); ${body} })()`);
@@ -104,11 +104,18 @@ const ROW = (name) =>
 const teamOf = (name) => obs("property:read", { path: `Mitarbeiter/${name}.md`, name: "Team" }).trim().split("\n").map((l) => l.trim());
 const picker = run("Mitarbeiter.base",
 	`for (let i = 0; i < 3; i++) { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await sleep(100); } ` +
-		`${ROW("Ada Albers")} cell.querySelector('.improved-bases-add').click(); await sleep(600); ` +
-		`const items = [...document.querySelectorAll('.suggestion-item')].map((i) => i.textContent); ` +
-		`[...document.querySelectorAll('.suggestion-item')].find((i) => i.textContent === 'Team Delta').click(); await sleep(1500); ` +
-		`return JSON.stringify(items);`);
-assert(JSON.stringify([...picker].sort()) === JSON.stringify(["Team Alpha", "Team Beta", "Team Delta", "Team Gamma"]), `picker entries: ${picker}`);
+		`${ROW("Ada Albers")} cell.querySelector('.improved-bases-relation').click(); await sleep(600); ` +
+		`const rows = () => [...document.querySelectorAll('.suggestion-item.improved-bases-entry')]; ` +
+		`const items = rows().map((r) => ({ label: r.querySelector('.improved-bases-entry-label').textContent, checked: r.querySelector('input').checked, icon: r.querySelector('.improved-bases-icon').textContent })); ` +
+		`rows().find((r) => r.textContent.includes('Team Delta')).click(); await sleep(600); ` +
+		`const open = !!document.querySelector('.modal-container .suggestion-item.improved-bases-entry'); ` +
+		`const checked = rows().find((r) => r.textContent.includes('Team Delta')).querySelector('input').checked; ` +
+		`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await sleep(1200); ` +
+		`return JSON.stringify({ items, open, checked });`);
+assert(JSON.stringify(picker.items.map((i) => i.label)) === JSON.stringify(["Team Alpha", "Team Beta", "Team Delta", "Team Gamma"]), `picker entries: ${JSON.stringify(picker)}`);
+assert(JSON.stringify(picker.items.map((i) => i.checked)) === JSON.stringify([true, false, false, false]), `active first: ${JSON.stringify(picker)}`);
+assert(JSON.stringify(picker.items.map((i) => i.icon)) === JSON.stringify(["📄", "📄", "🚀", "📄"]), `picker icons: ${JSON.stringify(picker)}`);
+assert(picker.open && picker.checked, `toggle keeps the picker open: ${JSON.stringify(picker)}`);
 await waitFor(() => JSON.stringify(teamOf("Ada Albers")) === JSON.stringify(["[[Team Alpha]]", "[[Team Delta]]"]), 5000);
 obs("rename", { path: "Teams/Team Alpha.md", name: "Team Aurora" });
 await waitFor(() => teamOf("Ada Albers").includes("[[Team Aurora]]"), 8000);
@@ -117,17 +124,23 @@ const panel = run("Mitarbeiter/Ada Albers.md",
 		`const a = p.querySelector('.improved-bases-chip .internal-link'); let hov = null; ` +
 		`const ref = app.workspace.on('hover-link', (e) => { hov = e.linktext ?? 'x'; }); ` +
 		`a.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, metaKey: true, ctrlKey: true })); await sleep(1200); app.workspace.offref(ref); ` +
-		`return JSON.stringify({ chips: [...p.querySelectorAll('.improved-bases-chip')].map((c) => c.textContent.replace('×', '')), hov, popover: !!document.querySelector('.popover.hover-popover') });`);
+		`return JSON.stringify({ chips: [...p.querySelectorAll('.improved-bases-chip-body')].map((c) => c.textContent), icons: [...p.querySelectorAll('.improved-bases-chip .improved-bases-icon')].map((c) => c.textContent), removes: p.querySelectorAll('.improved-bases-chip-remove, .improved-bases-add').length, hov, popover: !!document.querySelector('.popover.hover-popover') });`);
 assert(JSON.stringify(panel.chips) === JSON.stringify(["Team Aurora", "Team Delta"]), `panel chips: ${JSON.stringify(panel)}`);
+assert(JSON.stringify(panel.icons) === JSON.stringify(["📄", "🚀"]) && panel.removes === 0, `panel icons / no buttons: ${JSON.stringify(panel)}`);
 assert(panel.hov === "Team Aurora", `hover-link event: ${JSON.stringify(panel)}`);
 console.log(`popover: ${panel.popover} (environment-dependent)`);
 run("Mitarbeiter.base",
-	`${ROW("Ada Albers")} cell.querySelector('.improved-bases-chip-remove').click(); await sleep(1500); return JSON.stringify(1);`);
+	`${ROW("Ada Albers")} cell.querySelector('.improved-bases-relation').click(); await sleep(600); ` +
+		`[...document.querySelectorAll('.suggestion-item.improved-bases-entry')].find((r) => r.textContent.includes('Team Aurora')).click(); await sleep(600); ` +
+		`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await sleep(1200); return JSON.stringify(1);`);
 await waitFor(() => JSON.stringify(teamOf("Ada Albers")) === JSON.stringify(["[[Team Delta]]"]), 5000);
 const marks = run("Mitarbeiter.base",
 		`const cellOf = (n) => [...el.querySelectorAll('.bases-tr')].find((r) => r.textContent.includes(n)).querySelector('.bases-td[data-property="note.team" i]'); ` +
-		`return JSON.stringify({ foreign: !!cellOf('Gina Graf').querySelector('.is-foreign'), okChip: !cellOf('Cora Conrad').querySelector('.is-foreign'), mismatch: !!cellOf('Hugo Hahn').querySelector('.is-mismatch') });`);
-assert(marks.foreign && marks.okChip && marks.mismatch, `foreign/mismatch markers: ${JSON.stringify(marks)}`);
+		`return JSON.stringify({ foreign: !!cellOf('Gina Graf').querySelector('.is-foreign'), okChip: !cellOf('Cora Conrad').querySelector('.is-foreign'), hugoPlain: !!cellOf('Hugo Hahn').querySelector('.improved-bases-relation') && !cellOf('Hugo Hahn').querySelector('.is-mismatch'), ` +
+		`coraPlugin: !!cellOf('Cora Conrad').querySelector('.improved-bases-relation'), coraConflict: cellOf('Cora Conrad').querySelector('.improved-bases-conflict')?.getAttribute('aria-label') ?? null, adaConflict: !!cellOf('Ada Albers').querySelector('.improved-bases-conflict') });`);
+assert(marks.foreign && marks.okChip && marks.hugoPlain, `foreign marker / plain scalar: ${JSON.stringify(marks)}`);
+// Conflict: Cora is also in Meetings.base (Team pinned as text). In the Mitarbeiter table its own definition wins, with an info marker.
+assert(marks.coraPlugin && marks.coraConflict?.includes("Showing Mitarbeiter.base") && marks.coraConflict?.includes("Meetings.base defines it as text") && !marks.adaConflict, `conflict marker: ${JSON.stringify(marks)}`);
 console.log("RelationWidget ok");
 
 const sortKeys = (v) => Array.isArray(v) ? v.map(sortKeys) : v && typeof v === "object" ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortKeys(v[k])])) : v;
@@ -289,7 +302,7 @@ OPEN_ACTIVE("Verwaist.base");
 await waitFor(() => cells("Verwaist.base").some((c) => c.plugin), 10000);
 run("Verwaist.base",
 	`${ESC} document.querySelectorAll('.notice').forEach((n) => n.remove()); const cell = [...el.querySelectorAll('.bases-td[data-property="note.team" i]')][0]; ` +
-		`cell.querySelector('.improved-bases-add').click(); await sleep(800); return JSON.stringify(1);`);
+		`cell.querySelector('.improved-bases-relation').click(); await sleep(800); return JSON.stringify(1);`);
 await waitFor(() => evalJs("[...document.querySelectorAll('.notice')].some((n) => n.textContent.includes('Target base not found'))") === "true", 5000);
 run("Verwaist.base", `${ESC} return JSON.stringify(1);`);
 await waitFor(() => evalJs("document.querySelectorAll('.modal-container').length") === "0", 5000);

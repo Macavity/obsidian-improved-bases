@@ -6,7 +6,7 @@ import { OverlayRegistry } from "../src/widgets/types";
 
 const d = (p: Partial<FieldDraft>): FieldDraft => ({
 	originalName: null, originalBase: null, name: "X", type: "native", nativeLabel: null,
-	pinned: null, removed: false, multiple: false, options: [], ...p,
+	pinned: null, removed: false, multiple: false, icon: "", options: [], ...p,
 });
 const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 
@@ -26,6 +26,7 @@ function open(state: SchemaSettingsInput["state"], { countAffected: count, ...op
 		views: ["A"],
 		defaultViewIndex: 0,
 		expressions: [],
+		otherDefinitions: () => [],
 		...opts,
 	};
 	const modal = new SchemaSettingsModal({} as App, input, { onSave, onReset, countAffected });
@@ -272,6 +273,24 @@ describe("SchemaSettingsModal", () => {
 		expect(el.querySelector(".improved-bases-field-confirm")).toBeNull();
 	});
 
+	it("shows conflicting definitions of other bases under the field and follows edits", () => {
+		const otherDefinitions = vi.fn((name: string) => (name.toLowerCase() === "team" ? [{ basePath: "Meetings.base", field: { type: "text" as const }, shared: 1 }] : []));
+		const { el, q } = open({ kind: "fields", drafts: [d({ name: "Team", type: "relation", base: "Teams.base", multiple: true }), d({ name: "Role", type: "select" })] }, { otherDefinitions });
+		const rows = () => Array.from(el.querySelectorAll<HTMLElement>(".improved-bases-field-summary"));
+		rows()[0]?.click();
+		const hint = q<HTMLElement>(".improved-bases-field-conflict");
+		expect(hint.textContent).toBe("Also defined in Meetings.base as text; 1 note is in both bases.");
+		expect(hint.hidden).toBe(false);
+		// Switching the type to native (unpinned) ends the conflict.
+		const type = q<HTMLSelectElement>(".improved-bases-field-type");
+		type.value = "native";
+		type.dispatchEvent(new Event("change"));
+		expect(q<HTMLElement>(".improved-bases-field-conflict").hidden).toBe(true);
+		// Renaming to a free name ends it as well.
+		rows()[0]?.click();
+		rows()[1]?.click();
+		expect(q<HTMLElement>(".improved-bases-field-conflict").hidden).toBe(true);
+	});
 	it("hints when a renamed field is referenced by expressions", () => {
 		const { q } = open({ kind: "fields", drafts: [d({ originalName: "Status", name: "Status" })] }, { expressions: ['Status != "a"'] });
 		q<HTMLElement>(".improved-bases-field-summary").click();
@@ -320,5 +339,21 @@ describe("SchemaSettingsModal", () => {
 		await tick();
 		expect(error()).toMatch(/still loading/);
 		expect(onSave).not.toHaveBeenCalled();
+	});
+
+	it("edits the relation icon", async () => {
+		const { el, q, onSave } = open({ kind: "fields", drafts: [d({ name: "Lead", type: "relation", base: "Teams.base", icon: "👤" }), d({ name: "S", type: "select" })] });
+		const summaries = () => Array.from(el.querySelectorAll<HTMLElement>(".improved-bases-field-summary"));
+		summaries()[1]?.click();
+		expect(el.querySelector(".improved-bases-field-icon")).toBeNull();
+		summaries()[0]?.click();
+		const input = q<HTMLInputElement>(".improved-bases-field-icon");
+		expect(input.value).toBe("👤");
+		expect(input.placeholder).toBe("📄");
+		input.value = "👥";
+		input.dispatchEvent(new Event("input"));
+		q<HTMLElement>(".improved-bases-save").click();
+		await tick();
+		expect(onSave).toHaveBeenCalledWith([expect.objectContaining({ name: "Lead", icon: "👥" }), expect.objectContaining({ name: "S", icon: "" })], 0);
 	});
 });

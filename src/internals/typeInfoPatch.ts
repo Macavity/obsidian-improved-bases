@@ -1,7 +1,10 @@
 import type { App, EventRef } from "obsidian";
 import { around } from "monkey-around";
+import type { Resolution } from "../schema/Membership";
 import type { NativeType, RelationField, SelectField } from "../schema/types";
-import type { PluginWidget, PropertyRenderContext, WidgetEnv } from "../widgets/types";
+import { renderConflictMarker } from "../widgets/conflictMarker";
+import { baseContextOf } from "./baseContext";
+import type { PluginWidget, PropertyRenderContext, WidgetEnv, WidgetHandle } from "../widgets/types";
 import { getMetadataTypeManager, type MetadataTypeManager, type TypeInfo, type TypeWidget } from "./detect";
 
 export interface TypeInfoPatch {
@@ -53,13 +56,51 @@ export function installTypeInfoPatch(app: App, env: WidgetEnv, widgets: PluginWi
 		}
 	};
 
-	const renderPlugin = (el: HTMLElement, value: unknown, ctx: PropertyRenderContext, mtm: MetadataTypeManager): unknown => {
-		const field = membership.resolve(ctx.sourcePath, ctx.key);
-		if (!field) return undefined;
-		if (field.type === "relation") return widgets.relation(el, value, ctx, field, env);
-		if (field.type === "select") return widgets.select(el, value, ctx, field, env);
+	const renderField = (el: HTMLElement, value: unknown, ctx: PropertyRenderContext, res: Resolution, mtm: MetadataTypeManager): unknown => {
+		const { field } = res;
+		const source = { basePath: res.basePath, name: res.name };
+		if (field.type === "relation") return widgets.relation(el, value, ctx, field, env, source);
+		if (field.type === "select") return widgets.select(el, value, ctx, field, env, source);
 		const native = mtm.registeredTypeWidgets[NATIVE_WIDGET[field.type]];
 		return native ? native.render(el, value, ctx) : undefined;
+	};
+
+	const isHandle = (h: unknown): h is WidgetHandle => typeof h === "object" && h !== null && typeof (h as WidgetHandle).focus === "function";
+
+	/**
+	 * The base of the surrounding view decides between conflicting definitions; a conflict is shown as an info marker.
+	 * Bases builds table cells detached and attaches them later, so the context is checked again once `el` is in the
+	 * DOM: a different winner re-renders the cell, a same winner only refreshes the marker text.
+	 */
+	const renderPlugin = (el: HTMLElement, value: unknown, ctx: PropertyRenderContext, mtm: MetadataTypeManager): unknown => {
+		const context = baseContextOf(app, el);
+		const res = membership.resolveWithBase(ctx.sourcePath, ctx.key, context);
+		if (!res) return undefined;
+		let handle = renderField(el, value, ctx, res, mtm);
+		if (handle === undefined) return undefined;
+		if (res.others.length) renderConflictMarker(el, res, res.name, context);
+		if (!el.isConnected && res.others.length) {
+			window.setTimeout(() => {
+				if (!el.isConnected || !active) return;
+				const late = baseContextOf(app, el);
+				if (late === context) return;
+				const next = membership.resolveWithBase(ctx.sourcePath, ctx.key, late);
+				if (!next) return;
+				if (next.basePath !== res.basePath) {
+					el.empty();
+					el.removeClass("improved-bases-has-conflict");
+					const rerendered = renderField(el, value, ctx, next, mtm);
+					if (rerendered !== undefined) handle = rerendered;
+				} else {
+					el.querySelector(".improved-bases-conflict")?.remove();
+				}
+				if (next.others.length) renderConflictMarker(el, next, next.name, late);
+			}, 0);
+		}
+		// The handle Bases keeps must follow a re-render, so it delegates to the latest widget.
+		if (!isHandle(handle)) return handle;
+		const first = handle;
+		return { type: first.type, focus: (mode?: string) => (isHandle(handle) ? handle : first).focus(mode) };
 	};
 
 	const isStringArray = (v: unknown): boolean => Array.isArray(v) && v.every((x) => typeof x === "string");

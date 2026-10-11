@@ -107,6 +107,23 @@ describe("Membership", () => {
 		expect(m.resolveWithBase("x.md", "TEAM")).toMatchObject({ basePath: "A-People.base", name: "Team" });
 		warn.mockRestore();
 	});
+	it("prefers the given base when it is a candidate and lists the other definitions", () => {
+		const { m, push } = setup();
+		vi.spyOn(console, "warn").mockImplementation(() => {});
+		push("A-People.base", ["x.md"]);
+		push("B-Meetings.base", ["x.md"]);
+		settle();
+		const byPath = m.resolveWithBase("x.md", "team");
+		expect(byPath?.basePath).toBe("A-People.base");
+		expect(byPath?.others.map((o) => [o.basePath, o.field.type])).toEqual([["B-Meetings.base", "text"]]);
+		const preferred = m.resolveWithBase("x.md", "team", "B-Meetings.base");
+		expect(preferred?.basePath).toBe("B-Meetings.base");
+		expect(preferred?.field.type).toBe("text");
+		expect(preferred?.others.map((o) => o.basePath)).toEqual(["A-People.base"]);
+		// Not a candidate: the path rule applies.
+		expect(m.resolveWithBase("x.md", "team", "Z.base")?.basePath).toBe("A-People.base");
+		expect(m.resolve("x.md", "team", "B-Meetings.base")?.type).toBe("text");
+	});
 	it("resolveWithBase reports the winning base and the schema spelling", () => {
 		const sch = (path: string, name: string) => {
 			const r = parseSchema(path, { "improved-bases": { fields: { [name]: { type: "text" } } } }).schema;

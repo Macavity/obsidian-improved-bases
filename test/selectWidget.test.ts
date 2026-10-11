@@ -9,7 +9,7 @@ vi.mock("../src/widgets/pickers", () => ({ openOptionMenu: vi.fn(), openColorMen
 
 const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 
-function setup(value: unknown, opts: { multiple?: boolean; resolved?: boolean; writeFails?: boolean } = {}) {
+function setup(value: unknown, opts: { multiple?: boolean; resolved?: boolean; writeFails?: boolean; source?: { basePath: string; name: string } } = {}) {
 	const update = vi.fn(() => (opts.writeFails ? Promise.reject(new Error("locked")) : Promise.resolve()));
 	const env = {
 		app: {} as App,
@@ -21,7 +21,7 @@ function setup(value: unknown, opts: { multiple?: boolean; resolved?: boolean; w
 	const ctx = { app: env.app, key: "status", sourcePath: "n.md", onChange, blur: vi.fn() } as PropertyRenderContext;
 	const field: SelectField = { type: "select", multiple: opts.multiple ?? true, options: [{ value: "A", color: "red" }] };
 	const el = document.body.createDiv();
-	SelectWidget(el, value, ctx, field, env);
+	SelectWidget(el, value, ctx, field, env, opts.source);
 	el.querySelector<HTMLElement>(".improved-bases-add")?.click();
 	const call = vi.mocked(openOptionMenu).mock.calls.at(-1);
 	if (!call) throw new Error("option menu not opened");
@@ -69,6 +69,12 @@ describe("SelectWidget", () => {
 		single.create("New");
 		await tick();
 		expect(single.onChange).toHaveBeenCalledWith("New");
+	});
+	it("writes options into the base the patch resolved, not the first by path", async () => {
+		const { update, create } = setup(["A"], { source: { basePath: "Viewed.base", name: "Status" } });
+		create("B");
+		await tick();
+		expect(update).toHaveBeenCalledWith("Viewed.base", expect.any(Function));
 	});
 	it("does not select when the schema write fails or the field is unresolved", async () => {
 		const failing = setup(["A"], { writeFails: true });

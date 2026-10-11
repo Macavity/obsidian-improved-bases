@@ -84,3 +84,17 @@ Append-only audit trail. Add one dated entry per generation or refresh run, reco
 - source_commit: 9b45bc0 (was 391fff1)
 - Coverage: validation blocks reusing a removed field's name and checks reserved names only for new or renamed fields; untouched schema entries keep their key spelling; removal matches note keys case-insensitively in one pass and counts unreadable notes as failed; duplicate map keys are dropped on column rename; pinned type shown in the dialog; removal warns about filter/formula references.
 - Pages: [Commands](./modules/commands.md), [Schema edit](./flows/schema-edit.md), [Overview](./OVERVIEW.md)
+
+## 2026-10-11: refresh (relation styling and picker)
+
+- Profile: internal/standard
+- source_commit: a4df48b (was 9b45bc0; review fixes folded in: lenient `icon` parsing, link keydown guard, duplicate links listed once; test feedback: field fills the cell, chips on one line, plain link clicks open the picker)
+- Coverage: relation chips without background or remove button, entry icons (`icon` property → field `icon` → 📄, new `src/widgets/icons.ts`), optional `icon` key on relation fields through parser, drafts and the dialog's "Entry icon" field; `EntryPicker` is a checkbox toggle modal opened by clicking the field; smoke script follows.
+- Pages: [Widgets](./modules/widgets.md), [Commands](./modules/commands.md), [Field schema](./concepts/field-schema.md), [Value mismatch](./concepts/value-mismatch.md), [Widget render](./flows/widget-render.md), [Tooling](./modules/tooling.md), [Overview](./OVERVIEW.md)
+
+## 2026-10-11: refresh (field conflicts)
+
+- Profile: internal/standard
+- source_commit: a26466d (was a4df48b; the shape mismatch marker (`is-mismatch`, italic) is gone, a value in the other storage shape is shown like any other; link clicks open the note again, the picker opens from the field beside the entries; follow-up: select writes go to the shown base via `SchemaSource`, schema dialog advises on conflicting definitions without blocking)
+- Coverage: conflicting field definitions across schema bases: the base of the viewed table or embed wins when it is a candidate (`resolveWithBase(file, field, preferredBase)` with `others`), the field shows an info marker with tooltip (`src/widgets/conflictMarker.ts`), the base lookup moved to `src/internals/baseContext.ts` and detached cells are re-checked once attached.
+- Pages: [Membership](./concepts/membership.md), [Widget render](./flows/widget-render.md), [Internals](./modules/internals.md), [Widgets](./modules/widgets.md), [Overview](./OVERVIEW.md)

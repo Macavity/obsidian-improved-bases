@@ -10,6 +10,8 @@ tags:
 
 ## Summary
 
+`baseContextOf(app, el)` ([baseContext.ts](../../src/internals/baseContext.ts)) answers "which `.base` file backs the view that contains this element" for both the toolbar button and the widget render; it walks `workspace.iterateAllLeaves` for the containing leaf and reads `.internal-embed[src]` for embedded bases, returning null for code-block bases, the properties panel and the sidebar.
+
 `src/internals/` is the quarantine zone for everything that touches undocumented Obsidian members. The rest of the plugin only sees typed interfaces returned by detectors that yield `null` on unexpected shapes. The architectural rationale is in [Obsidian internals](../architecture/obsidian-internals.md).
 
 ## Responsibilities

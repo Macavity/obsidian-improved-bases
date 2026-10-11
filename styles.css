@@ -15,26 +15,54 @@
 }
 
 /* Relation widget */
+/* Fills the cell so the whole field is a click target; chips stay on one line and overflow to the side. */
 .improved-bases-relation {
 	display: flex;
-	flex-wrap: wrap;
+	flex-wrap: nowrap;
 	align-items: center;
 	gap: var(--size-2-2);
+	width: 100%;
+	min-width: 0;
+	overflow: hidden;
+	cursor: pointer;
+	min-height: var(--input-height);
+	border-radius: var(--radius-s);
+}
+.improved-bases-relation:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
 }
 .improved-bases-chip {
 	display: inline-flex;
+	flex: 0 0 auto;
 	align-items: center;
 	gap: var(--size-2-1);
-	padding: 0 var(--size-2-3);
+	white-space: nowrap;
 	border-radius: var(--radius-s);
-	background-color: var(--background-modifier-hover);
 }
 .improved-bases-chip.is-foreign {
-	outline: 1px dashed var(--text-warning);
+	text-decoration: underline dashed var(--text-warning);
 }
-.improved-bases-relation.is-mismatch {
-	opacity: 0.8;
-	font-style: italic;
+.improved-bases-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: var(--icon-s);
+	height: var(--icon-s);
+	--icon-size: var(--icon-s);
+}
+.improved-bases-icon.is-text {
+	font-size: var(--font-ui-small);
+	line-height: 1;
+}
+.improved-bases-entry {
+	display: flex;
+	align-items: center;
+	gap: var(--size-2-2);
+}
+.improved-bases-entry-check {
+	pointer-events: none;
+	margin: 0;
 }
 .improved-bases-chip-remove,
 .improved-bases-add {
@@ -43,16 +71,31 @@
 	line-height: 1.4;
 }
 
+/* Conflict marker: a note is in several schema bases defining this field; the info icon explains which one applies. */
+.improved-bases-has-conflict {
+	display: flex;
+	align-items: center;
+	gap: var(--size-2-2);
+}
+.improved-bases-has-conflict > :first-child {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+.improved-bases-conflict {
+	display: inline-flex;
+	flex: 0 0 auto;
+	margin-left: auto;
+	color: var(--text-muted);
+	--icon-size: var(--icon-s);
+	cursor: help;
+}
+
 /* Select widget: palette → Obsidian color variables (no variable exists for lime, brown, grey, black, white). */
 .improved-bases-select {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--size-2-2);
-}
-.improved-bases-select.is-mismatch {
-	opacity: 0.8;
-	font-style: italic;
 }
 [data-color] {
 	--ib-rgb: var(--mono-rgb-100);
