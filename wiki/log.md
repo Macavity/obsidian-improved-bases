@@ -84,3 +84,10 @@ Append-only audit trail. Add one dated entry per generation or refresh run, reco
 - source_commit: 9b45bc0 (was 391fff1)
 - Coverage: validation blocks reusing a removed field's name and checks reserved names only for new or renamed fields; untouched schema entries keep their key spelling; removal matches note keys case-insensitively in one pass and counts unreadable notes as failed; duplicate map keys are dropped on column rename; pinned type shown in the dialog; removal warns about filter/formula references.
 - Pages: [Commands](./modules/commands.md), [Schema edit](./flows/schema-edit.md), [Overview](./OVERVIEW.md)
+
+## 2026-10-11: refresh (relation styling and picker)
+
+- Profile: internal/standard
+- source_commit: 59918df (was 9b45bc0)
+- Coverage: relation chips without background or remove button, entry icons (`icon` property → field `icon` → 📄, new `src/widgets/icons.ts`), optional `icon` key on relation fields through parser, drafts and the dialog's "Entry icon" field; `EntryPicker` is a checkbox toggle modal opened by clicking the field; smoke script follows.
+- Pages: [Widgets](./modules/widgets.md), [Commands](./modules/commands.md), [Field schema](./concepts/field-schema.md), [Value mismatch](./concepts/value-mismatch.md), [Widget render](./flows/widget-render.md), [Tooling](./modules/tooling.md), [Overview](./OVERVIEW.md)

@@ -40,6 +40,7 @@ improved-bases:
       type: relation
       base: Referenzen/Teams/Teams.base
       multiple: true
+      icon: 👥
     Role:
       type: select
       multiple: false
@@ -56,10 +57,15 @@ views: ...
 - `multiple` (default `false`): `false` stores a string (`"[[X]]"` or `Value`), `true` stores a YAML list.
 - `options`: maps each value to a color: `red`, `orange`, `yellow`, `green`, `lime`, `cyan`, `blue`, `violet`, `pink`, `brown`, `grey`, `black`, `white`. Map order is display order. Unknown values show grey.
 - `base`: vault path of the target base. It needs no schema itself.
+- `icon` (optional, relations only): emoji shown next to each entry whose note has no `icon` property of its own. Default `📄`.
 - Field names are the property names. Obsidian and Bases treat `Team` and `team` as one property, so the plugin resolves field names that way too; writes to notes (renames) always use the exact key.
 - A note belongs to a schema base when it is in the result of that base (its filters apply), regardless of folder.
 
 Values that do not fit the schema (a link outside the target base, a list where `multiple: false`) are kept, shown with a marker, and only rewritten into the schema format when you edit them.
+
+### Relations
+
+A relation shows its entries as plain links, each with an icon: the `icon` property of the linked note (an emoji, as written by icon plugins) if it has one, else the field's `icon`, else `📄`. Clicking the field (anywhere but on a link) opens a picker over all entries of the target base with a filter box: active entries come first with a checked box, the rest below. Clicking a row toggles it and keeps the picker open; every toggle is saved immediately. With `multiple: false` the rows act like radio buttons, and unchecking the active one clears the field. Links keep their native behavior (click to open, hover for a preview).
 
 ## Schema settings
 
@@ -69,7 +75,7 @@ A dialog edits all fields of a base without touching YAML. Open it via:
 - **Schema settings** in the tab menu, the more-options menu or the file explorer context menu of a `.base` file,
 - the command "Open schema settings".
 
-The dialog lists every field the base knows: the columns of all views, the `properties:` keys and the property keys of the member notes. Rows follow the order of the current view (the one the dialog was opened from), the rest is alphabetical. A field without a plugin entry is native and shows Obsidian's detected type in the type dropdown (`native (text)`, ...). The other choices are `relation` and `select`; switching a field back to native deletes its plugin entry. The dialog edits field name, type, `multiple`, the target base of a relation, and the options of a select with their colors. Save writes all changes at once in one write to the base file; a base without a schema becomes a schema base on first save.
+The dialog lists every field the base knows: the columns of all views, the `properties:` keys and the property keys of the member notes. Rows follow the order of the current view (the one the dialog was opened from), the rest is alphabetical. A field without a plugin entry is native and shows Obsidian's detected type in the type dropdown (`native (text)`, ...). The other choices are `relation` and `select`; switching a field back to native deletes its plugin entry. The dialog edits field name, type, `multiple`, the target base and the entry icon of a relation (an emoji; use the system emoji picker, ⌃⌘Space on macOS, Win+. on Windows), and the options of a select with their colors. Save writes all changes at once in one write to the base file; a base without a schema becomes a schema base on first save.
 
 **Add field** appends the property to the `order` of a view. With more than one view, "Add new fields to" picks it; it is preselected with the view the dialog was opened from (the first view when opened from a command or menu).
 

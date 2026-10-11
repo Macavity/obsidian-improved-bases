@@ -13,7 +13,7 @@ tags:
 A **value mismatch** is any existing property value that does not fit the [field schema](./field-schema.md) it now falls under:
 
 - **Shape**: a list where `multiple: false`, or a scalar where `multiple: true` (`Array.isArray(value) !== field.multiple`). The widget adds `is-mismatch` to its root.
-- **Relation content**: a link whose destination is not in the target base's result; the chip gets `is-foreign` and the title "Not in target base".
+- **Relation content**: a link whose destination is not in the target base's result; the chip gets `is-foreign` (dashed underline) and the title "Not in target base". In the entry picker such links still appear at the top as active rows (also marked `is-foreign`) so they can be unchecked.
 - **Select content**: a value with no option in the schema; the pill is grey with the title "Not in options".
 
 In all cases the value is displayed as-is and never dropped. The next edit through the widget commits in schema shape (`relationOutput()` / `selectOutput()`), which clears the marker. Documented for users in the [README](../../README.md#schema-format).
