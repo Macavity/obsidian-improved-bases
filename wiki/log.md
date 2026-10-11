@@ -95,6 +95,6 @@ Append-only audit trail. Add one dated entry per generation or refresh run, reco
 ## 2026-10-11: refresh (field conflicts)
 
 - Profile: internal/standard
-- source_commit: 0069df7 (was a4df48b; link clicks open the note again, the picker opens from the field beside the entries; follow-up: select writes go to the shown base via `SchemaSource`, schema dialog advises on conflicting definitions without blocking)
+- source_commit: a26466d (was a4df48b; the shape mismatch marker (`is-mismatch`, italic) is gone, a value in the other storage shape is shown like any other; link clicks open the note again, the picker opens from the field beside the entries; follow-up: select writes go to the shown base via `SchemaSource`, schema dialog advises on conflicting definitions without blocking)
 - Coverage: conflicting field definitions across schema bases: the base of the viewed table or embed wins when it is a candidate (`resolveWithBase(file, field, preferredBase)` with `others`), the field shows an info marker with tooltip (`src/widgets/conflictMarker.ts`), the base lookup moved to `src/internals/baseContext.ts` and detached cells are re-checked once attached.
 - Pages: [Membership](./concepts/membership.md), [Widget render](./flows/widget-render.md), [Internals](./modules/internals.md), [Widgets](./modules/widgets.md), [Overview](./OVERVIEW.md)
