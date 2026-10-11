@@ -15,7 +15,7 @@ tags:
 Three rules:
 
 - **Latch**: `ready` becomes `true` once the registry is loaded, every schema base has a result, `metadataCache` has resolved, and 300 ms (`QUIET_MS`) passed without a new push. Before that `resolve()` returns `null` and everything renders native. The latch never resets.
-- **Conflict**: if a file is in several schema bases defining the same field, the first base by path (registry order) wins; a console warning is logged once per `(file, field)`.
+- **Conflict**: if a file is in several schema bases defining the same field, `resolveWithBase(file, field, preferredBase)` lets the base of the view being rendered win when it is a candidate, otherwise the first base by path (registry order). The result (`Resolution`) carries the competing definitions in `others`; the [getTypeInfo patch](./hull-widget.md) turns them into an info marker in the field (`renderConflictMarker` in [conflictMarker.ts](../../src/widgets/conflictMarker.ts)). A console warning is logged once per `(file, field)`.
 - **Events**: `changed(fieldNames[])` whenever the applicable fields may have changed (after latch, or schema diff); `targets-changed(basePath)` when a relation target's result set changes.
 
 ## Why it matters

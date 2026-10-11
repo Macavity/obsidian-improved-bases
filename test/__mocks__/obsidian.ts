@@ -370,3 +370,7 @@ export const KNOWN_ICONS = new Set<string>();
 export function getIcon(id: string): SVGSVGElement | null {
 	return KNOWN_ICONS.has(id) ? document.createElementNS("http://www.w3.org/2000/svg", "svg") : null;
 }
+
+export function setTooltip(el: HTMLElement, tooltip: string, _options?: unknown): void {
+	el.setAttribute("data-tooltip", tooltip);
+}

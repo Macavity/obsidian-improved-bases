@@ -25,7 +25,7 @@ Limits:
 - Undo (Cmd/Ctrl+Z) works only for edits in the properties panel. The native table has no undo for property edits.
 - There are no context menu entries on properties, only commands (below).
 - At startup the table briefly shows native widgets before the plugin widgets replace them.
-- If a note belongs to several schema bases that define the same field, the first base by path wins and a warning is logged to the console.
+- If a note belongs to several schema bases that define the same field, the base you are looking at wins (in its table or embed). Elsewhere (properties panel, sidebar, code-block bases) the first base by path wins. The field then shows an info icon whose tooltip names the bases and their definitions; a warning is also logged to the console.
 - Designed for a low double-digit number of schema bases (see Performance below).
 - With the window in the background, the plugin may take seconds to become ready after being enabled (Obsidian throttles hidden windows).
 

@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import type { App } from "obsidian";
 import type { TypeInfo, TypeWidget } from "../src/internals/detect";
 import { installTypeInfoPatch, type PluginWidgets } from "../src/internals/typeInfoPatch";
+import type { Resolution } from "../src/schema/Membership";
 import type { FieldSchema } from "../src/schema/types";
 import { OverlayRegistry, type PropertyRenderContext, type WidgetEnv } from "../src/widgets/types";
 
@@ -12,12 +13,14 @@ interface FakeMtm {
 }
 interface FakeMembership {
   knownFieldNames(): Set<string>;
-  resolve(path: string, key: string): FieldSchema | null;
+  resolveWithBase(path: string, key: string, preferredBase?: string | null): Resolution | null;
   shapesFor?(name: string): Set<"list" | "scalar" | "native">;
   on(name: string, cb: (...a: unknown[]) => void): unknown;
   offref?(ref: unknown): void;
 }
 
+const res = (field: FieldSchema | null, basePath = "T.base", others: Resolution["others"] = []): Resolution | null =>
+  field ? { field, basePath, name: "Team", others } : null;
 const widget = (type: string) => ({ type, validate: (_v?: unknown): boolean => true, render: vi.fn(() => ({ type, focus() {} })) });
 
 function fakeApp() {
@@ -42,8 +45,8 @@ describe("typeInfoPatch", () => {
     const { app, text, multitext, mtm } = fakeApp();
     const membership: FakeMembership = {
       knownFieldNames: () => new Set(["team"]),
-      resolve: (p) => p === "a.md" ? { type: "relation", base: "T.base", multiple: false }
-        : p === "m.md" ? { type: "list" } : null,
+      resolveWithBase: (p) => res(p === "a.md" ? { type: "relation", base: "T.base", multiple: false }
+        : p === "m.md" ? { type: "list" } : null),
       on: vi.fn(),
     };
     const relation = vi.fn(() => ({ type: "relation", focus() {} }));
@@ -61,9 +64,102 @@ describe("typeInfoPatch", () => {
     patch.uninstall();
     expect(mtm.getTypeInfo("Team", "[[X]]").inferred).toBe(text);
   });
+  it("passes the base of the surrounding view and marks conflicting definitions", () => {
+    const { app, text, mtm } = fakeApp();
+    const leafEl = document.body.createDiv();
+    (app as unknown as { workspace: unknown }).workspace = {
+      iterateAllLeaves: (cb: (l: unknown) => void) => cb({ view: { containerEl: leafEl, getViewType: () => "bases", file: { path: "Mitarbeiter.base", extension: "base" } } }),
+    };
+    const others: Resolution["others"] = [{ basePath: "Meetings.base", field: { type: "text" } }];
+    const resolveWithBase = vi.fn((p: string, _k: string, preferred?: string | null) =>
+      p === "cora.md" ? res({ type: "relation", base: "T.base", multiple: true }, preferred ?? "Meetings.base", others) : null);
+    const membership: FakeMembership = { knownFieldNames: () => new Set(["team"]), resolveWithBase, on: vi.fn() };
+    const relation = vi.fn(() => ({ type: "relation", focus() {} }));
+    installTypeInfoPatch(app, env(membership), widgets({ relation }));
+    const info = mtm.getTypeInfo("Team", null);
+    const cell = leafEl.createDiv();
+    info.inferred.render(cell, null, ctx("cora.md"));
+    expect(resolveWithBase).toHaveBeenLastCalledWith("cora.md", "Team", "Mitarbeiter.base");
+    expect(relation).toHaveBeenCalledTimes(1);
+    const marker = cell.querySelector<HTMLElement>(".improved-bases-conflict");
+    expect(marker?.getAttribute("aria-label")).toContain("Meetings.base");
+    expect(cell.classList.contains("improved-bases-has-conflict")).toBe(true);
+    // A click on the marker stays inside it (no picker, no cell edit).
+    const click = new MouseEvent("click", { bubbles: true, cancelable: true });
+    const seenByCell = vi.fn();
+    cell.addEventListener("click", seenByCell);
+    marker?.dispatchEvent(click);
+    expect(click.defaultPrevented).toBe(true);
+    expect(seenByCell).not.toHaveBeenCalled();
+    // Outside a Bases view there is no context; the marker still shows.
+    const panel = document.body.createDiv();
+    info.inferred.render(panel, null, ctx("cora.md"));
+    expect(resolveWithBase).toHaveBeenLastCalledWith("cora.md", "Team", null);
+    expect(panel.querySelector(".improved-bases-conflict")).not.toBeNull();
+    // No conflict, no marker; a native pin with a conflict gets one too.
+    const plain = vi.fn(() => res({ type: "relation", base: "T.base", multiple: true }));
+    membership.resolveWithBase = plain;
+    const quiet = document.body.createDiv();
+    info.inferred.render(quiet, null, ctx("ada.md"));
+    expect(quiet.querySelector(".improved-bases-conflict")).toBeNull();
+    membership.resolveWithBase = () => res({ type: "text" }, "Meetings.base", [{ basePath: "Mitarbeiter.base", field: { type: "relation", base: "T.base", multiple: true } }]);
+    const native = document.body.createDiv();
+    info.inferred.render(native, null, ctx("cora.md"));
+    expect(text.render).toHaveBeenCalled();
+    expect(native.querySelector(".improved-bases-conflict")).not.toBeNull();
+  });
+  it("re-checks the view context once a cell rendered detached is attached", () => {
+    vi.useFakeTimers();
+    try {
+      const { app, text, mtm } = fakeApp();
+      const leafEl = document.body.createDiv();
+      (app as unknown as { workspace: unknown }).workspace = {
+        iterateAllLeaves: (cb: (l: unknown) => void) => cb({ view: { containerEl: leafEl, getViewType: () => "bases", file: { path: "Meetings.base", extension: "base" } } }),
+      };
+      const relationField: FieldSchema = { type: "relation", base: "T.base", multiple: true };
+      const textField: FieldSchema = { type: "text" };
+      // Path rule: Meetings (text) first; in the Meetings view the same winner, in the Mitarbeiter view the relation.
+      const resolveWithBase = vi.fn((_p: string, _k: string, preferred?: string | null) =>
+        preferred === "Mitarbeiter.base"
+          ? res(relationField, "Mitarbeiter.base", [{ basePath: "Meetings.base", field: textField }])
+          : res(textField, "Meetings.base", [{ basePath: "Mitarbeiter.base", field: relationField }]));
+      const membership: FakeMembership = { knownFieldNames: () => new Set(["team"]), resolveWithBase, on: vi.fn() };
+      const relation = vi.fn(() => ({ type: "relation", focus() {} }));
+      installTypeInfoPatch(app, env(membership), widgets({ relation }));
+      const info = mtm.getTypeInfo("Team", null);
+      // Same winner: only the marker text changes once the context is known.
+      const cell = document.createElement("div");
+      info.inferred.render(cell, null, ctx("cora.md"));
+      expect(cell.querySelector(".improved-bases-conflict")?.getAttribute("aria-label")).toContain("first by path");
+      leafEl.appendChild(cell);
+      vi.runAllTimers();
+      expect(cell.querySelector(".improved-bases-conflict")?.getAttribute("aria-label")).toContain("Showing Meetings.base");
+      expect(cell.querySelectorAll(".improved-bases-conflict")).toHaveLength(1);
+      expect(text.render).toHaveBeenCalledTimes(1);
+      // Different winner: the cell is rendered again with the other definition.
+      (app as unknown as { workspace: unknown }).workspace = {
+        iterateAllLeaves: (cb: (l: unknown) => void) => cb({ view: { containerEl: leafEl, getViewType: () => "bases", file: { path: "Mitarbeiter.base", extension: "base" } } }),
+      };
+      const cell2 = document.createElement("div");
+      const handle = info.inferred.render(cell2, null, ctx("cora.md")) as { focus(): void };
+      expect(text.render).toHaveBeenCalledTimes(2);
+      leafEl.appendChild(cell2);
+      vi.runAllTimers();
+      expect(relation).toHaveBeenCalledTimes(1);
+      expect(cell2.querySelector(".improved-bases-conflict")?.getAttribute("aria-label")).toContain("Showing Mitarbeiter.base");
+      expect(() => handle.focus()).not.toThrow();
+      // A cell that never attaches is left alone.
+      const orphan = document.createElement("div");
+      info.inferred.render(orphan, null, ctx("cora.md"));
+      vi.runAllTimers();
+      expect(text.render).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it("falls back to original widget when plugin widget throws", () => {
     const { app, text, mtm } = fakeApp();
-    const membership: FakeMembership = { knownFieldNames: () => new Set(["team"]), resolve: () => ({ type: "relation", base: "T.base", multiple: false }), on: vi.fn() };
+    const membership: FakeMembership = { knownFieldNames: () => new Set(["team"]), resolveWithBase: () => res({ type: "relation", base: "T.base", multiple: false }), on: vi.fn() };
     vi.spyOn(console, "error").mockImplementation(() => {});
     installTypeInfoPatch(app, env(membership), widgets({ relation: () => { throw new Error("boom"); } }));
     mtm.getTypeInfo("Team", "x").inferred.render(div(), "x", ctx("a.md"));
@@ -71,7 +167,7 @@ describe("typeInfoPatch", () => {
   });
   it("matches names case-insensitively and gives new identity after refresh", () => {
     const { app, mtm } = fakeApp();
-    const membership: FakeMembership = { knownFieldNames: () => new Set(["team"]), resolve: () => null, on: vi.fn() };
+    const membership: FakeMembership = { knownFieldNames: () => new Set(["team"]), resolveWithBase: () => null, on: vi.fn() };
     const patch = installTypeInfoPatch(app, env(membership), widgets({}))!;
     const a = mtm.getTypeInfo("team", "x").inferred;
     expect(mtm.getTypeInfo("TEAM", "x").inferred).toBe(a);
@@ -86,7 +182,7 @@ describe("typeInfoPatch", () => {
     const handlers = new Map<string, (...a: unknown[]) => void>();
     const membership: FakeMembership = {
       knownFieldNames: () => new Set(["team"]),
-      resolve: () => null,
+      resolveWithBase: () => null,
       on: (n, cb) => { handlers.set(n, cb); return n; },
       offref: (n) => { handlers.delete(n as string); },
     };
@@ -108,7 +204,7 @@ describe("typeInfoPatch", () => {
     };
     const membership: FakeMembership = {
       knownFieldNames: () => new Set(Object.keys(shapes)),
-      resolve: () => null,
+      resolveWithBase: () => null,
       shapesFor: (n) => shapes[n] ?? new Set(),
       on: vi.fn(),
     };

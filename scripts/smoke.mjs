@@ -136,8 +136,11 @@ run("Mitarbeiter.base",
 await waitFor(() => JSON.stringify(teamOf("Ada Albers")) === JSON.stringify(["[[Team Delta]]"]), 5000);
 const marks = run("Mitarbeiter.base",
 		`const cellOf = (n) => [...el.querySelectorAll('.bases-tr')].find((r) => r.textContent.includes(n)).querySelector('.bases-td[data-property="note.team" i]'); ` +
-		`return JSON.stringify({ foreign: !!cellOf('Gina Graf').querySelector('.is-foreign'), okChip: !cellOf('Cora Conrad').querySelector('.is-foreign'), mismatch: !!cellOf('Hugo Hahn').querySelector('.is-mismatch') });`);
+		`return JSON.stringify({ foreign: !!cellOf('Gina Graf').querySelector('.is-foreign'), okChip: !cellOf('Cora Conrad').querySelector('.is-foreign'), mismatch: !!cellOf('Hugo Hahn').querySelector('.is-mismatch'), ` +
+		`coraPlugin: !!cellOf('Cora Conrad').querySelector('.improved-bases-relation'), coraConflict: cellOf('Cora Conrad').querySelector('.improved-bases-conflict')?.getAttribute('aria-label') ?? null, adaConflict: !!cellOf('Ada Albers').querySelector('.improved-bases-conflict') });`);
 assert(marks.foreign && marks.okChip && marks.mismatch, `foreign/mismatch markers: ${JSON.stringify(marks)}`);
+// Conflict: Cora is also in Meetings.base (Team pinned as text). In the Mitarbeiter table its own definition wins, with an info marker.
+assert(marks.coraPlugin && marks.coraConflict?.includes("Showing Mitarbeiter.base") && marks.coraConflict?.includes("Meetings.base defines it as text") && !marks.adaConflict, `conflict marker: ${JSON.stringify(marks)}`);
 console.log("RelationWidget ok");
 
 const sortKeys = (v) => Array.isArray(v) ? v.map(sortKeys) : v && typeof v === "object" ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortKeys(v[k])])) : v;

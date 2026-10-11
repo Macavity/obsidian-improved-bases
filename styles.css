@@ -75,6 +75,25 @@
 	line-height: 1.4;
 }
 
+/* Conflict marker: a note is in several schema bases defining this field; the info icon explains which one applies. */
+.improved-bases-has-conflict {
+	display: flex;
+	align-items: center;
+	gap: var(--size-2-2);
+}
+.improved-bases-has-conflict > :first-child {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+.improved-bases-conflict {
+	display: inline-flex;
+	flex: 0 0 auto;
+	margin-left: auto;
+	color: var(--text-muted);
+	--icon-size: var(--icon-s);
+	cursor: help;
+}
+
 /* Select widget: palette → Obsidian color variables (no variable exists for lime, brown, grey, black, white). */
 .improved-bases-select {
 	display: flex;

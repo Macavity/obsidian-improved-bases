@@ -18,6 +18,14 @@ function wantedPaths(schemas: BaseSchema[]): Set<string> {
 	return wanted;
 }
 
+/** Outcome of `resolveWithBase`: the definition that applies plus the competing ones (`others`, empty without a conflict). */
+export interface Resolution {
+	field: FieldSchema;
+	basePath: string;
+	name: string;
+	others: { basePath: string; field: FieldSchema }[];
+}
+
 export interface MembershipDeps {
 	/** Obsidian's metadata cache; the latch waits until it has resolved. Omitted = treated as resolved. */
 	cache?: Pick<MetadataCache, "on" | "offref" | "resolvedLinks">;
@@ -27,7 +35,8 @@ export interface MembershipDeps {
 
 /**
  * File -> schema base mapping. Membership = the file is in the query result of a schema base.
- * Conflict rule: if several schema bases describe the same field for a file, the first by basePath wins.
+ * Conflict rule: if several schema bases describe the same field for a file, the base of the view being rendered
+ * wins when it is one of them, otherwise the first by basePath.
  */
 export class Membership extends Events {
 	private watches = new Map<string, () => void>();
@@ -86,32 +95,34 @@ export class Membership extends Events {
 		}, this.quietMs);
 	}
 
-	resolve(filePath: string, propName: string): FieldSchema | null {
-		return this.resolveWithBase(filePath, propName)?.field ?? null;
+	resolve(filePath: string, propName: string, preferredBase?: string | null): FieldSchema | null {
+		return this.resolveWithBase(filePath, propName, preferredBase)?.field ?? null;
 	}
 
-	/** Like `resolve`, plus the winning schema base and the field's spelling in the schema. */
-	resolveWithBase(filePath: string, propName: string): { field: FieldSchema; basePath: string; name: string } | null {
+	/**
+	 * Like `resolve`, plus the winning schema base, the field's spelling in the schema and the other candidates.
+	 * `preferredBase` (the base of the view being rendered) wins when it is a candidate; otherwise the first by path.
+	 */
+	resolveWithBase(filePath: string, propName: string, preferredBase?: string | null): Resolution | null {
 		if (!this.latched) return null;
 		const key = propName.toLowerCase();
-		let winner: BaseSchema | null = null;
-		let found: { field: FieldSchema; basePath: string; name: string } | null = null;
+		const candidates: { basePath: string; field: FieldSchema; name: string }[] = [];
 		for (const schema of this.registry.schemas()) {
 			if (!this.members.get(schema.basePath)?.has(filePath)) continue;
 			const f = schema.fields.get(key);
-			if (!f) continue;
-			if (!winner) {
-				winner = schema;
-				found = { field: f.field, basePath: schema.basePath, name: f.name };
-			} else {
-				const id = `${filePath}\0${key}`;
-				if (!this.warned.has(id)) {
-					this.warned.add(id);
-					console.warn(`Improved Bases: "${filePath}" is in several schema bases defining "${propName}"; using ${winner.basePath}, ignoring ${schema.basePath}`);
-				}
+			if (f) candidates.push({ basePath: schema.basePath, field: f.field, name: f.name });
+		}
+		const winner = candidates.find((c) => c.basePath === preferredBase) ?? candidates[0];
+		if (!winner) return null;
+		const others = candidates.filter((c) => c !== winner).map(({ basePath, field }) => ({ basePath, field }));
+		if (others.length) {
+			const id = `${filePath}\0${key}`;
+			if (!this.warned.has(id)) {
+				this.warned.add(id);
+				console.warn(`Improved Bases: "${filePath}" is in several schema bases defining "${propName}": ${candidates.map((c) => c.basePath).join(", ")}`);
 			}
 		}
-		return found;
+		return { field: winner.field, basePath: winner.basePath, name: winner.name, others };
 	}
 
 	targetEntries(basePath: string): TFile[] | null {
