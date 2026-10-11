@@ -91,3 +91,10 @@ Append-only audit trail. Add one dated entry per generation or refresh run, reco
 - source_commit: a4df48b (was 9b45bc0; review fixes folded in: lenient `icon` parsing, link keydown guard, duplicate links listed once; test feedback: field fills the cell, chips on one line, plain link clicks open the picker)
 - Coverage: relation chips without background or remove button, entry icons (`icon` property → field `icon` → 📄, new `src/widgets/icons.ts`), optional `icon` key on relation fields through parser, drafts and the dialog's "Entry icon" field; `EntryPicker` is a checkbox toggle modal opened by clicking the field; smoke script follows.
 - Pages: [Widgets](./modules/widgets.md), [Commands](./modules/commands.md), [Field schema](./concepts/field-schema.md), [Value mismatch](./concepts/value-mismatch.md), [Widget render](./flows/widget-render.md), [Tooling](./modules/tooling.md), [Overview](./OVERVIEW.md)
+
+## 2026-10-11: refresh (field conflicts)
+
+- Profile: internal/standard
+- source_commit: b492576 (was a4df48b)
+- Coverage: conflicting field definitions across schema bases: the base of the viewed table or embed wins when it is a candidate (`resolveWithBase(file, field, preferredBase)` with `others`), the field shows an info marker with tooltip (`src/widgets/conflictMarker.ts`), the base lookup moved to `src/internals/baseContext.ts` and detached cells are re-checked once attached.
+- Pages: [Membership](./concepts/membership.md), [Widget render](./flows/widget-render.md), [Internals](./modules/internals.md), [Widgets](./modules/widgets.md), [Overview](./OVERVIEW.md)
