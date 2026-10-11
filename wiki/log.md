@@ -88,6 +88,6 @@ Append-only audit trail. Add one dated entry per generation or refresh run, reco
 ## 2026-10-11: refresh (relation styling and picker)
 
 - Profile: internal/standard
-- source_commit: 59918df (was 9b45bc0)
+- source_commit: e2f5e91 (was 9b45bc0; review fixes folded in: lenient `icon` parsing, link keydown guard, duplicate links listed once)
 - Coverage: relation chips without background or remove button, entry icons (`icon` property → field `icon` → 📄, new `src/widgets/icons.ts`), optional `icon` key on relation fields through parser, drafts and the dialog's "Entry icon" field; `EntryPicker` is a checkbox toggle modal opened by clicking the field; smoke script follows.
 - Pages: [Widgets](./modules/widgets.md), [Commands](./modules/commands.md), [Field schema](./concepts/field-schema.md), [Value mismatch](./concepts/value-mismatch.md), [Widget render](./flows/widget-render.md), [Tooling](./modules/tooling.md), [Overview](./OVERVIEW.md)
