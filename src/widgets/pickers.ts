@@ -1,35 +1,74 @@
-import { FuzzySuggestModal, Menu, type App, type MenuItem, type TFile } from "obsidian";
+import { FuzzySuggestModal, Menu, renderMatches, type App, type FuzzyMatch, type MenuItem, type TFile } from "obsidian";
 import { itemDom, menuInternals } from "../internals/menu";
 import { COLORS, type Color, type SelectField } from "../schema/types";
+import { renderIcon } from "./icons";
 import type { OverlayRegistry } from "./types";
 
-/** Picks one entry of a target base. */
-export class EntryPicker extends FuzzySuggestModal<TFile> {
+export interface PickerItem {
+	raw: string;
+	file: TFile | null;
+	label: string;
+	active: boolean;
+	foreign: boolean;
+}
+
+/** Checkbox list of entries: a click toggles the entry and keeps the modal open. */
+export class EntryPicker extends FuzzySuggestModal<PickerItem> {
 	private readonly unregister: (() => void) | null;
 
 	constructor(
 		app: App,
-		private readonly entries: TFile[] | null,
-		private readonly onPick: (file: TFile) => void,
+		private readonly items: PickerItem[],
+		private readonly iconOf: (item: PickerItem) => string,
+		private readonly onToggle: (item: PickerItem) => void,
 		overlays?: OverlayRegistry,
 	) {
 		super(app);
 		this.unregister = overlays?.add(() => this.close()) ?? null;
-		this.setPlaceholder("Select an entry");
+		this.setPlaceholder("Filter entries");
 		this.emptyStateText = "No entries";
 	}
 
-	getItems(): TFile[] {
-		return this.entries ?? [];
+	getItems(): PickerItem[] {
+		return this.items;
 	}
 
-	getItemText(file: TFile): string {
-		return file.basename;
+	getItemText(item: PickerItem): string {
+		return item.label;
 	}
 
-	onChooseItem(file: TFile): void {
-		this.onPick(file);
+	getSuggestions(query: string): FuzzyMatch<PickerItem>[] {
+		return super
+			.getSuggestions(query)
+			.map((match, index) => ({ match, index }))
+			.sort((a, b) => Number(!a.match.item.active) - Number(!b.match.item.active) || a.index - b.index)
+			.map(({ match }) => match);
 	}
+
+	renderSuggestion(match: FuzzyMatch<PickerItem>, el: HTMLElement): void {
+		const item = match.item;
+		el.addClass("improved-bases-entry");
+		el.dataset.raw = item.raw;
+		if (item.foreign) {
+			el.addClass("is-foreign");
+			el.title = "Not in target base";
+		}
+		const check = el.createEl("input", { cls: "improved-bases-entry-check", attr: { type: "checkbox", tabindex: "-1" } });
+		check.checked = item.active;
+		renderIcon(el.createSpan(), this.iconOf(item));
+		renderMatches(el.createSpan({ cls: "improved-bases-entry-label" }), item.label, match.match.matches);
+	}
+
+	selectSuggestion(match: FuzzyMatch<PickerItem>): void {
+		this.onToggle(match.item);
+		for (const row of Array.from(this.resultContainerEl.querySelectorAll<HTMLElement>(".improved-bases-entry"))) {
+			const item = this.items.find((i) => i.raw === row.dataset.raw);
+			const check = row.querySelector<HTMLInputElement>("input.improved-bases-entry-check");
+			if (item && check) check.checked = item.active;
+		}
+	}
+
+	onChooseItem(): void {}
 
 	onClose(): void {
 		super.onClose();

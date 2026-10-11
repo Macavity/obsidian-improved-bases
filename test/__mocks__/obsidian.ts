@@ -98,7 +98,20 @@ export class Modal {
 	}
 }
 
+interface MockMatch<T> {
+	item: T;
+	match: { score: number; matches: [number, number][] };
+}
+
 export class FuzzySuggestModal<T> extends Modal {
+	inputEl: HTMLInputElement;
+	resultContainerEl: HTMLElement;
+	emptyStateText = "";
+	constructor(app: unknown) {
+		super(app);
+		this.inputEl = this.modalEl.appendChild(document.createElement("input"));
+		this.resultContainerEl = this.modalEl.appendChild(document.createElement("div"));
+	}
 	setPlaceholder(_text: string): void {}
 	getItems(): T[] {
 		return [];
@@ -106,7 +119,34 @@ export class FuzzySuggestModal<T> extends Modal {
 	getItemText(_item: T): string {
 		return "";
 	}
+	getSuggestions(query: string): MockMatch<T>[] {
+		const q = query.toLowerCase();
+		return this.getItems()
+			.filter((item) => this.getItemText(item).toLowerCase().includes(q))
+			.map((item) => ({ item, match: { score: 0, matches: [] } }));
+	}
+	renderSuggestion(_match: MockMatch<T>, _el: HTMLElement): void {}
+	onChooseSuggestion(_match: MockMatch<T>, _evt: MouseEvent | KeyboardEvent): void {}
+	selectSuggestion(match: MockMatch<T>, evt: MouseEvent | KeyboardEvent): void {
+		this.close();
+		this.onChooseItem(match.item, evt);
+		this.onChooseSuggestion(match, evt);
+	}
 	onChooseItem(_item: T, _evt: MouseEvent | KeyboardEvent): void {}
+	/** Test helper: renders the suggestions for a query the way the modal's result list does. */
+	renderAll(query: string): void {
+		this.resultContainerEl.empty();
+		for (const match of this.getSuggestions(query)) {
+			const div = this.resultContainerEl.createDiv();
+			this.renderSuggestion(match, div);
+			div.addEventListener("click", (evt) => this.selectSuggestion(match, evt));
+		}
+	}
+}
+
+export function renderMatches(el: HTMLElement | DocumentFragment, text: string, _matches: unknown, _offset?: number): void {
+	if (el instanceof DocumentFragment) el.append(document.createTextNode(text));
+	else el.textContent = text;
 }
 
 export class PluginSettingTab {
