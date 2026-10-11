@@ -91,7 +91,7 @@ console.log(`membership.ready after enable: ${Date.now() - enabledAt} ms`);
 await waitFor(() => cells("Mitarbeiter.base").some((c) => c.plugin), 10000);
 console.log("TypeInfoPatch ok");
 
-// RelationWidget: picker, write format, remove, rename, panel parity, hover, foreign/mismatch markers.
+// RelationWidget: picker, write format, remove, rename, panel parity, hover, foreign marker, no marker for a scalar in a multiple field.
 // Console warnings can precede the result line in `eval` output; the result is the last line.
 const run = (path, body) => {
 	const out = evalJs(`(async () => { ${OPEN(path)} const sleep = (ms) => new Promise((r) => setTimeout(r, ms)); ${body} })()`);
@@ -136,9 +136,9 @@ run("Mitarbeiter.base",
 await waitFor(() => JSON.stringify(teamOf("Ada Albers")) === JSON.stringify(["[[Team Delta]]"]), 5000);
 const marks = run("Mitarbeiter.base",
 		`const cellOf = (n) => [...el.querySelectorAll('.bases-tr')].find((r) => r.textContent.includes(n)).querySelector('.bases-td[data-property="note.team" i]'); ` +
-		`return JSON.stringify({ foreign: !!cellOf('Gina Graf').querySelector('.is-foreign'), okChip: !cellOf('Cora Conrad').querySelector('.is-foreign'), mismatch: !!cellOf('Hugo Hahn').querySelector('.is-mismatch'), ` +
+		`return JSON.stringify({ foreign: !!cellOf('Gina Graf').querySelector('.is-foreign'), okChip: !cellOf('Cora Conrad').querySelector('.is-foreign'), hugoPlain: !!cellOf('Hugo Hahn').querySelector('.improved-bases-relation') && !cellOf('Hugo Hahn').querySelector('.is-mismatch'), ` +
 		`coraPlugin: !!cellOf('Cora Conrad').querySelector('.improved-bases-relation'), coraConflict: cellOf('Cora Conrad').querySelector('.improved-bases-conflict')?.getAttribute('aria-label') ?? null, adaConflict: !!cellOf('Ada Albers').querySelector('.improved-bases-conflict') });`);
-assert(marks.foreign && marks.okChip && marks.mismatch, `foreign/mismatch markers: ${JSON.stringify(marks)}`);
+assert(marks.foreign && marks.okChip && marks.hugoPlain, `foreign marker / plain scalar: ${JSON.stringify(marks)}`);
 // Conflict: Cora is also in Meetings.base (Team pinned as text). In the Mitarbeiter table its own definition wins, with an info marker.
 assert(marks.coraPlugin && marks.coraConflict?.includes("Showing Mitarbeiter.base") && marks.coraConflict?.includes("Meetings.base defines it as text") && !marks.adaConflict, `conflict marker: ${JSON.stringify(marks)}`);
 console.log("RelationWidget ok");

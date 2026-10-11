@@ -21,7 +21,7 @@ tags:
 - **Conflict marker** ([conflictMarker.ts](../../src/widgets/conflictMarker.ts)): `conflictText()` builds "Team is defined in 2 bases. Showing X (relation); Y defines it as text." (or "Using X (text, first by path)" without view context) and `renderConflictMarker()` appends `span.improved-bases-conflict` (Lucide `info`, `aria-label` + `setTooltip`) to the cell or panel row, which gets `improved-bases-has-conflict`; clicks on the icon are stopped so neither the picker nor the cell editor opens. Called by the [getTypeInfo patch](./internals.md), not by the widgets.
 - **Values** ([values.ts](../../src/widgets/values.ts)): `toList()`, `linkTarget()` (strips alias/heading/block), `relationOutput()`/`selectOutput()` (string vs list per `multiple`), `colorOf()`, and the two schema mutations `addOptionMutation()` / `setColorMutation()` which write options through the shared `setOption()` ([keys.ts](../../src/schema/keys.ts), `Object.defineProperty`) to stay prototype-safe; `isRecord()` comes from [parse.ts](../../src/schema/parse.ts).
 - **Types** ([types.ts](../../src/widgets/types.ts)): `PropertyRenderContext` (`key` is lowercase from the table but original spelling from the panel; `sourcePath`; `onChange`; `blur`), `WidgetHandle`, `OverlayRegistry`, `WidgetEnv`, `PluginWidget`.
-- Both widgets detect a [value mismatch](../concepts/value-mismatch.md) (`Array.isArray(value) !== field.multiple`) and add `is-mismatch` until the next commit.
+- Both widgets show a value in the other storage shape (a [value mismatch](../concepts/value-mismatch.md) of shape) like any other value, without a marker, and write the schema shape on the next commit.
 
 ## Public API / entry points
 

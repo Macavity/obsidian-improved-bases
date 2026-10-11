@@ -11,19 +11,17 @@ const NOT_IN_TARGET = "Not in target base";
 export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, field, env) => {
 	const { app, membership } = env;
 	let links = toList(value);
-	// A list for `multiple: false` (or a string for `multiple: true`) is shown unchanged; it is rewritten on the next edit.
-	const mismatch = value != null && Array.isArray(value) !== field.multiple;
+	// A list for `multiple: false` (or a string for `multiple: true`) is a valid value: shown like any other and only
+	// rewritten into the schema shape on the next edit, as Obsidian does after a property type change.
 
 	const root = el.createDiv({
 		cls: "improved-bases-relation",
 		// No aria-label: the chip links are the accessible name; the popup is announced via aria-haspopup.
 		attr: { "data-improved-bases": "relation", tabindex: "0", role: "button", "aria-haspopup": "dialog" },
 	});
-	if (mismatch) root.addClass("is-mismatch");
 
 	const commit = (next: string[]): void => {
 		links = next;
-		root.removeClass("is-mismatch");
 		draw();
 		ctx.onChange(relationOutput(next, field.multiple));
 	};

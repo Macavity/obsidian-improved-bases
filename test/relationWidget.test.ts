@@ -48,16 +48,21 @@ describe("RelationWidget", () => {
 		expect(chips().map((c) => c.querySelector(".improved-bases-chip-body")?.textContent)).toEqual(["[[A]]", "[[B]]", "plain"]);
 		expect(chips().map((c) => c.classList.contains("is-foreign"))).toEqual([false, true, true]);
 		expect(el.querySelector(".improved-bases-chip-remove, .improved-bases-add")).toBeNull();
-		expect(el.querySelector(".is-mismatch")).toBeNull();
 	});
 	it("falls back to 📄 without a field icon", () => {
 		const { chips } = setup(["[[A]]"]);
 		expect(chips()[0]?.querySelector(".improved-bases-icon")?.textContent).toBe("📄");
 	});
-	it("marks nothing foreign while members are unknown and flags shape mismatches", () => {
-		const { el, chips } = setup("[[B]]", { members: null, multiple: true });
+	it("marks nothing foreign while members are unknown and shows a scalar in a multiple field like any value", () => {
+		const { el, chips, onChange } = setup("[[B]]", { members: null, multiple: true });
 		expect(chips()[0]?.classList.contains("is-foreign")).toBe(false);
-		expect(el.querySelector(".is-mismatch")).not.toBeNull();
+		expect(el.querySelector(".is-mismatch")).toBeNull();
+		expect(el.querySelector<HTMLElement>(".improved-bases-relation")?.getAttribute("style")).toBeNull();
+		// The next edit writes the schema shape.
+		el.querySelector<HTMLElement>(".improved-bases-relation")!.click();
+		const [, items, , onToggle] = vi.mocked(EntryPicker).mock.calls[0]! as unknown as [App, PickerItem[], unknown, (i: PickerItem) => void];
+		onToggle(items[0]!);
+		expect(onChange).toHaveBeenLastCalledWith([]);
 	});
 	it("opens the picker on field click, Enter and Space, but leaves link clicks to the link", () => {
 		const { el, handle } = setup(["[[A]]"]);

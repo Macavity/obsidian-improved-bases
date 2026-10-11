@@ -64,10 +64,6 @@
 	pointer-events: none;
 	margin: 0;
 }
-.improved-bases-relation.is-mismatch {
-	opacity: 0.8;
-	font-style: italic;
-}
 .improved-bases-chip-remove,
 .improved-bases-add {
 	height: auto;
@@ -100,10 +96,6 @@
 	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--size-2-2);
-}
-.improved-bases-select.is-mismatch {
-	opacity: 0.8;
-	font-style: italic;
 }
 [data-color] {
 	--ib-rgb: var(--mono-rgb-100);

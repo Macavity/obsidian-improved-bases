@@ -11,17 +11,15 @@ export const SelectWidget: PluginWidget<SelectField> = (el, value, ctx, field, e
 	// Local copy: schema writes reach the widget only after the next patch refresh.
 	const options = field.options.map((o) => ({ ...o }));
 	const local: SelectField = { ...field, options };
-	// A list for `multiple: false` (or a string for `multiple: true`) is shown unchanged; it is rewritten on the next edit.
-	const mismatch = value != null && Array.isArray(value) !== field.multiple;
+	// A list for `multiple: false` (or a string for `multiple: true`) is a valid value: shown like any other and only
+	// rewritten into the schema shape on the next edit, as Obsidian does after a property type change.
 	// Writes follow the base whose definition is displayed (the patch passes it); the fallback matches the display rule without context.
 	const sourceOf = (): SchemaSource | null => source ?? membership.resolveWithBase(ctx.sourcePath, ctx.key);
 
 	const root = el.createDiv({ cls: "improved-bases-select", attr: { "data-improved-bases": "select" } });
-	if (mismatch) root.addClass("is-mismatch");
 
 	const commit = (next: string[]): void => {
 		values = next;
-		root.removeClass("is-mismatch");
 		draw();
 		ctx.onChange(selectOutput(next, field.multiple));
 	};

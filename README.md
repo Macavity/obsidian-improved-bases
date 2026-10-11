@@ -61,7 +61,7 @@ views: ...
 - Field names are the property names. Obsidian and Bases treat `Team` and `team` as one property, so the plugin resolves field names that way too; writes to notes (renames) always use the exact key.
 - A note belongs to a schema base when it is in the result of that base (its filters apply), regardless of folder.
 
-Values that do not fit the schema (a link outside the target base, a list where `multiple: false`) are kept, shown with a marker, and only rewritten into the schema format when you edit them.
+A link outside the target base or a select value that is not an option is kept and shown with a marker. A value in the other storage shape (a list where `multiple: false`, a single value where `multiple: true`) is a normal value: it is shown like any other and only rewritten into the schema shape when you edit it, as Obsidian does after you change a property type.
 
 ### Relations
 
