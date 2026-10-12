@@ -30,6 +30,7 @@ data.json
 
 # test vault
 test-vault/.obsidian/plugins/
+test-vault/.obsidian/themes/
 test-vault/.obsidian/workspace*.json
 test-vault/.obsidian/cache
 test-vault/.trash/
