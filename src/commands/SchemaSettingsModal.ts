@@ -152,6 +152,11 @@ export class SchemaSettingsModal extends Modal {
 		this.setTitle(`Schema settings – ${basename(this.input.basePath)}`);
 		if (this.input.state.kind === "error") this.renderError(this.input.state.message, this.input.state.resettable);
 		else this.renderFields();
+		// Obsidian focuses the first input (the icon field); nothing in the dialog deserves the initial focus.
+		window.setTimeout(() => {
+			const active = document.activeElement;
+			if (active instanceof HTMLElement && active !== this.modalEl && this.modalEl.contains(active)) active.blur();
+		}, 0);
 	}
 
 	onClose(): void {
@@ -399,7 +404,7 @@ export class SchemaSettingsModal extends Modal {
 			attr: { type: "text", placeholder: "Field name", "aria-label": "Field name" },
 		});
 		name.value = draft.name;
-		const typeWrap = main.createEl("label", { cls: "improved-bases-type-select" });
+		const typeWrap = main.createDiv({ cls: "improved-bases-type-select" });
 		const typeIconEl = typeWrap.createSpan({ cls: "improved-bases-type-icon" });
 		const type = typeWrap.createEl("select", { cls: "improved-bases-field-type", attr: { "aria-label": "Field type" } });
 		for (const t of TYPES) type.createEl("option", { text: typeText(draft, t), attr: { value: t } });

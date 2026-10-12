@@ -328,17 +328,15 @@
 	box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
 }
 
-/* Type: one box holding icon, select and chevron; plain text until hovered or focused */
+/* Type: one box; the select covers it entirely so every click opens it, icon and chevron float above without taking clicks */
 .improved-bases-schema .improved-bases-type-select {
+	position: relative;
 	display: flex;
 	align-items: center;
-	gap: var(--size-2-2);
 	min-width: 0;
 	height: var(--input-height);
-	padding: 0 var(--size-2-3);
 	border: 1px solid transparent;
 	border-radius: var(--radius-s);
-	cursor: pointer;
 }
 .improved-bases-schema .improved-bases-type-select:hover,
 .improved-bases-schema .improved-bases-type-select:focus-within {
@@ -351,17 +349,24 @@
 }
 .improved-bases-schema .improved-bases-type-icon,
 .improved-bases-schema .improved-bases-type-chevron {
+	position: absolute;
+	top: 50%;
+	transform: translateY(-50%);
 	display: inline-flex;
-	flex: 0 0 auto;
 	color: var(--text-muted);
 	--icon-size: var(--icon-s);
 	pointer-events: none;
 }
+.improved-bases-schema .improved-bases-type-icon {
+	left: var(--size-2-3);
+}
+.improved-bases-schema .improved-bases-type-chevron {
+	right: var(--size-2-3);
+}
 .improved-bases-schema .improved-bases-field-type {
-	flex: 1 1 auto;
-	min-width: 0;
+	width: 100%;
 	height: 100%;
-	padding: 0;
+	padding: 0 calc(var(--size-2-3) + var(--icon-s) + var(--size-2-2));
 	border: 0;
 	background: transparent;
 	box-shadow: none;
