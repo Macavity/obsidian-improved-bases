@@ -14,7 +14,7 @@ A **field schema** (`FieldSchema` in [types.ts](../../src/schema/types.ts)) desc
 
 | Shape | Keys | Storage |
 |---|---|---|
-| `RelationField` | `type: relation`, `base` (vault-relative `.base` path), `multiple`, optional `icon` (string, stored trimmed; the default emoji for entries whose note has no `icon` property; a blank, null or non-string value is ignored rather than invalidating the field) | `"[[X]]"` or a list of wikilinks |
+| `RelationField` | `type: relation`, `base` (vault-relative `.base` path), `multiple`. The icon shown next to an entry is not part of the field: it comes from the entry's note (`icon` property) or from the target base's own default icon (`BaseSchema.icon`, see [Schema base](./schema-base.md)) | `"[[X]]"` or a list of wikilinks |
 | `SelectField` | `type: select`, `multiple`, `options` (value → one of 13 `COLORS`, map order = display order) | `Value` or a list of values |
 | `NativeField` | `type` in `text`, `list`, `number`, `checkbox`, `date`, `datetime` | native |
 

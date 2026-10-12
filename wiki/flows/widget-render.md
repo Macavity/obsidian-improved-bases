@@ -60,7 +60,7 @@ sequenceDiagram
 - Patch inactive (`active = false` after uninstall): wrapper returns original info; hulls already handed out render native.
 - `getTypeInfo` returns info without `expected`/`inferred`: passed through unchanged.
 - Relation target base missing: chips still render (via `LinkValue`), the picker is not opened, only a `Notice` ("Target base not found") is shown.
-- Relation entry icons are read at render time (`icon` property of the destination note); a later change of that property shows up on the next render of the cell or row, not live.
+- Relation entry icons are read at render time (`icon` property of the destination note, else the target base's default icon via `membership.baseIcon()`); a later change of either shows up on the next render of the cell or row, not live.
 
 ## Related
 

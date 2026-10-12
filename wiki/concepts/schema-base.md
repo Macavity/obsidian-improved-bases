@@ -10,7 +10,7 @@ tags:
 
 ## Definition
 
-A **schema base** is any `.base` file whose YAML has an `improved-bases:` key with a `fields:` map that parses without errors. Its [field schemas](./field-schema.md) apply to exactly the notes in that base's query result (filters included, folder irrelevant). A base referenced only as a relation target does not need a schema itself. The user-facing format is in the [README](../../README.md#schema-format).
+A **schema base** is any `.base` file whose YAML has an `improved-bases:` key that parses without errors (a `fields:` map, which may be absent or empty, and an optional `icon`). Its [field schemas](./field-schema.md) apply to exactly the notes in that base's query result (filters included, folder irrelevant). The `icon` (`BaseSchema.icon`, trimmed; blank, null or non-string values are ignored) is the base's **default entry icon**: every relation that targets this base shows it next to entries whose note has no `icon` property, so a base looks the same wherever it is referenced ([Widgets](../modules/widgets.md), `entryIcon()`); the schema settings dialog edits it as "Default entry icon" in its header ([Commands](../modules/commands.md)). A base referenced only as a relation target does not need a schema itself; one that carries only an icon is a schema base without fields. The user-facing format is in the [README](../../README.md#schema-format).
 
 ## Why it matters
 
