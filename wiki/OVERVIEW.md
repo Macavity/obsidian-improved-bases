@@ -73,4 +73,3 @@ Read the diagram top-down: [`SchemaRegistry`](./modules/schema.md) finds every `
 
 ### Maintenance
 
-- [Wiki log](./log.md) — generation and refresh history.

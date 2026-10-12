@@ -8,7 +8,7 @@ The content directory is the resolved `content.dir` — read it with `config({ k
 
 **Server requirement.** Phases that author or audit the wiki (`write`/`edit`/`links`/`search`) need the OK Hocuspocus server. Source reading (native tools) and git do not. If a `write` returns "Hocuspocus server is not running", tell the user to run `ok start` and retry — do NOT fall back to native file writes for the wiki markdown.
 
-**Prerequisite.** This procedure assumes the `codebase-wiki` pack is seeded (`ok seed --pack codebase-wiki` → `wiki/` with `architecture/ modules/ flows/ concepts/ guides/`, each carrying folder frontmatter + a page template, plus `wiki/OVERVIEW.md` + `wiki/log.md`). If `exec("ls -A <content-dir>/wiki")` shows the layout is missing, tell the user to seed first, then start over.
+**Prerequisite.** This procedure assumes the `codebase-wiki` pack is seeded (`ok seed --pack codebase-wiki` → `wiki/` with `architecture/ modules/ flows/ concepts/ guides/`, each carrying folder frontmatter + a page template, plus `wiki/OVERVIEW.md`). If `exec("ls -A <content-dir>/wiki")` shows the layout is missing, tell the user to seed first, then start over.
 
 ---
 
@@ -106,8 +106,7 @@ Atomic pages for domain terms and core abstractions (one term each): definition,
    - **orphans** — pages nothing links to. Adopt each by linking it from OVERVIEW or a relevant section page (or, rarely, justify it as intentionally standalone).
    - **hubs** — ranks by *inbound* links. Confirm your **concept/module pages** show up here — that's the signal cross-linking actually happened. Don't expect `OVERVIEW`: a freshly authored nav page has almost no inbound links, so it won't appear (and that's correct — its coverage was checked in step 1).
    - **`audit`** — fix every reported finding. A clean result proves every checked link resolves only when `brokenLinkSuppression` is absent; when that marker is present, reserved-log findings were deliberately withheld and are not repair work. (This covers links to source files too, not just `.md`/`.mdx`: it's the `orphans`/`hubs` graph above that tracks doc-to-doc edges only. `brokenLinks` on each write/edit is the same check per-write, per the code-reference rule above.)
-3. Append a `wiki/log.md` entry (see *Log discipline*).
-4. Tell the user the wiki is ready and surface the OVERVIEW preview URL.
+3. Tell the user the wiki is ready and surface the OVERVIEW preview URL.
 
 ---
 
@@ -120,22 +119,6 @@ Incremental by default — don't re-read the whole repo.
 3. **Map changed code → affected pages.** For each changed package/area, update its module/architecture/flow pages (read the changed source first). Update OVERVIEW only if the structure changed (new package, removed subsystem, new top-level flow).
 4. **Full-regen fallback.** If the diff is large or structural (many packages, a restructure), or git is unavailable / `source_commit` is missing, fall back to a full GENERATE pass rather than a partial patch.
 5. **Re-stamp** `source_commit` to the new `git rev-parse HEAD` and re-run the Phase 7 link-graph audit on the touched pages.
-6. Append a `wiki/log.md` refresh entry.
-
----
-
-## Log discipline
-
-`wiki/log.md` is an append-only audit trail. Append one dated entry per generation or refresh run (one per run, not per page). Reference touched pages as markdown links so they register in the backlink graph. Entry shape:
-
-```markdown
-## YYYY-MM-DD: <generate | refresh>
-
-- Profile: <audience>/<depth>
-- source_commit: <short-sha> (was <prev-sha> on refresh)
-- Coverage: <which sections/packages were written or updated>
-- Pages: [Overview](./OVERVIEW.md), [Server](./modules/server.md), ...
-```
 
 ---
 

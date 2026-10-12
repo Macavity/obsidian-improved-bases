@@ -1,6 +1,6 @@
 ---
 name: codebase-wiki
-description: "How to work in a Codebase Wiki project (the `codebase-wiki` starter pack): an agent-authored, source-grounded wiki of the surrounding codebase. Read when the project has a `wiki/` knowledge base with `architecture/`, `modules/`, `flows/`, `concepts/`, and `guides/` sections plus `wiki/OVERVIEW.md`, or when asked to generate or refresh a wiki of this codebase. Carries the per-folder rules and freshness + log discipline, summarizes the audience/depth knobs and source-reference convention, and bundles the full generate/refresh procedure in `references/`. Complements the platform `open-knowledge` skill; does not replace it."
+description: "How to work in a Codebase Wiki project (the `codebase-wiki` starter pack): an agent-authored, source-grounded wiki of the surrounding codebase. Read when the project has a `wiki/` knowledge base with `architecture/`, `modules/`, `flows/`, `concepts/`, and `guides/` sections plus `wiki/OVERVIEW.md`, or when asked to generate or refresh a wiki of this codebase. Carries the per-folder rules and freshness discipline, summarizes the audience/depth knobs and source-reference convention, and bundles the full generate/refresh procedure in `references/`. Complements the platform `open-knowledge` skill; does not replace it."
 compatibility: "Any agent host with the OpenKnowledge MCP server configured. Installed project-local by `ok seed --pack codebase-wiki`."
 metadata:
   pack: "codebase-wiki"
@@ -19,7 +19,6 @@ This project holds an **agent-authored wiki of a codebase** — DeepWiki, but li
 wiki/
   OVERVIEW.md     hub: what it is, a big-picture architecture diagram, a nav map to every section.
                   Frontmatter carries `profile` (audience/depth) + `source_commit` (freshness anchor).
-  log.md          append-only generation / refresh audit trail
   architecture/   system boundaries, layers, subsystems, cross-cutting concerns + diagrams
   modules/        one page per package / module: purpose, entry points, key files, deps
   flows/          key end-to-end flows as sequence / flow diagrams + narrative
@@ -64,19 +63,6 @@ The full rules — the GitHub-URL / relative fallback, the `#Lxx` caveat, and th
 ## Freshness discipline (MUST)
 
 `OVERVIEW.md` frontmatter carries `source_commit` — the git HEAD the wiki was last generated/refreshed against. It is the freshness anchor: refresh mode diffs `source_commit..HEAD` to update only the affected pages, then re-stamps it. **Always re-stamp `source_commit` after a generate or refresh run** — a stale anchor silently breaks incremental refresh.
-
-## Log discipline (MUST)
-
-`wiki/log.md` is an append-only audit trail. **Append one dated entry per generation or refresh run** — one per run, not per page. Reference touched pages as markdown links (`[Server](./modules/server.md)`) so they register in the backlink graph. Entry shape:
-
-```markdown
-## YYYY-MM-DD: <generate | refresh>
-
-- Profile: <audience>/<depth>
-- source_commit: <short-sha> (was <prev-sha> on refresh)
-- Coverage: <sections / packages written or updated>
-- Pages: [Overview](./OVERVIEW.md), [Server](./modules/server.md), ...
-```
 
 ## Templates
 
