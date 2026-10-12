@@ -57,6 +57,7 @@ const BASE_ICON = "lucide-layout-list";
 const NATIVE_ICONS: Record<string, string> = {
 	text: "lucide-text",
 	multitext: "lucide-list",
+	list: "lucide-list",
 	tags: "lucide-tags",
 	aliases: "lucide-forward",
 	number: "lucide-binary",
@@ -128,6 +129,7 @@ export class SchemaSettingsModal extends Modal {
 	private addView: number;
 	private icon: string;
 	private query = "";
+	private searchEl: HTMLInputElement | null = null;
 	/** Bumped on every list render and on close; pending confirmations of an older generation are stale. */
 	private generation = 0;
 
@@ -234,6 +236,7 @@ export class SchemaSettingsModal extends Modal {
 		const bar = this.contentEl.createDiv({ cls: "improved-bases-toolbar" });
 		const search = bar.createDiv({ cls: "search-input-container improved-bases-search" });
 		const input = search.createEl("input", { attr: { type: "search", placeholder: "Find a field…", "aria-label": "Find a field" } });
+		this.searchEl = input;
 		input.addEventListener("input", () => {
 			this.query = input.value.trim().toLowerCase();
 			this.renderList();
@@ -249,6 +252,8 @@ export class SchemaSettingsModal extends Modal {
 			};
 			this.drafts.push(draft);
 			this.focusNext = draft;
+			this.query = "";
+			if (this.searchEl) this.searchEl.value = "";
 			this.renderList();
 		});
 	}

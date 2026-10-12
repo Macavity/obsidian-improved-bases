@@ -198,6 +198,17 @@ describe("SchemaSettingsModal", () => {
 		expect(names(el)).toEqual(["A"]);
 	});
 
+	it("clears the search when a field is added so the new row is visible", () => {
+		const { el, q } = open({ kind: "fields", drafts: [d({ name: "A" })] });
+		const search = q<HTMLInputElement>(".improved-bases-search input");
+		search.value = "zzz";
+		search.dispatchEvent(new Event("input"));
+		expect(el.querySelectorAll(".improved-bases-field-row")).toHaveLength(0);
+		q<HTMLElement>(".improved-bases-add-field").click();
+		expect(search.value).toBe("");
+		expect(el.querySelectorAll(".improved-bases-field-row")).toHaveLength(2);
+	});
+
 	it("shows validation errors and refuses renames while members are unknown", async () => {
 		const { q, onSave, error } = open({ kind: "fields", drafts: [d({ originalName: "A", name: "A" }), d({ name: "" })] }, { membersKnown: () => false });
 		const second = q<HTMLInputElement>(".improved-bases-field-row:nth-child(2) .improved-bases-field-name");
@@ -313,12 +324,13 @@ describe("SchemaSettingsModal", () => {
 				d({ name: "Alpha", nativeLabel: "text", pinned: { type: "text" } }),
 				d({ name: "Beta", pinned: { type: "number" } }),
 				d({ name: "Gamma", nativeLabel: "text", pinned: { type: "number" } }),
+				d({ name: "Delta", pinned: { type: "list" } }),
 			],
 		});
 		const labels = Array.from(el.querySelectorAll<HTMLSelectElement>(".improved-bases-field-type")).map((s) => s.options[0]?.textContent);
-		expect(labels).toEqual(["Text", "Native", "Text (pinned)", "Number (pinned)", "Number (pinned)"]);
+		expect(labels).toEqual(["Text", "Native", "Text (pinned)", "Number (pinned)", "Number (pinned)", "List (pinned)"]);
 		expect(Array.from(q<HTMLSelectElement>(".improved-bases-field-type").options).map((o) => o.textContent)).toEqual(["Text", "Relation", "Select"]);
-		expect(Array.from(el.querySelectorAll(".improved-bases-type-icon")).map((x) => x.getAttribute("data-icon"))).toEqual(["lucide-text", "lucide-text", "lucide-text", "lucide-binary", "lucide-binary"]);
+		expect(Array.from(el.querySelectorAll(".improved-bases-type-icon")).map((x) => x.getAttribute("data-icon"))).toEqual(["lucide-text", "lucide-text", "lucide-text", "lucide-binary", "lucide-binary", "lucide-list"]);
 		expect(q<HTMLButtonElement>(".improved-bases-field-disclosure").disabled).toBe(true);
 	});
 

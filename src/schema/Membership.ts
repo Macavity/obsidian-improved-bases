@@ -4,9 +4,16 @@ import type { BaseQuery } from "../query/BaseQuery";
 import type { SchemaRegistry } from "./SchemaRegistry";
 import type { BaseSchema, FieldSchema } from "./types";
 
-const sig = (s: BaseSchema): string => JSON.stringify([...s.fields]);
+const sig = (s: BaseSchema): string => JSON.stringify([s.icon ?? null, [...s.fields]]);
 
 const QUIET_MS = 300;
+
+/** Field names (lowercase) of relations whose target is `basePath`; their widgets show its default icon. */
+function relationsTargeting(schemas: BaseSchema[], basePath: string): string[] {
+	const out: string[] = [];
+	for (const s of schemas) for (const [k, f] of s.fields) if (f.field.type === "relation" && f.field.base === basePath) out.push(k);
+	return out;
+}
 
 /** Paths to watch: every schema base plus every relation target. */
 function wantedPaths(schemas: BaseSchema[]): Set<string> {
@@ -196,6 +203,7 @@ export class Membership extends Events {
 			if (this.known.get(path) === next.get(path)) continue;
 			for (const k of this.oldSchemas.get(path)?.fields.keys() ?? []) affected.add(k);
 			for (const k of nextSchemas.get(path)?.fields.keys() ?? []) affected.add(k);
+			for (const k of relationsTargeting(schemas, path)) affected.add(k);
 		}
 		this.oldSchemas = nextSchemas;
 		this.known = next;

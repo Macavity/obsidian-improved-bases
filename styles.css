@@ -638,7 +638,7 @@
 	.improved-bases-schema .improved-bases-field-main {
 		grid-template-columns: var(--size-4-6) minmax(100px, 1fr) 130px 28px;
 	}
-	.improved-bases-schema .improved-bases-column-head span:nth-child(3),
+	.improved-bases-schema .improved-bases-column-head span:nth-child(4),
 	.improved-bases-schema .improved-bases-field-details {
 		display: none;
 	}
