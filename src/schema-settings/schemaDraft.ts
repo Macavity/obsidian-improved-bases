@@ -22,8 +22,8 @@ export interface FieldDraft {
 	type: DraftType;
 	/** Obsidian's type for this property ("text", "multitext", "tags", ...) or null. */
 	nativeLabel: string | null;
-	/** Pinned native entry, written back unchanged while its type is not changed. */
-	pinned: Record<string, unknown> | null;
+	/** Native schema entry overriding Obsidian's type for this base, written back unchanged while its type is not changed. */
+	override: Record<string, unknown> | null;
 	removed: boolean;
 	multiple: boolean;
 	base?: string;
@@ -42,15 +42,15 @@ export function typeChoices(draft: FieldDraft): TypeChoice[] {
 	return [...own, ...NATIVE_TYPES.map((t): TypeChoice => `native:${t}`), "relation", "select"];
 }
 
-/** The choice a draft shows: its plugin type, else the pinned type, else Obsidian's. */
+/** The choice a draft shows: its plugin type, else the overriding type, else Obsidian's. */
 export function typeChoice(draft: FieldDraft): TypeChoice {
 	if (draft.type !== "native") return draft.type;
-	const pinned = draft.pinned?.type;
-	const type = typeof pinned === "string" && (NATIVE_TYPES as readonly string[]).includes(pinned) ? pinned : detectedType(draft);
+	const override = draft.override?.type;
+	const type = typeof override === "string" && (NATIVE_TYPES as readonly string[]).includes(override) ? override : detectedType(draft);
 	return type === null ? "native" : `native:${type as NativeType}`;
 }
 
-/** Applies a choice: Obsidian's own type unpins, another native type pins it; plugin types keep their details. */
+/** Applies a choice: Obsidian's own type drops the override, another native type becomes one; plugin types keep their details. */
 export function applyTypeChoice(draft: FieldDraft, choice: TypeChoice): void {
 	if (choice === "relation" || choice === "select") {
 		draft.type = choice;
@@ -58,7 +58,7 @@ export function applyTypeChoice(draft: FieldDraft, choice: TypeChoice): void {
 	}
 	draft.type = "native";
 	const type = choice === "native" ? null : (choice.slice("native:".length) as NativeType);
-	draft.pinned = type === null || type === detectedType(draft) ? null : { type };
+	draft.override = type === null || type === detectedType(draft) ? null : { type };
 }
 
 /** Another schema base's definition of the same field name, with the number of this base's members that are also in it. */
@@ -68,8 +68,8 @@ export interface OtherDefinition { basePath: string; field: FieldSchema; shared:
 function draftShape(draft: FieldDraft): { type: string; multiple: boolean; base: string | null } | null {
 	if (draft.type === "relation") return { type: "relation", multiple: draft.multiple, base: draft.base ?? null };
 	if (draft.type === "select") return { type: "select", multiple: draft.multiple, base: null };
-	const pinned = draft.pinned?.type;
-	return typeof pinned === "string" ? { type: pinned, multiple: false, base: null } : null;
+	const override = draft.override?.type;
+	return typeof override === "string" ? { type: override, multiple: false, base: null } : null;
 }
 
 function fieldShape(field: FieldSchema): { type: string; multiple: boolean; base: string | null } {
@@ -131,7 +131,7 @@ function collectNames(input: KnownFieldsInput, current: string[]): string[] {
 function toDraft(name: string, field: FieldSchema | undefined, label: string | null): FieldDraft {
 	const draft: FieldDraft = {
 		originalName: name, originalBase: null, name, type: "native", nativeLabel: label,
-		pinned: null, removed: false, multiple: false, options: [],
+		override: null, removed: false, multiple: false, options: [],
 	};
 	if (!field) return draft;
 	if (field.type === "relation") {
@@ -139,7 +139,7 @@ function toDraft(name: string, field: FieldSchema | undefined, label: string | n
 	} else if (field.type === "select") {
 		Object.assign(draft, { type: "select", multiple: field.multiple, options: field.options.map((o) => ({ value: o.value, color: o.color })) });
 	} else {
-		draft.pinned = { type: field.type };
+		draft.override = { type: field.type };
 	}
 	return draft;
 }
@@ -251,7 +251,7 @@ function applyDrafts(f: RawFields, live: FieldDraft[], originalNames: string[]):
 
 /** Raw schema value for one draft. */
 function draftToField(draft: FieldDraft): Record<string, unknown> | null {
-	if (draft.type === "native") return draft.pinned;
+	if (draft.type === "native") return draft.override;
 	if (draft.type === "relation") return { type: "relation", base: draft.base, multiple: draft.multiple };
 	const options = Object.create(null) as Record<string, unknown>;
 	for (const o of draft.options) setOption(options, o.value, o.color);

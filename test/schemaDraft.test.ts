@@ -5,7 +5,7 @@ import { updateSchemaSource } from "../src/schema/SchemaWriter";
 import type { BaseColumns, RawFields } from "../src/schema/baseDoc";
 import { parseSchema } from "../src/schema/parse";
 
-const d = (p: Partial<FieldDraft>): FieldDraft => ({ originalName: null, originalBase: null, name: "X", type: "native", nativeLabel: null, pinned: null, removed: false, multiple: false, options: [], ...p });
+const d = (p: Partial<FieldDraft>): FieldDraft => ({ originalName: null, originalBase: null, name: "X", type: "native", nativeLabel: null, override: null, removed: false, multiple: false, options: [], ...p });
 const mutation = (drafts: FieldDraft[], originals: string[]) => draftsToEdits(drafts, originals, 0).mutate;
 const leadOf = (src: string): unknown => (parse(src) as { "improved-bases": { fields: Record<string, unknown> } })["improved-bases"].fields.Lead;
 const none: BaseColumns = { views: [], orderByView: [], configured: [], expressions: [] };
@@ -23,7 +23,7 @@ describe("schemaDraft", () => {
 	});
 	it("validates names, duplicates, bases, options", () => {
 		expect(validateDrafts([d({ name: "" })], [])).toHaveLength(1);
-		expect(validateDrafts([d({ name: "__proto__", pinned: { type: "text" } })], []).join()).toMatch(/reserved/i);
+		expect(validateDrafts([d({ name: "__proto__", override: { type: "text" } })], []).join()).toMatch(/reserved/i);
 		expect(validateDrafts([d({ name: "Role" }), d({ name: "role" })], []).join()).toMatch(/duplicate/i);
 		expect(validateDrafts([d({ name: "L", type: "relation", base: "X.base" })], ["M.base"]).join()).toMatch(/base/i);
 		expect(validateDrafts([d({ name: "L", type: "relation", base: "M.base" })], ["M.base"])).toEqual([]);
@@ -38,8 +38,8 @@ describe("schemaDraft", () => {
 		const f: RawFields = { Role: { type: "select", multiple: false, options: { A: "red" } }, Old: { type: "text" }, Keep: { type: "date" } };
 		mutation([
 			d({ originalName: "Role", name: "Role", type: "select", options: [{ value: "B", color: "blue" }, { value: "A", color: "red" }] }),
-			d({ originalName: "Old", name: "New", pinned: { type: "text" } }),
-			d({ originalName: "Keep", name: "Keep", pinned: { type: "date" } }),
+			d({ originalName: "Old", name: "New", override: { type: "text" } }),
+			d({ originalName: "Keep", name: "Keep", override: { type: "date" } }),
 			d({ name: "Lead", type: "relation", base: "M.base", multiple: true }),
 		], ["Role", "Old", "Keep"])(f);
 		expect(Object.keys(f)).toEqual(["Role", "Keep", "New", "Lead"]);
@@ -49,7 +49,7 @@ describe("schemaDraft", () => {
 	});
 	it("is prototype-safe", () => {
 		const f: RawFields = {};
-		mutation([d({ name: "__proto__", pinned: { type: "text" } }), d({ name: "S", type: "select", options: [{ value: "__proto__", color: "red" }] })], [])(f);
+		mutation([d({ name: "__proto__", override: { type: "text" } }), d({ name: "S", type: "select", options: [{ value: "__proto__", color: "red" }] })], [])(f);
 		expect(Object.getPrototypeOf(f)).toBe(Object.prototype);
 		expect(Object.hasOwn(f.S!.options as object, "__proto__")).toBe(true);
 	});
@@ -98,8 +98,8 @@ describe("schemaDraft", () => {
 		const drafts = knownFieldDrafts({ columns: cols, schemaFields: schema, memberKeys: ["created", "team", "position"], nativeLabel: (n) => (n === "Team" ? "multitext" : null), currentView: 1 });
 		expect(drafts.map((x) => x.name)).toEqual(["Zeta", "Status", "Alpha", "created", "Team"]);
 		expect(drafts[1]).toMatchObject({ type: "select", originalName: "Status" });
-		expect(drafts[2]).toMatchObject({ type: "native", pinned: { type: "text" }, originalName: "Alpha" });
-		expect(drafts[4]).toMatchObject({ type: "native", nativeLabel: "multitext", originalName: "Team", pinned: null });
+		expect(drafts[2]).toMatchObject({ type: "native", override: { type: "text" }, originalName: "Alpha" });
+		expect(drafts[4]).toMatchObject({ type: "native", nativeLabel: "multitext", originalName: "Team", override: null });
 	});
 	it("treats an out-of-range view as no current view", () => {
 		const drafts = knownFieldDrafts({ columns: cols, schemaFields: null, memberKeys: [], nativeLabel: () => null, currentView: 5 });
@@ -109,7 +109,7 @@ describe("schemaDraft", () => {
 		const drafts = [
 			d({ originalName: "Status", name: "Stand", type: "select", options: [{ value: "x", color: "red" }] }),
 			d({ originalName: "Team", name: "Team", type: "native" }),
-			d({ originalName: "Alpha", name: "Alpha", type: "native", pinned: { type: "text" } }),
+			d({ originalName: "Alpha", name: "Alpha", type: "native", override: { type: "text" } }),
 			d({ originalName: "Old", name: "Old", removed: true }),
 			d({ originalName: null, name: "Neu", type: "native" }),
 		];
@@ -136,16 +136,16 @@ describe("schemaDraft", () => {
 	});
 	it("keeps an untouched reserved key in the schema", () => {
 		const f: RawFields = { Prototype: { type: "text" } };
-		mutation([d({ originalName: "Prototype", name: "Prototype", pinned: { type: "text" } })], ["Prototype"])(f);
+		mutation([d({ originalName: "Prototype", name: "Prototype", override: { type: "text" } })], ["Prototype"])(f);
 		expect(f).toEqual({ Prototype: { type: "text" } });
 	});
 	it("keeps the existing key spelling unless explicitly renamed", () => {
 		const f: RawFields = { status: { type: "text" } };
-		mutation([d({ originalName: "Status", name: "Status", pinned: { type: "text" } })], ["Status"])(f);
+		mutation([d({ originalName: "Status", name: "Status", override: { type: "text" } })], ["Status"])(f);
 		expect(Object.keys(f)).toEqual(["status"]);
 		expect(f.status).toEqual({ type: "text" });
 		const g: RawFields = { status: { type: "text" } };
-		mutation([d({ originalName: "status", name: "Status", pinned: { type: "text" } })], ["status"])(g);
+		mutation([d({ originalName: "status", name: "Status", override: { type: "text" } })], ["status"])(g);
 		expect(Object.keys(g)).toEqual(["Status"]);
 		expect(g.Status).toEqual({ type: "text" });
 	});
@@ -164,9 +164,9 @@ describe("schemaDraft", () => {
 		const select = d({ name: "Status", type: "select", multiple: false, options: [{ value: "A", color: "red" }] });
 		expect(conflictHint(select, [{ basePath: "X.base", field: { type: "select", multiple: false, options: [{ value: "B", color: "blue" }] }, shared: 2 }])).toBeNull();
 		expect(conflictHint(select, [{ basePath: "X.base", field: { type: "select", multiple: true, options: [] }, shared: 2 }])).toBe("Also defined in X.base as select (multiple); 2 notes are in both bases.");
-		// Native drafts: a pinned type compares, an unpinned one is not defined here.
-		expect(conflictHint(d({ name: "Team", type: "native", pinned: { type: "text" } }), others)).toBeNull();
-		expect(conflictHint(d({ name: "Team", type: "native", pinned: { type: "list" } }), others)).toBe("Also defined in Meetings.base as text; 1 note is in both bases.");
+		// Native drafts: an overriding type compares, one without override is not defined here.
+		expect(conflictHint(d({ name: "Team", type: "native", override: { type: "text" } }), others)).toBeNull();
+		expect(conflictHint(d({ name: "Team", type: "native", override: { type: "list" } }), others)).toBe("Also defined in Meetings.base as text; 1 note is in both bases.");
 		expect(conflictHint(d({ name: "Team", type: "native" }), others)).toBeNull();
 		expect(conflictHint(relation, [])).toBeNull();
 	});
@@ -184,26 +184,26 @@ describe("schemaDraft", () => {
 			expect(typeChoices(d({ nativeLabel: "tags" }))).toEqual(["native", ...NATIVE, "relation", "select"]);
 			expect(typeChoices(d({ nativeLabel: null }))).toEqual(["native", ...NATIVE, "relation", "select"]);
 		});
-		it("shows the pinned type, else Obsidian's", () => {
+		it("shows the overriding type, else Obsidian's", () => {
 			expect(typeChoice(d({ nativeLabel: "text" }))).toBe("native:text");
 			expect(typeChoice(d({ nativeLabel: "multitext" }))).toBe("native:list");
-			expect(typeChoice(d({ nativeLabel: "text", pinned: { type: "number" } }))).toBe("native:number");
+			expect(typeChoice(d({ nativeLabel: "text", override: { type: "number" } }))).toBe("native:number");
 			expect(typeChoice(d({ nativeLabel: "tags" }))).toBe("native");
 			expect(typeChoice(d({ type: "select" }))).toBe("select");
 		});
-		it("pins another native type and unpins Obsidian's own", () => {
+		it("overrides with another native type and drops the override for Obsidian's own", () => {
 			const draft = d({ nativeLabel: "text" });
 			applyTypeChoice(draft, "native:number");
-			expect(draft).toMatchObject({ type: "native", pinned: { type: "number" } });
+			expect(draft).toMatchObject({ type: "native", override: { type: "number" } });
 			applyTypeChoice(draft, "select");
 			expect(draft.type).toBe("select");
 			applyTypeChoice(draft, "native:text");
-			expect(draft).toMatchObject({ type: "native", pinned: null });
-			const tags = d({ nativeLabel: "tags", pinned: { type: "list" } });
+			expect(draft).toMatchObject({ type: "native", override: null });
+			const tags = d({ nativeLabel: "tags", override: { type: "list" } });
 			applyTypeChoice(tags, "native");
-			expect(tags).toMatchObject({ type: "native", pinned: null });
+			expect(tags).toMatchObject({ type: "native", override: null });
 		});
-		it("writes a pinned type chosen in the dialog", () => {
+		it("writes a type override chosen in the dialog", () => {
 			const draft = d({ originalName: "Due", name: "Due", nativeLabel: "text" });
 			applyTypeChoice(draft, "native:date");
 			const f: RawFields = {};

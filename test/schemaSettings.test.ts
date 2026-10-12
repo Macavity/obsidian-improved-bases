@@ -16,7 +16,7 @@ const fmText = (f: TFile) => {
   const fm = (f as unknown as { frontmatter?: Record<string, unknown> }).frontmatter;
   return fm ? `---\n${Object.entries(fm).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join("\n")}\n---\n` : "";
 };
-const d = (o: Partial<FieldDraft>): FieldDraft => ({ originalName: null, originalBase: null, name: "", type: "native", nativeLabel: null, pinned: null, removed: false, multiple: false, options: [], ...o });
+const d = (o: Partial<FieldDraft>): FieldDraft => ({ originalName: null, originalBase: null, name: "", type: "native", nativeLabel: null, override: null, removed: false, multiple: false, options: [], ...o });
 
 const registry = (schemas: { basePath: string; fields: Map<string, { name: string; field: { type: "text" } }> }[], errors: Record<string, string[]>) =>
   ({ schemas: () => schemas, errors: () => new Map(Object.entries(errors)) }) as unknown as SchemaRegistry;

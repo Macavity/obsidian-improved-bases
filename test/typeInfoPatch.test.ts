@@ -97,7 +97,7 @@ describe("typeInfoPatch", () => {
     info.inferred.render(panel, null, ctx("cora.md"));
     expect(resolveWithBase).toHaveBeenLastCalledWith("cora.md", "Team", null);
     expect(panel.querySelector(".improved-bases-conflict")).not.toBeNull();
-    // No conflict, no marker; a native pin with a conflict gets one too.
+    // No conflict, no marker; a native override with a conflict gets one too.
     const plain = vi.fn(() => res({ type: "relation", base: "T.base", multiple: true }));
     membership.resolveWithBase = plain;
     const quiet = document.body.createDiv();

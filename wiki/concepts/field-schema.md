@@ -22,7 +22,7 @@ Field names are matched case-insensitively (the map key is lowercased, the origi
 
 ## Why it matters
 
-It is the contract between the three sides of the plugin: the parser guarantees the shape, the widgets render from it, and the writer mutations produce it. `multiple` decides the storage shape; an existing property in the other shape is a [value mismatch](./value-mismatch.md) that is shown as-is and rewritten on the next edit. The plugin section stores only customization (`relation`, `select`); a property without an entry is "native" and the dialog shows Obsidian's detected type. A native type in a schema (pinned, chosen in the dialog) forces that native widget for members regardless of `types.json` (`NATIVE_WIDGET` map in [typeInfoPatch.ts](../../src/internals/typeInfoPatch.ts)).
+It is the contract between the three sides of the plugin: the parser guarantees the shape, the widgets render from it, and the writer mutations produce it. `multiple` decides the storage shape; an existing property in the other shape is a [value mismatch](./value-mismatch.md) that is shown as-is and rewritten on the next edit. The plugin section stores only customization (`relation`, `select`); a property without an entry is "native" and the dialog shows Obsidian's detected type. A native type in a schema (a type override, chosen in the dialog) forces that native widget for members regardless of `types.json` (`NATIVE_WIDGET` map in [typeInfoPatch.ts](../../src/internals/typeInfoPatch.ts)).
 
 ## Where it lives
 

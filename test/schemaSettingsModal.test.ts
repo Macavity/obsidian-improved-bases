@@ -13,7 +13,7 @@ const chips = (el: HTMLElement) => Array.from(el.querySelectorAll(".improved-bas
 
 const d = (p: Partial<FieldDraft>): FieldDraft => ({
 	originalName: null, originalBase: null, name: "X", type: "native", nativeLabel: null,
-	pinned: null, removed: false, multiple: false, options: [], ...p,
+	override: null, removed: false, multiple: false, options: [], ...p,
 });
 const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 const names = (el: HTMLElement) => Array.from(el.querySelectorAll<HTMLInputElement>(".improved-bases-field-name")).map((i) => i.value);
@@ -315,21 +315,21 @@ describe("SchemaSettingsModal", () => {
 		expect(three.onSave).toHaveBeenCalledWith([expect.objectContaining({ name: "N" })], 2, "");
 	});
 
-	it("labels native fields with their type and pin", () => {
+	it("labels native fields with their type and override", () => {
 		const { el, q } = open({
 			kind: "fields",
 			drafts: [
 				d({ name: "Status", nativeLabel: "text" }),
 				d({ name: "Tags" }),
-				d({ name: "Alpha", nativeLabel: "text", pinned: { type: "text" } }),
-				d({ name: "Beta", pinned: { type: "number" } }),
-				d({ name: "Gamma", nativeLabel: "text", pinned: { type: "number" } }),
-				d({ name: "Delta", pinned: { type: "list" } }),
+				d({ name: "Alpha", nativeLabel: "text", override: { type: "text" } }),
+				d({ name: "Beta", override: { type: "number" } }),
+				d({ name: "Gamma", nativeLabel: "text", override: { type: "number" } }),
+				d({ name: "Delta", override: { type: "list" } }),
 			],
 		});
 		const selects = Array.from(el.querySelectorAll<HTMLSelectElement>(".improved-bases-field-type"));
 		expect(selects.map((s) => s.selectedOptions[0]?.textContent)).toEqual(["Text", "Native", "Text", "Number", "Number", "List"]);
-		expect(details(el)).toEqual(["—", "—", "Pinned", "Pinned", "Pinned", "Pinned"]);
+		expect(details(el)).toEqual(["—", "—", "Type override", "Type override", "Type override", "Type override"]);
 		const all = ["Text", "List", "Number", "Checkbox", "Date", "Date & time", "Relation", "Select"];
 		expect(Array.from(q<HTMLSelectElement>(".improved-bases-field-type").options).map((o) => o.textContent)).toEqual(all);
 		expect(Array.from(selects[1]?.options ?? []).map((o) => o.textContent)).toEqual(["Native", ...all]);
@@ -410,7 +410,7 @@ describe("SchemaSettingsModal", () => {
 		expect(hints()[0]?.textContent).toBe("Also defined in Meetings.base as text; 1 note is in both bases.");
 		expect(hints().map((h) => h.hidden)).toEqual([false, true]);
 		expect(Array.from(el.querySelectorAll(".improved-bases-field-row")).map((r) => r.classList.contains("has-warning"))).toEqual([true, false]);
-		// Switching the type to native (unpinned) ends the conflict.
+		// Switching the type to native (not overridden) ends the conflict.
 		const type = q<HTMLSelectElement>(".improved-bases-field-type");
 		type.value = "native";
 		type.dispatchEvent(new Event("change"));
@@ -435,8 +435,8 @@ describe("SchemaSettingsModal", () => {
 		expect(q<HTMLElement>(".improved-bases-field-hint").hidden).toBe(true);
 	});
 
-	it("pins a native type from the dropdown and unpins Obsidian's own", () => {
-		const { el, q } = open({ kind: "fields", drafts: [d({ name: "G", nativeLabel: "text", pinned: { type: "number" } })] });
+	it("overrides the type from the dropdown and drops the override for Obsidian's own", () => {
+		const { el, q } = open({ kind: "fields", drafts: [d({ name: "G", nativeLabel: "text", override: { type: "number" } })] });
 		const type = q<HTMLSelectElement>(".improved-bases-field-type");
 		expect(type.value).toBe("native:number");
 		const icon = () => q(".improved-bases-type-icon").getAttribute("data-icon");
@@ -444,7 +444,7 @@ describe("SchemaSettingsModal", () => {
 		type.value = "native:date";
 		type.dispatchEvent(new Event("change"));
 		expect(icon()).toBe("lucide-calendar");
-		expect(details(el)).toEqual(["Pinned"]);
+		expect(details(el)).toEqual(["Type override"]);
 		expect(q<HTMLButtonElement>(".improved-bases-field-disclosure").disabled).toBe(true);
 		type.value = "native:text";
 		type.dispatchEvent(new Event("change"));

@@ -94,7 +94,7 @@ function snapshot(drafts: FieldDraft[], icon: string): string {
 function typeIcon(draft: FieldDraft): string {
 	if (draft.type === "relation") return "lucide-link";
 	if (draft.type === "select") return "lucide-circle-dot";
-	const label = draft.pinned ? String(draft.pinned.type) : draft.nativeLabel;
+	const label = draft.override ? String(draft.override.type) : draft.nativeLabel;
 	return (label && NATIVE_ICONS[label]) ?? "lucide-text";
 }
 
@@ -246,7 +246,7 @@ export class SchemaSettingsModal extends Modal {
 		add.addEventListener("click", () => {
 			const draft: FieldDraft = {
 				originalName: null, originalBase: null, name: "", type: "native", nativeLabel: null,
-				pinned: null, removed: false, multiple: false, options: [],
+				override: null, removed: false, multiple: false, options: [],
 			};
 			this.drafts.push(draft);
 			this.focusNext = draft;
@@ -464,7 +464,7 @@ export class SchemaSettingsModal extends Modal {
 		refresh();
 	}
 
-	/** Details column: option colors and count, relation target and cardinality, "Pinned" or a dash for native fields. */
+	/** Details column: option colors and count, relation target and cardinality, "Type override" or a dash for native fields. */
 	private renderDetails(el: HTMLElement, draft: FieldDraft): void {
 		el.empty();
 		if (draft.type === "select") {
@@ -474,7 +474,7 @@ export class SchemaSettingsModal extends Modal {
 			if (draft.base) this.renderBaseIcon(el.createSpan({ cls: "improved-bases-details-icon" }), draft.base);
 			el.createSpan({ cls: "improved-bases-details-target", text: draft.base ?? "No base chosen" });
 		} else {
-			if (draft.pinned) el.createEl("em", { cls: "improved-bases-details-tag", text: "Pinned" });
+			if (draft.override) el.createEl("em", { cls: "improved-bases-details-tag", text: "Type override" });
 			else el.createSpan({ cls: "improved-bases-details-muted", text: "—" });
 			return;
 		}
