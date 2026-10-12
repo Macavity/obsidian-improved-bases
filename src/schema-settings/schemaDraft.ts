@@ -1,4 +1,4 @@
-import { isColor, type BaseSchema, type Color, type FieldSchema } from "../schema/types";
+import { isColor, NATIVE_TYPES, type BaseSchema, type Color, type FieldSchema, type NativeType } from "../schema/types";
 import { findOwnKey, isUnsafeKey, setOption } from "../schema/keys";
 import type { BaseColumns, ColumnEdits, RawFields } from "../schema/baseDoc";
 
@@ -7,6 +7,9 @@ export type DraftType = "native" | "relation" | "select";
 
 /** All selectable field types. */
 export const TYPES: readonly DraftType[] = ["native", "relation", "select"];
+
+/** A dropdown choice: Obsidian's own type (`native`, offered only when it is no schema type), a native schema type, or a plugin type. */
+export type TypeChoice = DraftType | `native:${NativeType}`;
 
 /** One select option while editing. */
 export interface OptionDraft { value: string; color: Color }
@@ -25,6 +28,37 @@ export interface FieldDraft {
 	multiple: boolean;
 	base?: string;
 	options: OptionDraft[];
+}
+
+/** Obsidian's detected type as a schema native type (`multitext` is `list`); null for tags, aliases or an unknown type. */
+export function detectedType(draft: FieldDraft): NativeType | null {
+	const label = draft.nativeLabel === "multitext" ? "list" : draft.nativeLabel;
+	return label !== null && (NATIVE_TYPES as readonly string[]).includes(label) ? (label as NativeType) : null;
+}
+
+/** Every native type, Obsidian's own first when it is not one of them, then the plugin types. */
+export function typeChoices(draft: FieldDraft): TypeChoice[] {
+	const own: TypeChoice[] = detectedType(draft) === null ? ["native"] : [];
+	return [...own, ...NATIVE_TYPES.map((t): TypeChoice => `native:${t}`), "relation", "select"];
+}
+
+/** The choice a draft shows: its plugin type, else the pinned type, else Obsidian's. */
+export function typeChoice(draft: FieldDraft): TypeChoice {
+	if (draft.type !== "native") return draft.type;
+	const pinned = draft.pinned?.type;
+	const type = typeof pinned === "string" && (NATIVE_TYPES as readonly string[]).includes(pinned) ? pinned : detectedType(draft);
+	return type === null ? "native" : `native:${type as NativeType}`;
+}
+
+/** Applies a choice: Obsidian's own type unpins, another native type pins it; plugin types keep their details. */
+export function applyTypeChoice(draft: FieldDraft, choice: TypeChoice): void {
+	if (choice === "relation" || choice === "select") {
+		draft.type = choice;
+		return;
+	}
+	draft.type = "native";
+	const type = choice === "native" ? null : (choice.slice("native:".length) as NativeType);
+	draft.pinned = type === null || type === detectedType(draft) ? null : { type };
 }
 
 /** Another schema base's definition of the same field name, with the number of this base's members that are also in it. */

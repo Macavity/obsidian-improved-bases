@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parse } from "yaml";
-import { conflictHint, draftsToEdits, knownFieldDrafts, removals, renameKey, renames, TYPES, validateDrafts, type FieldDraft, type OtherDefinition } from "../src/schema-settings/schemaDraft";
+import { applyTypeChoice, conflictHint, detectedType, draftsToEdits, knownFieldDrafts, removals, renameKey, renames, typeChoice, typeChoices, TYPES, validateDrafts, type FieldDraft, type OtherDefinition } from "../src/schema-settings/schemaDraft";
 import { updateSchemaSource } from "../src/schema/SchemaWriter";
 import type { BaseColumns, RawFields } from "../src/schema/baseDoc";
 import { parseSchema } from "../src/schema/parse";
@@ -169,5 +169,46 @@ describe("schemaDraft", () => {
 		expect(conflictHint(d({ name: "Team", type: "native", pinned: { type: "list" } }), others)).toBe("Also defined in Meetings.base as text; 1 note is in both bases.");
 		expect(conflictHint(d({ name: "Team", type: "native" }), others)).toBeNull();
 		expect(conflictHint(relation, [])).toBeNull();
+	});
+
+	describe("type choices", () => {
+		const NATIVE = ["native:text", "native:list", "native:number", "native:checkbox", "native:date", "native:datetime"];
+		it("maps Obsidian's type to a schema type", () => {
+			expect(detectedType(d({ nativeLabel: "text" }))).toBe("text");
+			expect(detectedType(d({ nativeLabel: "multitext" }))).toBe("list");
+			expect(detectedType(d({ nativeLabel: "tags" }))).toBeNull();
+			expect(detectedType(d({ nativeLabel: null }))).toBeNull();
+		});
+		it("lists every native type, plus Obsidian's own when it is not one", () => {
+			expect(typeChoices(d({ nativeLabel: "text" }))).toEqual([...NATIVE, "relation", "select"]);
+			expect(typeChoices(d({ nativeLabel: "tags" }))).toEqual(["native", ...NATIVE, "relation", "select"]);
+			expect(typeChoices(d({ nativeLabel: null }))).toEqual(["native", ...NATIVE, "relation", "select"]);
+		});
+		it("shows the pinned type, else Obsidian's", () => {
+			expect(typeChoice(d({ nativeLabel: "text" }))).toBe("native:text");
+			expect(typeChoice(d({ nativeLabel: "multitext" }))).toBe("native:list");
+			expect(typeChoice(d({ nativeLabel: "text", pinned: { type: "number" } }))).toBe("native:number");
+			expect(typeChoice(d({ nativeLabel: "tags" }))).toBe("native");
+			expect(typeChoice(d({ type: "select" }))).toBe("select");
+		});
+		it("pins another native type and unpins Obsidian's own", () => {
+			const draft = d({ nativeLabel: "text" });
+			applyTypeChoice(draft, "native:number");
+			expect(draft).toMatchObject({ type: "native", pinned: { type: "number" } });
+			applyTypeChoice(draft, "select");
+			expect(draft.type).toBe("select");
+			applyTypeChoice(draft, "native:text");
+			expect(draft).toMatchObject({ type: "native", pinned: null });
+			const tags = d({ nativeLabel: "tags", pinned: { type: "list" } });
+			applyTypeChoice(tags, "native");
+			expect(tags).toMatchObject({ type: "native", pinned: null });
+		});
+		it("writes a pinned type chosen in the dialog", () => {
+			const draft = d({ originalName: "Due", name: "Due", nativeLabel: "text" });
+			applyTypeChoice(draft, "native:date");
+			const f: RawFields = {};
+			mutation([draft], ["Due"])(f);
+			expect(f.Due).toEqual({ type: "date" });
+		});
 	});
 });

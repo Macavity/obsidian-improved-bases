@@ -3,7 +3,7 @@ import { referencesName } from "../schema/baseDoc";
 import { openOptionEditMenu } from "../widgets/pickers";
 import { renderIcon } from "../widgets/icons";
 import type { OverlayRegistry } from "../widgets/types";
-import { conflictHint, removals, renames, TYPES, validateDrafts, type DraftType, type FieldDraft, type OptionDraft, type OtherDefinition } from "./schemaDraft";
+import { applyTypeChoice, conflictHint, removals, renames, typeChoice, typeChoices, validateDrafts, type FieldDraft, type OptionDraft, type OtherDefinition, type TypeChoice } from "./schemaDraft";
 
 export interface SchemaSettingsInput {
 	basePath: string;
@@ -74,18 +74,16 @@ function errorText(e: unknown): string {
 	return e instanceof Error ? e.message : String(e);
 }
 
-/** "Text", "Native" (type unknown) or "Number (pinned)"; the pin decides the widget in this base, so its type wins. */
-function nativeText(draft: FieldDraft): string {
-	const type = draft.pinned ? String(draft.pinned.type) : draft.nativeLabel;
+/** "Text", "Tags", … for a type name; "Native" when Obsidian's type is unknown. */
+function nativeLabel(type: string | null): string {
 	if (type === null) return "Native";
-	const label = NATIVE_LABELS[type] ?? type.charAt(0).toUpperCase() + type.slice(1);
-	return draft.pinned ? `${label} (pinned)` : label;
+	return NATIVE_LABELS[type] ?? type.charAt(0).toUpperCase() + type.slice(1);
 }
 
-function typeText(draft: FieldDraft, type: DraftType): string {
-	if (type === "relation") return "Relation";
-	if (type === "select") return "Select";
-	return nativeText(draft);
+function choiceText(draft: FieldDraft, choice: TypeChoice): string {
+	if (choice === "relation") return "Relation";
+	if (choice === "select") return "Select";
+	return nativeLabel(choice === "native" ? draft.nativeLabel : choice.slice("native:".length));
 }
 
 /** Change detection for the footer: the drafts and the base icon as saved. */
@@ -418,8 +416,8 @@ export class SchemaSettingsModal extends Modal {
 		const typeWrap = main.createDiv({ cls: "improved-bases-type-select" });
 		const typeIconEl = typeWrap.createSpan({ cls: "improved-bases-type-icon" });
 		const type = typeWrap.createEl("select", { cls: "improved-bases-field-type", attr: { "aria-label": "Field type" } });
-		for (const t of TYPES) type.createEl("option", { text: typeText(draft, t), attr: { value: t } });
-		type.value = draft.type;
+		for (const choice of typeChoices(draft)) type.createEl("option", { text: choiceText(draft, choice), attr: { value: choice } });
+		type.value = typeChoice(draft);
 		setIcon(typeWrap.createSpan({ cls: "improved-bases-type-chevron" }), "lucide-chevron-down");
 		const details = main.createDiv({ cls: "improved-bases-field-details" });
 		const trash = iconButton(main, "lucide-trash-2", "Remove field", "improved-bases-field-remove");
@@ -453,7 +451,7 @@ export class SchemaSettingsModal extends Modal {
 			refresh();
 		});
 		type.addEventListener("change", () => {
-			draft.type = type.value as DraftType;
+			applyTypeChoice(draft, type.value as TypeChoice);
 			if (expandable(draft)) this.expanded.add(draft);
 			editor.empty();
 			refresh();
@@ -466,7 +464,7 @@ export class SchemaSettingsModal extends Modal {
 		refresh();
 	}
 
-	/** Details column: option colors and count, relation target and cardinality, or a dash for native fields. */
+	/** Details column: option colors and count, relation target and cardinality, "Pinned" or a dash for native fields. */
 	private renderDetails(el: HTMLElement, draft: FieldDraft): void {
 		el.empty();
 		if (draft.type === "select") {
@@ -476,7 +474,8 @@ export class SchemaSettingsModal extends Modal {
 			if (draft.base) this.renderBaseIcon(el.createSpan({ cls: "improved-bases-details-icon" }), draft.base);
 			el.createSpan({ cls: "improved-bases-details-target", text: draft.base ?? "No base chosen" });
 		} else {
-			el.createSpan({ cls: "improved-bases-details-muted", text: "—" });
+			if (draft.pinned) el.createEl("em", { cls: "improved-bases-details-tag", text: "Pinned" });
+			else el.createSpan({ cls: "improved-bases-details-muted", text: "—" });
 			return;
 		}
 		if (draft.multiple) el.createEl("em", { cls: "improved-bases-details-tag", text: "Multiple" });

@@ -327,9 +327,12 @@ describe("SchemaSettingsModal", () => {
 				d({ name: "Delta", pinned: { type: "list" } }),
 			],
 		});
-		const labels = Array.from(el.querySelectorAll<HTMLSelectElement>(".improved-bases-field-type")).map((s) => s.options[0]?.textContent);
-		expect(labels).toEqual(["Text", "Native", "Text (pinned)", "Number (pinned)", "Number (pinned)", "List (pinned)"]);
-		expect(Array.from(q<HTMLSelectElement>(".improved-bases-field-type").options).map((o) => o.textContent)).toEqual(["Text", "Relation", "Select"]);
+		const selects = Array.from(el.querySelectorAll<HTMLSelectElement>(".improved-bases-field-type"));
+		expect(selects.map((s) => s.selectedOptions[0]?.textContent)).toEqual(["Text", "Native", "Text", "Number", "Number", "List"]);
+		expect(details(el)).toEqual(["—", "—", "Pinned", "Pinned", "Pinned", "Pinned"]);
+		const all = ["Text", "List", "Number", "Checkbox", "Date", "Date & time", "Relation", "Select"];
+		expect(Array.from(q<HTMLSelectElement>(".improved-bases-field-type").options).map((o) => o.textContent)).toEqual(all);
+		expect(Array.from(selects[1]?.options ?? []).map((o) => o.textContent)).toEqual(["Native", ...all]);
 		expect(Array.from(el.querySelectorAll(".improved-bases-type-icon")).map((x) => x.getAttribute("data-icon"))).toEqual(["lucide-text", "lucide-text", "lucide-text", "lucide-binary", "lucide-binary", "lucide-list"]);
 		expect(q<HTMLButtonElement>(".improved-bases-field-disclosure").disabled).toBe(true);
 	});
@@ -432,10 +435,21 @@ describe("SchemaSettingsModal", () => {
 		expect(q<HTMLElement>(".improved-bases-field-hint").hidden).toBe(true);
 	});
 
-	it("shows the pinned type in the type dropdown", () => {
-		const { q } = open({ kind: "fields", drafts: [d({ name: "G", nativeLabel: "text", pinned: { type: "number" } })] });
-		const labels = Array.from(q<HTMLSelectElement>(".improved-bases-field-type").options).map((o) => o.textContent);
-		expect(labels[0]).toBe("Number (pinned)");
+	it("pins a native type from the dropdown and unpins Obsidian's own", () => {
+		const { el, q } = open({ kind: "fields", drafts: [d({ name: "G", nativeLabel: "text", pinned: { type: "number" } })] });
+		const type = q<HTMLSelectElement>(".improved-bases-field-type");
+		expect(type.value).toBe("native:number");
+		const icon = () => q(".improved-bases-type-icon").getAttribute("data-icon");
+		expect(icon()).toBe("lucide-binary");
+		type.value = "native:date";
+		type.dispatchEvent(new Event("change"));
+		expect(icon()).toBe("lucide-calendar");
+		expect(details(el)).toEqual(["Pinned"]);
+		expect(q<HTMLButtonElement>(".improved-bases-field-disclosure").disabled).toBe(true);
+		type.value = "native:text";
+		type.dispatchEvent(new Event("change"));
+		expect(icon()).toBe("lucide-text");
+		expect(details(el)).toEqual(["—"]);
 	});
 
 	it("warns in the remove confirmation when expressions reference the field", async () => {
