@@ -178,7 +178,7 @@ describe("buildSchemaSettings", () => {
       fileManager: { processFrontMatter },
     } as unknown as App;
     const writer = { update: vi.fn(() => Promise.resolve()), reset: vi.fn(() => Promise.resolve()) };
-    const membership = { targetEntries: () => all, baseIcon: () => (opts.icon ?? null) };
+    const membership = { targetEntries: () => all, baseIcon: (p: string) => (p === "M.base" ? opts.icon ?? null : p === "Z.base" ? "🏢" : null) };
     const env = { app, writer, membership, overlays: {} } as unknown as WidgetEnv;
     return { app, env, reg, writer, membership, processFrontMatter, viewName: opts.viewName ?? null };
   }
@@ -218,6 +218,8 @@ describe("buildSchemaSettings", () => {
     expect(writer.update).toHaveBeenCalledWith("M.base", expect.any(Function), { add: [], remove: [], rename: [] }, "👥");
     const none = await build();
     expect(none.input.icon).toBe("");
+    expect(input.baseIcon("Z.base")).toBe("🏢");
+    expect(input.baseIcon("A.base")).toBeNull();
   });
   it("collects the other bases", async () => {
     const { input } = await build();

@@ -78,22 +78,6 @@ export class EntryPicker extends FuzzySuggestModal<PickerItem> {
 }
 
 /** Picks one of the given base paths. */
-export class BasePicker extends FuzzySuggestModal<string> {
-	constructor(app: App, private readonly paths: string[], private readonly onPick: (p: string) => void) {
-		super(app);
-		this.setPlaceholder("Select a target base");
-	}
-	getItems(): string[] {
-		return this.paths;
-	}
-	getItemText(p: string): string {
-		return p;
-	}
-	onChooseItem(p: string): void {
-		this.onPick(p);
-	}
-}
-
 const COLOR_LABELS: Record<Color, string> = {
 	red: "Red", orange: "Orange", yellow: "Yellow", green: "Green", lime: "Lime", cyan: "Cyan", blue: "Blue",
 	violet: "Violet", pink: "Pink", brown: "Brown", grey: "Grey", black: "Black", white: "White",

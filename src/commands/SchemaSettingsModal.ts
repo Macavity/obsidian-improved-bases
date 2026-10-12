@@ -1,6 +1,7 @@
 import { ButtonComponent, Modal, setIcon, ToggleComponent, type App } from "obsidian";
 import { referencesName } from "../schema/baseDoc";
-import { BasePicker, openOptionEditMenu } from "../widgets/pickers";
+import { openOptionEditMenu } from "../widgets/pickers";
+import { renderIcon } from "../widgets/icons";
 import type { OverlayRegistry } from "../widgets/types";
 import { conflictHint, removals, renames, TYPES, validateDrafts, type DraftType, type FieldDraft, type OptionDraft, type OtherDefinition } from "./schemaDraft";
 
@@ -11,6 +12,8 @@ export interface SchemaSettingsInput {
 	icon: string;
 	/** Target base candidates (a base may relate to itself). */
 	basePaths: string[];
+	/** Default entry icon of a base, for the target box and the details column; null without one. */
+	baseIcon: (path: string) => string | null;
 	overlays: OverlayRegistry;
 	/** Whether the members of this base are known; renames and removals need them to migrate the notes. */
 	membersKnown: () => boolean;
@@ -46,6 +49,9 @@ const NATIVE_LABELS: Record<string, string> = {
 	date: "Date",
 	datetime: "Date & time",
 };
+
+/** Generic icon for a base without a default entry icon. */
+const BASE_ICON = "lucide-layout-list";
 
 /** Lucide icons for Obsidian's property types. */
 const NATIVE_ICONS: Record<string, string> = {
@@ -462,6 +468,7 @@ export class SchemaSettingsModal extends Modal {
 			for (const option of draft.options.slice(0, 3)) el.createSpan({ cls: "improved-bases-color-dot", attr: { "data-color": option.color } });
 			el.createSpan({ text: plural(draft.options.length, "option") });
 		} else if (draft.type === "relation") {
+			if (draft.base) this.renderBaseIcon(el.createSpan({ cls: "improved-bases-details-icon" }), draft.base);
 			el.createSpan({ cls: "improved-bases-details-target", text: draft.base ?? "No base chosen" });
 		} else {
 			el.createSpan({ cls: "improved-bases-details-muted", text: "—" });
@@ -490,19 +497,40 @@ export class SchemaSettingsModal extends Modal {
 		hint.createSpan({ text });
 	}
 
+	/** The base's own icon (emoji or built-in icon name), else the generic base icon. */
+	private renderBaseIcon(el: HTMLElement, path: string): void {
+		const icon = this.input.baseIcon(path);
+		el.empty();
+		if (icon) renderIcon(el, icon);
+		else setIcon(el, BASE_ICON);
+	}
+
 	/** Type-dependent detail panel; options stay in the draft when the type changes. */
 	private renderEditor(el: HTMLElement, draft: FieldDraft, refresh: () => void): void {
 		if (draft.type === "relation") {
-			const target = el.createEl("label", { cls: "improved-bases-editor-field" });
+			const target = el.createDiv({ cls: "improved-bases-editor-field" });
 			target.createSpan({ text: "Related base" });
-			const pick = target.createEl("button", { cls: "improved-bases-field-base", attr: { type: "button" } });
-			pick.setText(draft.base ?? "Choose base");
-			pick.addEventListener("click", () => {
-				new BasePicker(this.app, this.input.basePaths, (p) => {
-					draft.base = p;
-					pick.setText(p);
-					refresh();
-				}).open();
+			const box = target.createDiv({ cls: "improved-bases-type-select improved-bases-base-select" });
+			const icon = box.createSpan({ cls: "improved-bases-type-icon" });
+			const select = box.createEl("select", { cls: "improved-bases-field-base", attr: { "aria-label": "Related base" } });
+			if (!draft.base) select.createEl("option", { text: "Choose base", attr: { value: "", disabled: "" } });
+			const paths = draft.base && !this.input.basePaths.includes(draft.base) ? [draft.base, ...this.input.basePaths] : this.input.basePaths;
+			for (const path of paths) select.createEl("option", { text: path, attr: { value: path } });
+			select.value = draft.base ?? "";
+			setIcon(box.createSpan({ cls: "improved-bases-type-chevron" }), "lucide-chevron-down");
+			const refreshIcon = (): void => {
+				if (draft.base) this.renderBaseIcon(icon, draft.base);
+				else {
+					icon.empty();
+					setIcon(icon, BASE_ICON);
+				}
+			};
+			refreshIcon();
+			select.addEventListener("change", () => {
+				draft.base = select.value || undefined;
+				select.querySelector('option[value=""]')?.remove();
+				refreshIcon();
+				refresh();
 			});
 		}
 		if (draft.type === "select") this.renderOptions(el.createDiv({ cls: "improved-bases-options" }), draft, refresh);

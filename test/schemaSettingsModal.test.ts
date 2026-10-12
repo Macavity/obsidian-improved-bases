@@ -6,7 +6,7 @@ import { OverlayRegistry } from "../src/widgets/types";
 import { openOptionEditMenu } from "../src/widgets/pickers";
 import type { Color } from "../src/schema/types";
 
-vi.mock("../src/widgets/pickers", () => ({ openOptionEditMenu: vi.fn(), BasePicker: vi.fn() }));
+vi.mock("../src/widgets/pickers", () => ({ openOptionEditMenu: vi.fn() }));
 type ChipHandlers = { onRename: () => void; onRemove: () => void; onColor: (c: Color) => void };
 const lastMenu = () => vi.mocked(openOptionEditMenu).mock.calls.at(-1)?.[2] as ChipHandlers;
 const chips = (el: HTMLElement) => Array.from(el.querySelectorAll(".improved-bases-option-chip")).map((p) => p.textContent);
@@ -30,7 +30,8 @@ function open(state: SchemaSettingsInput["state"], { countAffected: count, ...op
 		basePath: "Teams/Mitarbeiter.base",
 		state,
 		icon: "",
-		basePaths: ["Teams.base"],
+		basePaths: ["Teams.base", "Other.base"],
+		baseIcon: (path: string) => (path === "Teams.base" ? "👥" : null),
 		overlays: new OverlayRegistry(),
 		membersKnown: () => true,
 		views: ["A"],
@@ -69,14 +70,15 @@ describe("SchemaSettingsModal", () => {
 		expect(modal.titleEl.textContent).toBe("Schema settings – Mitarbeiter");
 		expect(modal.modalEl.classList.contains("improved-bases-schema-modal")).toBe(true);
 		expect(names(el)).toEqual(["Lead", "Status", " "]);
-		expect(details(el)).toEqual(["Teams.baseMultiple", "2 optionsMultiple", "—"]);
+		expect(details(el)).toEqual(["👥Teams.baseMultiple", "2 optionsMultiple", "—"]);
 		expect(Array.from(el.querySelectorAll(".improved-bases-color-dot")).map((x) => x.getAttribute("data-color"))).toEqual(["red", "blue"]);
 		expect(Array.from(el.querySelectorAll(".improved-bases-type-icon")).map((x) => x.getAttribute("data-icon"))).toEqual(["lucide-link", "lucide-circle-dot", "lucide-text"]);
 		expect(Array.from(el.querySelectorAll<HTMLButtonElement>(".improved-bases-field-disclosure")).map((x) => x.disabled)).toEqual([false, false, true]);
 		expect(expanded(el)).toEqual([false, false, false]);
 		q<HTMLElement>(".improved-bases-field-disclosure").click();
 		expect(expanded(el)).toEqual([true, false, false]);
-		expect(q(".improved-bases-field-base").textContent).toBe("Teams.base");
+		expect(q<HTMLSelectElement>(".improved-bases-field-base").value).toBe("Teams.base");
+		expect(q(".improved-bases-base-select .improved-bases-type-icon").textContent).toBe("👥");
 		expect(el.querySelector(".improved-bases-field-multiple")).not.toBeNull();
 		q<HTMLElement>(".improved-bases-field-disclosure").click();
 		expect(expanded(el)).toEqual([false, false, false]);
@@ -133,8 +135,20 @@ describe("SchemaSettingsModal", () => {
 		type.value = "relation";
 		type.dispatchEvent(new Event("change"));
 		expect(expanded(el)).toEqual([true]);
-		expect(q(".improved-bases-field-base").textContent).toBe("Choose base");
+		const base = q<HTMLSelectElement>(".improved-bases-field-base");
+		expect(base.value).toBe("");
+		expect(Array.from(base.options).map((o) => o.textContent)).toEqual(["Choose base", "Teams.base", "Other.base"]);
+		expect(q(".improved-bases-base-select .improved-bases-type-icon").getAttribute("data-icon")).toBe("lucide-layout-list");
 		expect(details(el)).toEqual(["No base chosen"]);
+		base.value = "Teams.base";
+		base.dispatchEvent(new Event("change"));
+		expect(q(".improved-bases-base-select .improved-bases-type-icon").textContent).toBe("👥");
+		expect(Array.from(base.options).map((o) => o.textContent)).toEqual(["Teams.base", "Other.base"]);
+		expect(details(el)).toEqual(["👥Teams.base"]);
+		base.value = "Other.base";
+		base.dispatchEvent(new Event("change"));
+		expect(q(".improved-bases-base-select .improved-bases-type-icon").getAttribute("data-icon")).toBe("lucide-layout-list");
+		expect(details(el)).toEqual(["Other.base"]);
 		type.value = "select";
 		type.dispatchEvent(new Event("change"));
 		expect(el.querySelectorAll(".improved-bases-option-chip")).toHaveLength(1);

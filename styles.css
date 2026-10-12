@@ -363,7 +363,24 @@
 .improved-bases-schema .improved-bases-type-chevron {
 	right: var(--size-2-3);
 }
-.improved-bases-schema .improved-bases-field-type {
+.improved-bases-schema .improved-bases-base-select {
+	min-width: 14em;
+}
+.improved-bases-schema .improved-bases-base-select .improved-bases-type-icon.is-text {
+	font-size: var(--font-ui-small);
+	line-height: 1;
+}
+.improved-bases-schema .improved-bases-details-icon {
+	display: inline-flex;
+	flex: 0 0 auto;
+	--icon-size: var(--icon-s);
+}
+.improved-bases-schema .improved-bases-details-icon.is-text {
+	font-size: var(--font-ui-small);
+	line-height: 1;
+}
+.improved-bases-schema .improved-bases-field-type,
+.improved-bases-schema .improved-bases-field-base {
 	width: 100%;
 	height: 100%;
 	padding: 0 calc(var(--size-2-3) + var(--icon-s) + var(--size-2-2));
@@ -376,7 +393,8 @@
 	font-size: var(--font-ui-small);
 	cursor: pointer;
 }
-.improved-bases-schema .improved-bases-field-type:focus {
+.improved-bases-schema .improved-bases-field-type:focus,
+.improved-bases-schema .improved-bases-field-base:focus {
 	outline: none;
 	box-shadow: none;
 }
