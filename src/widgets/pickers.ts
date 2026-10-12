@@ -171,6 +171,29 @@ export function openOptionMenu(
 }
 
 /** DOM menu with the color palette. */
+/** Menu on an option chip in the schema dialog: rename, remove, then the colors (the current one checked). */
+export function openOptionEditMenu(
+	evt: MouseEvent,
+	current: Color,
+	handlers: { onRename: () => void; onRemove: () => void; onColor: (c: Color) => void },
+	overlays: OverlayRegistry,
+): void {
+	const menu = new Menu();
+	menu.setUseNativeMenu(false);
+	track(menu, overlays);
+	menu.addItem((item) => item.setTitle("Rename").setIcon("lucide-pencil").onClick(handlers.onRename));
+	menu.addItem((item) => item.setTitle("Remove").setIcon("lucide-trash-2").onClick(handlers.onRemove));
+	menu.addSeparator();
+	for (const color of COLORS) {
+		menu.addItem((item) => {
+			colorItem(item, COLOR_LABELS[color], color);
+			item.setChecked(color === current);
+			item.onClick(() => handlers.onColor(color));
+		});
+	}
+	menu.showAtMouseEvent(evt);
+}
+
 export function openColorMenu(evt: MouseEvent, onPick: (c: Color) => void, overlays: OverlayRegistry): void {
 	const menu = new Menu();
 	menu.setUseNativeMenu(false);

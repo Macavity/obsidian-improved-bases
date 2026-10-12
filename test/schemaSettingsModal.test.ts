@@ -3,6 +3,13 @@ import type { App } from "obsidian";
 import { SchemaSettingsModal, type SchemaSettingsInput } from "../src/commands/SchemaSettingsModal";
 import type { FieldDraft } from "../src/commands/schemaDraft";
 import { OverlayRegistry } from "../src/widgets/types";
+import { openOptionEditMenu } from "../src/widgets/pickers";
+import type { Color } from "../src/schema/types";
+
+vi.mock("../src/widgets/pickers", () => ({ openOptionEditMenu: vi.fn(), BasePicker: vi.fn() }));
+type ChipHandlers = { onRename: () => void; onRemove: () => void; onColor: (c: Color) => void };
+const lastMenu = () => vi.mocked(openOptionEditMenu).mock.calls.at(-1)?.[2] as ChipHandlers;
+const chips = (el: HTMLElement) => Array.from(el.querySelectorAll(".improved-bases-option-chip")).map((p) => p.textContent);
 
 const d = (p: Partial<FieldDraft>): FieldDraft => ({
 	originalName: null, originalBase: null, name: "X", type: "native", nativeLabel: null,
@@ -47,6 +54,7 @@ function open(state: SchemaSettingsInput["state"], { countAffected: count, ...op
 
 beforeEach(() => {
 	document.body.innerHTML = "";
+	vi.mocked(openOptionEditMenu).mockClear();
 });
 
 describe("SchemaSettingsModal", () => {
@@ -114,11 +122,11 @@ describe("SchemaSettingsModal", () => {
 	it("re-renders the body when the type changes and keeps options", () => {
 		const { el, q } = open({ kind: "fields", drafts: [d({ name: "S", type: "select", options: [{ value: "A", color: "red" }] })] });
 		q<HTMLElement>(".improved-bases-field-disclosure").click();
-		expect(el.querySelectorAll(".improved-bases-pill")).toHaveLength(1);
+		expect(el.querySelectorAll(".improved-bases-option-chip")).toHaveLength(1);
 		const type = q<HTMLSelectElement>(".improved-bases-field-type");
 		type.value = "native";
 		type.dispatchEvent(new Event("change"));
-		expect(el.querySelector(".improved-bases-pill")).toBeNull();
+		expect(el.querySelector(".improved-bases-option-chip")).toBeNull();
 		expect(el.querySelector(".improved-bases-field-multiple")).toBeNull();
 		expect(expanded(el)).toEqual([false]);
 		expect(details(el)).toEqual(["—"]);
@@ -130,23 +138,36 @@ describe("SchemaSettingsModal", () => {
 		expect(details(el)).toEqual(["No base chosen"]);
 		type.value = "select";
 		type.dispatchEvent(new Event("change"));
-		expect(el.querySelectorAll(".improved-bases-pill")).toHaveLength(1);
+		expect(el.querySelectorAll(".improved-bases-option-chip")).toHaveLength(1);
 	});
 
-	it("edits options: add, rename, remove, and toggles multiple", () => {
+	it("edits options: add, rename, recolor, remove, and toggles multiple", () => {
 		const { el, q } = open({ kind: "fields", drafts: [d({ name: "S", type: "select", options: [{ value: "A", color: "red" }] })] });
 		q<HTMLElement>(".improved-bases-field-disclosure").click();
+		expect(el.querySelector(".improved-bases-option-new")).toBeNull();
+		q<HTMLElement>(".improved-bases-option-add-button").click();
 		const input = q<HTMLInputElement>(".improved-bases-option-new");
 		input.value = " B ";
 		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
-		expect(Array.from(el.querySelectorAll(".improved-bases-pill")).map((p) => p.textContent)).toEqual(["A", "B"]);
-		q<HTMLElement>(".improved-bases-option-edit").click();
+		expect(chips(el)).toEqual(["A", "B"]);
+		// Enter keeps the input open for the next option; Escape turns it back into the button.
+		const next = q<HTMLInputElement>(".improved-bases-option-new");
+		next.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+		expect(el.querySelector(".improved-bases-option-new")).toBeNull();
+		expect(el.querySelector(".improved-bases-option-add-button")).not.toBeNull();
+		q<HTMLElement>(".improved-bases-option-chip").click();
+		expect(vi.mocked(openOptionEditMenu).mock.calls.at(-1)?.[1]).toBe("red");
+		lastMenu().onRename();
 		const rename = q<HTMLInputElement>(".improved-bases-option-input");
 		rename.value = "AA";
 		rename.dispatchEvent(new Event("blur"));
-		expect(Array.from(el.querySelectorAll(".improved-bases-pill")).map((p) => p.textContent)).toEqual(["AA", "B"]);
-		q<HTMLElement>(".improved-bases-option-remove").click();
-		expect(Array.from(el.querySelectorAll(".improved-bases-pill")).map((p) => p.textContent)).toEqual(["B"]);
+		expect(chips(el)).toEqual(["AA", "B"]);
+		q<HTMLElement>(".improved-bases-option-chip").click();
+		lastMenu().onColor("blue");
+		expect(q(".improved-bases-option-chip").getAttribute("data-color")).toBe("blue");
+		q<HTMLElement>(".improved-bases-option-chip").click();
+		lastMenu().onRemove();
+		expect(chips(el)).toEqual(["B"]);
 		expect(details(el)).toEqual(["1 option"]);
 		q<HTMLElement>(".improved-bases-field-multiple").click();
 		expect(details(el)).toEqual(["1 optionMultiple"]);
@@ -166,6 +187,9 @@ describe("SchemaSettingsModal", () => {
 
 	it("shows validation errors and refuses renames while members are unknown", async () => {
 		const { q, onSave, error } = open({ kind: "fields", drafts: [d({ originalName: "A", name: "A" }), d({ name: "" })] }, { membersKnown: () => false });
+		const second = q<HTMLInputElement>(".improved-bases-field-row:nth-child(2) .improved-bases-field-name");
+		second.value = " ";
+		second.dispatchEvent(new Event("input"));
 		q<HTMLElement>(".improved-bases-save").click();
 		await tick();
 		expect(error()).toBe("Field name is empty");
@@ -217,7 +241,30 @@ describe("SchemaSettingsModal", () => {
 	it("shows no reset button for a non-resettable error", () => {
 		const { el } = open({ kind: "error", message: "bad yaml", resettable: false });
 		expect(el.querySelector(".improved-bases-reset")).toBeNull();
-		expect(Array.from(el.querySelectorAll("button")).map((b) => b.textContent)).toEqual(["Cancel"]);
+		expect(Array.from(el.querySelectorAll("button")).map((b) => b.textContent)).toEqual(["Close"]);
+	});
+
+	it("offers Close until something changed, then Cancel and Save", () => {
+		const { el, q, modal } = open({ kind: "fields", drafts: [d({ originalName: "A", name: "A" })] });
+		const buttons = () => Array.from(el.querySelectorAll(".improved-bases-footer-buttons button")).map((b) => b.textContent);
+		expect(buttons()).toEqual(["Close"]);
+		const name = q<HTMLInputElement>(".improved-bases-field-name");
+		name.value = "B";
+		name.dispatchEvent(new Event("input"));
+		expect(buttons()).toEqual(["Cancel", "Save"]);
+		name.value = "A";
+		name.dispatchEvent(new Event("input"));
+		expect(buttons()).toEqual(["Close"]);
+		const icon = modal.modalEl.querySelector<HTMLInputElement>(".improved-bases-base-icon-input");
+		if (!icon) throw new Error("missing icon input");
+		icon.value = " 👤 ";
+		icon.dispatchEvent(new Event("input"));
+		expect(buttons()).toEqual(["Cancel", "Save"]);
+		icon.value = "";
+		icon.dispatchEvent(new Event("input"));
+		expect(buttons()).toEqual(["Close"]);
+		q<HTMLElement>(".improved-bases-close").click();
+		expect(document.body.contains(modal.modalEl)).toBe(false);
 	});
 
 	it("shows the view dropdown only for several views and passes the choice to save", async () => {
@@ -226,16 +273,22 @@ describe("SchemaSettingsModal", () => {
 		const two = open({ kind: "fields", drafts: [] }, { views: ["A", "B"], defaultViewIndex: 1 });
 		const sel = two.q<HTMLSelectElement>(".improved-bases-add-view");
 		expect(sel.value).toBe("1");
+		two.q<HTMLElement>(".improved-bases-add-field").click();
+		two.q<HTMLInputElement>(".improved-bases-field-name").value = "N";
+		two.q<HTMLInputElement>(".improved-bases-field-name").dispatchEvent(new Event("input"));
 		two.q<HTMLElement>(".improved-bases-save").click();
 		await tick();
-		expect(two.onSave).toHaveBeenCalledWith([], 1, "");
+		expect(two.onSave).toHaveBeenCalledWith([expect.objectContaining({ name: "N" })], 1, "");
 		const three = open({ kind: "fields", drafts: [] }, { views: ["A", "B", "C"] });
 		const pick = three.q<HTMLSelectElement>(".improved-bases-add-view");
 		pick.value = "2";
 		pick.dispatchEvent(new Event("change"));
+		three.q<HTMLElement>(".improved-bases-add-field").click();
+		three.q<HTMLInputElement>(".improved-bases-field-name").value = "N";
+		three.q<HTMLInputElement>(".improved-bases-field-name").dispatchEvent(new Event("input"));
 		three.q<HTMLElement>(".improved-bases-save").click();
 		await tick();
-		expect(three.onSave).toHaveBeenCalledWith([], 2, "");
+		expect(three.onSave).toHaveBeenCalledWith([expect.objectContaining({ name: "N" })], 2, "");
 	});
 
 	it("labels native fields with their type and pin", () => {
@@ -250,8 +303,8 @@ describe("SchemaSettingsModal", () => {
 			],
 		});
 		const labels = Array.from(el.querySelectorAll<HTMLSelectElement>(".improved-bases-field-type")).map((s) => s.options[0]?.textContent);
-		expect(labels).toEqual(["native (text)", "native", "native (text, pinned)", "native (number, pinned)", "native (number, pinned)"]);
-		expect(Array.from(q<HTMLSelectElement>(".improved-bases-field-type").options).map((o) => o.textContent)).toEqual(["native (text)", "relation", "select"]);
+		expect(labels).toEqual(["Text", "Native", "Text (pinned)", "Number (pinned)", "Number (pinned)"]);
+		expect(Array.from(q<HTMLSelectElement>(".improved-bases-field-type").options).map((o) => o.textContent)).toEqual(["Text", "Relation", "Select"]);
 		expect(Array.from(el.querySelectorAll(".improved-bases-type-icon")).map((x) => x.getAttribute("data-icon"))).toEqual(["lucide-text", "lucide-text", "lucide-text", "lucide-binary", "lucide-binary"]);
 		expect(q<HTMLButtonElement>(".improved-bases-field-disclosure").disabled).toBe(true);
 	});
@@ -357,7 +410,7 @@ describe("SchemaSettingsModal", () => {
 	it("shows the pinned type in the type dropdown", () => {
 		const { q } = open({ kind: "fields", drafts: [d({ name: "G", nativeLabel: "text", pinned: { type: "number" } })] });
 		const labels = Array.from(q<HTMLSelectElement>(".improved-bases-field-type").options).map((o) => o.textContent);
-		expect(labels[0]).toBe("native (number, pinned)");
+		expect(labels[0]).toBe("Number (pinned)");
 	});
 
 	it("warns in the remove confirmation when expressions reference the field", async () => {
@@ -376,14 +429,21 @@ describe("SchemaSettingsModal", () => {
 	});
 
 	it("passes removed drafts to save", async () => {
-		const { q, onSave } = open({ kind: "fields", drafts: [d({ originalName: "S", name: "", removed: true }), d({ originalName: "T", name: "T" })] });
+		const { q, onSave } = open({ kind: "fields", drafts: [d({ originalName: "S", name: "S" }), d({ originalName: "T", name: "T" })] }, { countAffected: () => Promise.resolve(1) });
+		q<HTMLElement>(".improved-bases-field-remove").click();
+		await tick();
+		q<HTMLElement>(".improved-bases-confirm-remove").click();
 		q<HTMLElement>(".improved-bases-save").click();
 		await tick();
 		expect(onSave).toHaveBeenCalledWith([expect.objectContaining({ originalName: "S", removed: true }), expect.objectContaining({ originalName: "T" })], 0, "");
 	});
 
 	it("refuses removals while members are unknown on save", async () => {
-		const { q, onSave, error } = open({ kind: "fields", drafts: [d({ originalName: "S", name: "S", removed: true })] }, { membersKnown: () => false });
+		const { q, onSave, error, modal } = open({ kind: "fields", drafts: [d({ originalName: "S", name: "S", removed: true })] }, { membersKnown: () => false });
+		const icon = modal.modalEl.querySelector<HTMLInputElement>(".improved-bases-base-icon-input");
+		if (!icon) throw new Error("missing icon input");
+		icon.value = "x";
+		icon.dispatchEvent(new Event("input"));
 		q<HTMLElement>(".improved-bases-save").click();
 		await tick();
 		expect(error()).toMatch(/still loading/);

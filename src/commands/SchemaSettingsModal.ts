@@ -1,6 +1,6 @@
 import { ButtonComponent, Modal, setIcon, ToggleComponent, type App } from "obsidian";
 import { referencesName } from "../schema/baseDoc";
-import { BasePicker, openColorMenu } from "../widgets/pickers";
+import { BasePicker, openOptionEditMenu } from "../widgets/pickers";
 import type { OverlayRegistry } from "../widgets/types";
 import { conflictHint, removals, renames, TYPES, validateDrafts, type DraftType, type FieldDraft, type OptionDraft, type OtherDefinition } from "./schemaDraft";
 
@@ -36,6 +36,19 @@ const MEMBERS_LOADING = "Base members are still loading, try again in a moment";
 const IDLE_STATUS = "Changes are written to the base on Save. Renames and removals also update the member notes.";
 const ICON_HELP = "Emoji shown for this base's entries in relations, unless a note has its own icon property. The system emoji picker opens with ctrl+cmd+space on macOS and with the Windows key + period on Windows.";
 
+/** Labels for Obsidian's property types. */
+const NATIVE_LABELS: Record<string, string> = {
+	text: "Text",
+	multitext: "List",
+	list: "List",
+	tags: "Tags",
+	aliases: "Aliases",
+	number: "Number",
+	checkbox: "Checkbox",
+	date: "Date",
+	datetime: "Date & time",
+};
+
 /** Lucide icons for Obsidian's property types. */
 const NATIVE_ICONS: Record<string, string> = {
 	text: "lucide-text",
@@ -58,15 +71,23 @@ function errorText(e: unknown): string {
 	return e instanceof Error ? e.message : String(e);
 }
 
-/** "native", "native (text)" or "native (number, pinned)"; the pin decides the widget in this base, so its type wins. */
+/** "Text", "Native" (type unknown) or "Number (pinned)"; the pin decides the widget in this base, so its type wins. */
 function nativeText(draft: FieldDraft): string {
-	const label = draft.pinned ? String(draft.pinned.type) : draft.nativeLabel;
-	if (label === null) return "native";
-	return draft.pinned ? `native (${label}, pinned)` : `native (${label})`;
+	const type = draft.pinned ? String(draft.pinned.type) : draft.nativeLabel;
+	if (type === null) return "Native";
+	const label = NATIVE_LABELS[type] ?? type.charAt(0).toUpperCase() + type.slice(1);
+	return draft.pinned ? `${label} (pinned)` : label;
 }
 
 function typeText(draft: FieldDraft, type: DraftType): string {
-	return type === "native" ? nativeText(draft) : type;
+	if (type === "relation") return "Relation";
+	if (type === "select") return "Select";
+	return nativeText(draft);
+}
+
+/** Change detection for the footer: the drafts and the base icon as saved. */
+function snapshot(drafts: FieldDraft[], icon: string): string {
+	return JSON.stringify({ drafts, icon });
 }
 
 function typeIcon(draft: FieldDraft): string {
@@ -99,6 +120,9 @@ export class SchemaSettingsModal extends Modal {
 	private listEl: HTMLElement | null = null;
 	private errorEl: HTMLElement | null = null;
 	private statusEl: HTMLElement | null = null;
+	private buttonsEl: HTMLElement | null = null;
+	private primary: ((b: ButtonComponent) => void) | null = null;
+	private readonly initial: string;
 	private focusNext: FieldDraft | null = null;
 	private addView: number;
 	private icon: string;
@@ -117,6 +141,12 @@ export class SchemaSettingsModal extends Modal {
 			: [];
 		this.addView = input.defaultViewIndex;
 		this.icon = input.icon;
+		this.initial = snapshot(this.drafts, this.icon);
+	}
+
+	/** Whether saving would change the base. */
+	private dirty(): boolean {
+		return this.input.state.kind === "fields" && snapshot(this.drafts, this.icon.trim()) !== this.initial;
 	}
 
 	onOpen(): void {
@@ -191,6 +221,7 @@ export class SchemaSettingsModal extends Modal {
 		input.value = this.icon;
 		input.addEventListener("input", () => {
 			this.icon = input.value;
+			this.updateStatus();
 		});
 	}
 
@@ -231,20 +262,41 @@ export class SchemaSettingsModal extends Modal {
 		});
 	}
 
-	/** Status line (pending renames and removals, or the last error) plus Cancel and an optional primary action. */
+	/** Status line (pending renames and removals, or the last error) plus the buttons. */
 	private renderFooter(primary: ((b: ButtonComponent) => void) | null): void {
 		const footer = this.contentEl.createDiv({ cls: "improved-bases-footer" });
 		const status = footer.createDiv({ cls: "improved-bases-footer-status" });
 		this.statusEl = status.createDiv({ cls: "improved-bases-rename-status" });
 		this.errorEl = status.createDiv({ cls: "improved-bases-form-error" });
+		this.buttonsEl = footer.createDiv({ cls: "improved-bases-footer-buttons" });
+		this.primary = primary;
 		this.updateStatus();
-		const buttons = footer.createDiv({ cls: "improved-bases-footer-buttons" });
-		new ButtonComponent(buttons).setButtonText("Cancel").onClick(() => this.close());
-		if (primary) primary(new ButtonComponent(buttons));
+	}
+
+	/** Close while nothing changed; Cancel and Save once there is something to save. The reset button stays next to Close. */
+	private renderButtons(): void {
+		const el = this.buttonsEl;
+		if (!el) return;
+		const dirty = this.dirty();
+		if (el.dataset.dirty === String(dirty) && el.hasChildNodes()) return;
+		el.dataset.dirty = String(dirty);
+		el.empty();
+		if (this.input.state.kind === "error") {
+			new ButtonComponent(el).setButtonText("Close").onClick(() => this.close()).buttonEl.addClass("improved-bases-close");
+			if (this.primary) this.primary(new ButtonComponent(el));
+			return;
+		}
+		if (!dirty) {
+			new ButtonComponent(el).setButtonText("Close").onClick(() => this.close()).buttonEl.addClass("improved-bases-close");
+			return;
+		}
+		new ButtonComponent(el).setButtonText("Cancel").onClick(() => this.close()).buttonEl.addClass("improved-bases-cancel");
+		if (this.primary) this.primary(new ButtonComponent(el));
 	}
 
 	/** Pending renames and removals, as a reminder that Save migrates the notes. */
 	private updateStatus(): void {
+		this.renderButtons();
 		const el = this.statusEl;
 		if (!el || this.input.state.kind !== "fields") return;
 		el.empty();
@@ -356,9 +408,10 @@ export class SchemaSettingsModal extends Modal {
 		name.value = draft.name;
 		const typeWrap = main.createEl("label", { cls: "improved-bases-type-select" });
 		const typeIconEl = typeWrap.createSpan({ cls: "improved-bases-type-icon" });
-		const type = typeWrap.createEl("select", { cls: "dropdown improved-bases-field-type", attr: { "aria-label": "Field type" } });
+		const type = typeWrap.createEl("select", { cls: "improved-bases-field-type", attr: { "aria-label": "Field type" } });
 		for (const t of TYPES) type.createEl("option", { text: typeText(draft, t), attr: { value: t } });
 		type.value = draft.type;
+		setIcon(typeWrap.createSpan({ cls: "improved-bases-type-chevron" }), "lucide-chevron-down");
 		const details = main.createDiv({ cls: "improved-bases-field-details" });
 		const trash = iconButton(main, "lucide-trash-2", "Remove field", "improved-bases-field-remove");
 		const hint = row.createDiv({ cls: "improved-bases-field-hint" });
@@ -471,41 +524,51 @@ export class SchemaSettingsModal extends Modal {
 		};
 		const list = el.createDiv({ cls: "improved-bases-option-list" });
 		for (const option of draft.options) this.renderOption(list, draft, option, rerender);
-		const add = list.createDiv({ cls: "improved-bases-option-add" });
-		const input = add.createEl("input", {
-			cls: "improved-bases-option-new",
-			attr: { type: "text", placeholder: "New option", "aria-label": "New option" },
-		});
-		const submit = (): void => {
-			const value = input.value.trim();
-			if (!value) return;
-			draft.options.push({ value, color: "grey" });
-			rerender();
-			el.querySelector<HTMLInputElement>(".improved-bases-option-new")?.focus();
-		};
-		input.addEventListener("keydown", (evt) => {
-			if (evt.key !== "Enter" || evt.isComposing) return;
-			evt.preventDefault();
-			submit();
-		});
-		const button = add.createEl("button", { cls: "improved-bases-option-add-button", attr: { type: "button", "aria-label": "Add option" } });
-		setIcon(button.createSpan(), "lucide-plus");
-		button.createSpan({ text: "Option" });
-		button.addEventListener("click", submit);
+		this.renderAddOption(el, list, draft, rerender);
 	}
 
-	private renderOption(list: HTMLElement, draft: FieldDraft, option: OptionDraft, rerender: () => void): void {
-		const row = list.createDiv({ cls: "improved-bases-option-row" });
-		const pill = row.createSpan({ cls: "improved-bases-pill", text: option.value, attr: { "data-color": option.color, "aria-label": "Change color" } });
-		pill.addEventListener("click", (evt) => {
-			openColorMenu(evt, (color) => {
-				option.color = color;
-				pill.setAttribute("data-color", color);
+	/** "+ Option" turns into an input; Enter adds and keeps it open, an empty blur or Escape turns it back. */
+	private renderAddOption(container: HTMLElement, list: HTMLElement, draft: FieldDraft, rerender: () => void): void {
+		const button = list.createEl("button", { cls: "improved-bases-option-add-button", attr: { type: "button", "aria-label": "Add option" } });
+		setIcon(button.createSpan(), "lucide-plus");
+		button.createSpan({ text: "Option" });
+		button.addEventListener("click", () => {
+			const input = createEl("input", {
+				cls: "improved-bases-option-new",
+				attr: { type: "text", placeholder: "New option", "aria-label": "New option" },
+			});
+			const submit = (): void => {
+				const value = input.value.trim();
+				if (!value) return;
+				draft.options.push({ value, color: "grey" });
 				rerender();
-			}, this.input.overlays);
+				container.querySelector<HTMLElement>(".improved-bases-option-add-button")?.click();
+			};
+			input.addEventListener("keydown", (evt) => {
+				if (evt.isComposing) return;
+				if (evt.key === "Escape") {
+					evt.preventDefault();
+					input.replaceWith(button);
+				} else if (evt.key === "Enter") {
+					evt.preventDefault();
+					submit();
+				}
+			});
+			input.addEventListener("blur", () => {
+				if (input.value.trim()) submit();
+				else if (input.isConnected) input.replaceWith(button);
+			});
+			button.replaceWith(input);
+			input.focus();
 		});
-		const edit = iconButton(row, "lucide-pencil", "Rename option", "improved-bases-option-edit");
-		edit.addEventListener("click", () => {
+	}
+
+	/** A chip with the color dot and the value; a click opens the menu with rename, remove and the colors. */
+	private renderOption(list: HTMLElement, draft: FieldDraft, option: OptionDraft, rerender: () => void): void {
+		const chip = list.createEl("button", { cls: "improved-bases-option-chip", attr: { type: "button", "aria-label": `Edit option ${option.value}`, "data-color": option.color } });
+		chip.createSpan({ cls: "improved-bases-color-dot" });
+		chip.createSpan({ cls: "improved-bases-option-value", text: option.value });
+		const rename = (): void => {
 			const input = createEl("input", { cls: "improved-bases-option-input", attr: { type: "text", "aria-label": "Option value" } });
 			input.value = option.value;
 			let done = false;
@@ -522,14 +585,22 @@ export class SchemaSettingsModal extends Modal {
 				commit();
 			});
 			input.addEventListener("blur", commit);
-			pill.replaceWith(input);
+			chip.replaceWith(input);
 			input.focus();
 			input.select();
-		});
-		const remove = iconButton(row, "lucide-x", "Remove option", "improved-bases-option-remove");
-		remove.addEventListener("click", () => {
-			draft.options.remove(option);
-			rerender();
+		};
+		chip.addEventListener("click", (evt) => {
+			openOptionEditMenu(evt, option.color, {
+				onRename: rename,
+				onRemove: () => {
+					draft.options.remove(option);
+					rerender();
+				},
+				onColor: (color) => {
+					option.color = color;
+					rerender();
+				},
+			}, this.input.overlays);
 		});
 	}
 

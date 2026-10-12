@@ -327,23 +327,57 @@
 	border-color: var(--background-modifier-border-focus);
 	box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
 }
+/* The datalist's picker arrow is noise next to the name. */
+.improved-bases-schema .improved-bases-field-name::-webkit-calendar-picker-indicator {
+	display: none;
+}
 
-/* Type: icon plus dropdown */
+/* Type: one box holding icon, select and chevron; plain text until hovered or focused */
 .improved-bases-schema .improved-bases-type-select {
 	display: flex;
 	align-items: center;
 	gap: var(--size-2-2);
 	min-width: 0;
+	height: var(--input-height);
+	padding: 0 var(--size-2-3);
+	border: 1px solid transparent;
+	border-radius: var(--radius-s);
+	cursor: pointer;
 }
-.improved-bases-schema .improved-bases-type-icon {
+.improved-bases-schema .improved-bases-type-select:hover,
+.improved-bases-schema .improved-bases-type-select:focus-within {
+	background-color: var(--background-modifier-form-field);
+	border-color: var(--background-modifier-border);
+}
+.improved-bases-schema .improved-bases-type-select:focus-within {
+	border-color: var(--background-modifier-border-focus);
+	box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+}
+.improved-bases-schema .improved-bases-type-icon,
+.improved-bases-schema .improved-bases-type-chevron {
 	display: inline-flex;
 	flex: 0 0 auto;
 	color: var(--text-muted);
 	--icon-size: var(--icon-s);
+	pointer-events: none;
 }
 .improved-bases-schema .improved-bases-field-type {
 	flex: 1 1 auto;
 	min-width: 0;
+	height: 100%;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	box-shadow: none;
+	appearance: none;
+	-webkit-appearance: none;
+	color: var(--text-normal);
+	font-size: var(--font-ui-small);
+	cursor: pointer;
+}
+.improved-bases-schema .improved-bases-field-type:focus {
+	outline: none;
+	box-shadow: none;
 }
 
 /* Details */
@@ -461,39 +495,27 @@
 	align-items: center;
 	gap: var(--size-2-2);
 }
-.improved-bases-schema .improved-bases-option-row {
-	display: inline-flex;
-	align-items: center;
-	gap: 0;
-	padding-right: var(--size-2-1);
-	border: 1px solid var(--background-modifier-border);
-	border-radius: var(--radius-s);
-	background-color: var(--background-primary);
-}
-.improved-bases-schema .improved-bases-option-row .improved-bases-pill {
-	border: 0;
-	background-color: transparent;
-	cursor: pointer;
-}
-.improved-bases-schema .improved-bases-option-row .improved-bases-pill::before {
-	content: "";
-	width: 8px;
-	height: 8px;
-	border-radius: 50%;
-	background-color: rgb(var(--ib-rgb));
-}
-.improved-bases-schema .improved-bases-option-row .clickable-icon {
-	padding: var(--size-2-1);
-	--icon-size: var(--icon-xs);
-}
-.improved-bases-schema .improved-bases-option-input {
-	width: 8em;
-}
-.improved-bases-schema .improved-bases-option-add {
+/* Option chips: dot plus value; the click menu holds rename, remove and the colors */
+.improved-bases-schema .improved-bases-option-chip {
 	display: inline-flex;
 	align-items: center;
 	gap: var(--size-2-2);
+	height: auto;
+	padding: var(--size-2-1) var(--size-2-3);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	background-color: var(--background-primary);
+	box-shadow: none;
+	color: var(--text-normal);
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-normal);
+	cursor: pointer;
 }
+.improved-bases-schema .improved-bases-option-chip:hover {
+	border-color: var(--background-modifier-border-hover);
+	background-color: var(--background-modifier-hover);
+}
+.improved-bases-schema .improved-bases-option-input,
 .improved-bases-schema .improved-bases-option-new {
 	width: 9em;
 }
