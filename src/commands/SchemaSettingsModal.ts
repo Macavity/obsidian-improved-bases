@@ -1,4 +1,4 @@
-import { Modal, Setting, setIcon, type App, type ButtonComponent } from "obsidian";
+import { ButtonComponent, Modal, setIcon, ToggleComponent, type App } from "obsidian";
 import { referencesName } from "../schema/baseDoc";
 import { BasePicker, openColorMenu } from "../widgets/pickers";
 import type { OverlayRegistry } from "../widgets/types";
@@ -31,6 +31,19 @@ export interface SchemaSettingsHandlers {
 }
 
 const MEMBERS_LOADING = "Base members are still loading, try again in a moment";
+const IDLE_STATUS = "Changes are written to the base on Save. Renames and removals also update the member notes.";
+
+/** Lucide icons for Obsidian's property types. */
+const NATIVE_ICONS: Record<string, string> = {
+	text: "lucide-text",
+	multitext: "lucide-list",
+	tags: "lucide-tags",
+	aliases: "lucide-forward",
+	number: "lucide-binary",
+	checkbox: "lucide-check-square",
+	date: "lucide-calendar",
+	datetime: "lucide-clock",
+};
 
 let instances = 0;
 
@@ -53,12 +66,20 @@ function typeText(draft: FieldDraft, type: DraftType): string {
 	return type === "native" ? nativeText(draft) : type;
 }
 
-function summary(draft: FieldDraft): string {
-	const parts = [draft.name.trim() || "Unnamed field", typeText(draft, draft.type)];
-	if (draft.type === "relation" && draft.base) parts.push(draft.base);
-	if (draft.type === "select") parts.push(`${draft.options.length} options`);
-	if ((draft.type === "relation" || draft.type === "select") && draft.multiple) parts.push("multiple");
-	return parts.join(" · ");
+function typeIcon(draft: FieldDraft): string {
+	if (draft.type === "relation") return "lucide-link";
+	if (draft.type === "select") return "lucide-circle-dot";
+	const label = draft.pinned ? String(draft.pinned.type) : draft.nativeLabel;
+	return (label && NATIVE_ICONS[label]) ?? "lucide-text";
+}
+
+/** Only plugin types have details to expand. */
+function expandable(draft: FieldDraft): boolean {
+	return draft.type === "relation" || draft.type === "select";
+}
+
+function plural(n: number, word: string): string {
+	return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
 
 function iconButton(parent: HTMLElement, icon: string, label: string, cls: string): HTMLButtonElement {
@@ -74,8 +95,10 @@ export class SchemaSettingsModal extends Modal {
 	private readonly listId = `improved-bases-property-names-${++instances}`;
 	private listEl: HTMLElement | null = null;
 	private errorEl: HTMLElement | null = null;
+	private statusEl: HTMLElement | null = null;
 	private focusNext: FieldDraft | null = null;
 	private addView: number;
+	private query = "";
 	/** Bumped on every list render and on close; pending confirmations of an older generation are stale. */
 	private generation = 0;
 
@@ -95,6 +118,7 @@ export class SchemaSettingsModal extends Modal {
 		const { contentEl } = this;
 		contentEl.empty();
 		contentEl.addClass("improved-bases-schema");
+		this.modalEl.addClass("improved-bases-schema-modal");
 		this.setTitle(`Schema settings – ${basename(this.input.basePath)}`);
 		if (this.input.state.kind === "error") this.renderError(this.input.state.message, this.input.state.resettable);
 		else this.renderFields();
@@ -136,22 +160,12 @@ export class SchemaSettingsModal extends Modal {
 		const { contentEl } = this;
 		const datalist = contentEl.createEl("datalist", { attr: { id: this.listId } });
 		for (const name of this.input.propertyNames) datalist.createEl("option", { attr: { value: name } });
-		this.renderViewPicker();
-		this.listEl = contentEl.createDiv({ cls: "improved-bases-field-list" });
+		this.renderToolbar();
+		const table = contentEl.createDiv({ cls: "improved-bases-table" });
+		const head = table.createDiv({ cls: "improved-bases-column-head" });
+		for (const label of ["Field name", "Type", "Details", ""]) head.createSpan({ text: label });
+		this.listEl = table.createDiv({ cls: "improved-bases-field-list" });
 		this.renderList();
-		const add = contentEl.createEl("button", { cls: "improved-bases-add-field", attr: { type: "button" } });
-		setIcon(add.createSpan({ cls: "improved-bases-add-field-icon" }), "plus");
-		add.createSpan({ text: "Add field" });
-		add.addEventListener("click", () => {
-			const draft: FieldDraft = {
-				originalName: null, originalBase: null, name: "", type: "native", nativeLabel: null,
-				pinned: null, removed: false, multiple: false, icon: "", options: [],
-			};
-			this.drafts.push(draft);
-			this.expanded.add(draft);
-			this.focusNext = draft;
-			this.renderList();
-		});
 		this.renderFooter((b) => {
 			b.setButtonText("Save").setCta();
 			b.buttonEl.addClass("improved-bases-save");
@@ -159,24 +173,79 @@ export class SchemaSettingsModal extends Modal {
 		});
 	}
 
-	/** Target view for new columns; only offered when there is a choice. */
-	private renderViewPicker(): void {
-		const { views } = this.input;
-		if (views.length <= 1) return;
-		new Setting(this.contentEl).setName("Add new fields to").addDropdown((d) => {
-			d.selectEl.addClass("improved-bases-add-view");
-			for (const [i, view] of views.entries()) d.addOption(String(i), view);
-			d.setValue(String(this.addView)).onChange((v) => {
-				this.addView = Number(v);
-			});
+	/** Search, the target view for new columns (only offered when there is a choice) and the add button. */
+	private renderToolbar(): void {
+		const bar = this.contentEl.createDiv({ cls: "improved-bases-toolbar" });
+		const search = bar.createDiv({ cls: "search-input-container improved-bases-search" });
+		const input = search.createEl("input", { attr: { type: "search", placeholder: "Find a field…", "aria-label": "Find a field" } });
+		input.addEventListener("input", () => {
+			this.query = input.value.trim().toLowerCase();
+			this.renderList();
+		});
+		this.renderViewPicker(bar);
+		const add = bar.createEl("button", { cls: "mod-cta improved-bases-add-field", attr: { type: "button" } });
+		setIcon(add.createSpan({ cls: "improved-bases-add-field-icon" }), "lucide-plus");
+		add.createSpan({ text: "Add field" });
+		add.addEventListener("click", () => {
+			const draft: FieldDraft = {
+				originalName: null, originalBase: null, name: "", type: "native", nativeLabel: null,
+				pinned: null, removed: false, multiple: false, icon: "", options: [],
+			};
+			this.drafts.push(draft);
+			this.focusNext = draft;
+			this.renderList();
 		});
 	}
 
-	/** Error line plus a Cancel button and an optional primary action. */
+	private renderViewPicker(bar: HTMLElement): void {
+		const { views } = this.input;
+		if (views.length <= 1) return;
+		const label = bar.createEl("label", { cls: "improved-bases-add-view-label" });
+		label.createSpan({ text: "Add new fields to" });
+		const select = label.createEl("select", { cls: "dropdown improved-bases-add-view" });
+		for (const [i, view] of views.entries()) select.createEl("option", { text: view, attr: { value: String(i) } });
+		select.value = String(this.addView);
+		select.addEventListener("change", () => {
+			this.addView = Number(select.value);
+		});
+	}
+
+	/** Status line (pending renames and removals, or the last error) plus Cancel and an optional primary action. */
 	private renderFooter(primary: ((b: ButtonComponent) => void) | null): void {
-		this.errorEl = this.contentEl.createDiv({ cls: "improved-bases-form-error" });
-		const setting = new Setting(this.contentEl).addButton((b) => b.setButtonText("Cancel").onClick(() => this.close()));
-		if (primary) setting.addButton(primary);
+		const footer = this.contentEl.createDiv({ cls: "improved-bases-footer" });
+		const status = footer.createDiv({ cls: "improved-bases-footer-status" });
+		this.statusEl = status.createDiv({ cls: "improved-bases-rename-status" });
+		this.errorEl = status.createDiv({ cls: "improved-bases-form-error" });
+		this.updateStatus();
+		const buttons = footer.createDiv({ cls: "improved-bases-footer-buttons" });
+		new ButtonComponent(buttons).setButtonText("Cancel").onClick(() => this.close());
+		if (primary) primary(new ButtonComponent(buttons));
+	}
+
+	/** Pending renames and removals, as a reminder that Save migrates the notes. */
+	private updateStatus(): void {
+		const el = this.statusEl;
+		if (!el || this.input.state.kind !== "fields") return;
+		el.empty();
+		const pending = renames(this.drafts.map((d) => ({ ...d, name: d.name.trim() }))).filter((r) => r.to !== "");
+		const removed = removals(this.drafts);
+		if (!pending.length && !removed.length) {
+			el.removeClass("has-pending");
+			setIcon(el.createSpan({ cls: "improved-bases-status-icon" }), "lucide-info");
+			el.createSpan({ text: IDLE_STATUS });
+			return;
+		}
+		el.addClass("has-pending");
+		const parts = [];
+		if (pending.length) parts.push(plural(pending.length, "pending rename"));
+		if (removed.length) parts.push(plural(removed.length, "removal"));
+		el.createSpan({ cls: "improved-bases-status-badge", text: String(pending.length + removed.length) });
+		const text = el.createDiv({ cls: "improved-bases-status-text" });
+		text.createEl("b", { text: parts.join(", ") });
+		const details = [...pending.map((r) => `${r.from} → ${r.to}`), ...removed.map((name) => `${name} removed`)];
+		const shown = details.slice(0, 2);
+		if (details.length > 2) shown.push(`+${details.length - 2} more`);
+		text.createEl("p", { text: shown.join(" · ") });
 	}
 
 	private renderList(): void {
@@ -184,17 +253,22 @@ export class SchemaSettingsModal extends Modal {
 		if (!list) return;
 		this.generation++;
 		list.empty();
-		for (const draft of this.drafts) {
+		const shown = this.drafts.filter((d) => !this.query || d.name.toLowerCase().includes(this.query));
+		for (const draft of shown) {
 			if (draft.removed) this.renderRemovedRow(list, draft);
 			else this.renderRow(list, draft);
 		}
+		if (!shown.length) list.createDiv({ cls: "improved-bases-field-empty", text: this.drafts.length ? "No field matches the search" : "No fields yet" });
+		this.updateStatus();
 	}
 
 	private renderRemovedRow(list: HTMLElement, draft: FieldDraft): void {
 		const row = list.createDiv({ cls: "improved-bases-field-row improved-bases-field-removed" });
-		const head = row.createDiv({ cls: "improved-bases-field-summary" });
-		head.createSpan({ cls: "improved-bases-field-summary-text", text: summary(draft) });
-		const undo = head.createEl("button", { cls: "improved-bases-undo", text: "Undo", attr: { type: "button" } });
+		const main = row.createDiv({ cls: "improved-bases-field-main" });
+		main.createSpan({ cls: "improved-bases-field-disclosure" });
+		main.createSpan({ cls: "improved-bases-field-removed-name", text: draft.name.trim() || "Unnamed field" });
+		main.createSpan({ cls: "improved-bases-field-details", text: "Removed on save" });
+		const undo = main.createEl("button", { cls: "improved-bases-undo", text: "Undo", attr: { type: "button" } });
 		undo.addEventListener("click", () => {
 			draft.removed = false;
 			this.renderList();
@@ -220,11 +294,12 @@ export class SchemaSettingsModal extends Modal {
 	private renderConfirm(row: HTMLElement, draft: FieldDraft, name: string): void {
 		row.empty();
 		const confirm = row.createDiv({ cls: "improved-bases-field-confirm" });
+		setIcon(confirm.createSpan({ cls: "improved-bases-warning-icon" }), "lucide-alert-triangle");
 		const warning = referencesName(this.input.expressions, name) ? " Filters or formulas reference it." : "";
 		const text = confirm.createSpan({ text: `Remove '${name}' and its value from the notes?${warning}` });
+		const keep = confirm.createEl("button", { cls: "improved-bases-confirm-keep", text: "Keep", attr: { type: "button" } });
 		const remove = confirm.createEl("button", { cls: "mod-warning improved-bases-confirm-remove", text: "Remove", attr: { type: "button" } });
 		remove.disabled = true;
-		const keep = confirm.createEl("button", { cls: "improved-bases-confirm-keep", text: "Keep", attr: { type: "button" } });
 		remove.addEventListener("click", () => {
 			draft.removed = true;
 			this.expanded.delete(draft);
@@ -247,123 +322,139 @@ export class SchemaSettingsModal extends Modal {
 		);
 	}
 
+	/** One table row: disclosure, name, type, details, remove; hints and the detail editor below. */
 	private renderRow(list: HTMLElement, draft: FieldDraft): void {
 		const row = list.createDiv({ cls: "improved-bases-field-row" });
-		const head = row.createDiv({ cls: "improved-bases-field-summary" });
-		const chevron = head.createSpan({ cls: "improved-bases-field-chevron" });
-		const text = head.createSpan({ cls: "improved-bases-field-summary-text" });
-		const refresh = (): void => {
-			text.setText(summary(draft));
-			setIcon(chevron, this.expanded.has(draft) ? "chevron-down" : "chevron-right");
-		};
-		refresh();
-		const trash = iconButton(head, "trash-2", "Remove field", "improved-bases-field-remove");
-		trash.addEventListener("click", (evt) => {
-			evt.stopPropagation();
-			this.requestRemoval(row, draft);
+		const main = row.createDiv({ cls: "improved-bases-field-main" });
+		const disclosure = main.createEl("button", { cls: "improved-bases-field-disclosure", attr: { type: "button", "aria-label": "Show details" } });
+		setIcon(disclosure, "lucide-chevron-right");
+		const name = main.createEl("input", {
+			cls: "improved-bases-field-name",
+			attr: { type: "text", placeholder: "Field name", "aria-label": "Field name", list: this.listId },
 		});
-		head.addEventListener("click", () => {
+		name.value = draft.name;
+		const typeWrap = main.createEl("label", { cls: "improved-bases-type-select" });
+		const typeIconEl = typeWrap.createSpan({ cls: "improved-bases-type-icon" });
+		const type = typeWrap.createEl("select", { cls: "dropdown improved-bases-field-type", attr: { "aria-label": "Field type" } });
+		for (const t of TYPES) type.createEl("option", { text: typeText(draft, t), attr: { value: t } });
+		type.value = draft.type;
+		const details = main.createDiv({ cls: "improved-bases-field-details" });
+		const trash = iconButton(main, "lucide-trash-2", "Remove field", "improved-bases-field-remove");
+		const hint = row.createDiv({ cls: "improved-bases-field-hint" });
+		const conflict = row.createDiv({ cls: "improved-bases-field-hint improved-bases-field-conflict" });
+		const editor = row.createDiv({ cls: "improved-bases-field-editor" });
+
+		const refresh = (): void => {
+			const open = expandable(draft) && this.expanded.has(draft);
+			disclosure.disabled = !expandable(draft);
+			disclosure.toggleClass("is-open", open);
+			setIcon(typeIconEl, typeIcon(draft));
+			this.renderDetails(details, draft);
+			this.updateHint(hint, draft);
+			this.updateConflict(conflict, draft);
+			row.toggleClass("has-warning", !hint.hidden || !conflict.hidden);
+			row.toggleClass("is-expanded", open);
+			editor.hidden = !open;
+			if (!open) editor.empty();
+			else if (!editor.hasChildNodes()) this.renderEditor(editor, draft, refresh);
+			this.updateStatus();
+		};
+
+		disclosure.addEventListener("click", () => {
 			if (this.expanded.has(draft)) this.expanded.delete(draft);
 			else this.expanded.add(draft);
-			this.renderList();
+			refresh();
 		});
-		if (this.expanded.has(draft)) this.renderEditor(row.createDiv({ cls: "improved-bases-field-editor" }), draft, refresh);
+		name.addEventListener("input", () => {
+			draft.name = name.value;
+			refresh();
+		});
+		type.addEventListener("change", () => {
+			draft.type = type.value as DraftType;
+			if (expandable(draft)) this.expanded.add(draft);
+			editor.empty();
+			refresh();
+		});
+		trash.addEventListener("click", () => this.requestRemoval(row, draft));
+		if (this.focusNext === draft) {
+			this.focusNext = null;
+			window.setTimeout(() => name.focus(), 0);
+		}
+		refresh();
 	}
 
-	private renderEditor(el: HTMLElement, draft: FieldDraft, refresh: () => void): void {
-		new Setting(el).setName("Name").addText((t) => {
-			t.inputEl.addClass("improved-bases-field-name");
-			t.inputEl.setAttribute("list", this.listId);
-			t.setValue(draft.name).onChange((v) => {
-				draft.name = v;
-				refresh();
-				this.updateHint(hint, draft);
-				this.updateConflict(conflict, draft);
-			});
-			if (this.focusNext === draft) {
-				this.focusNext = null;
-				window.setTimeout(() => t.inputEl.focus(), 0);
-			}
-		});
-		const hint = el.createDiv({ cls: "improved-bases-field-hint" });
-		this.updateHint(hint, draft);
-		const body = createDiv();
-		const conflict = createDiv({ cls: "improved-bases-field-hint improved-bases-field-conflict" });
-		const onBodyChange = (): void => {
-			refresh();
-			this.updateConflict(conflict, draft);
-		};
-		new Setting(el).setName("Type").addDropdown((d) => {
-			d.selectEl.addClass("improved-bases-field-type");
-			for (const type of TYPES) d.addOption(type, typeText(draft, type));
-			d.setValue(draft.type).onChange((v) => {
-				draft.type = v as DraftType;
-				refresh();
-				this.renderBody(body, draft, onBodyChange);
-				this.updateConflict(conflict, draft);
-			});
-		});
-		el.appendChild(body);
-		this.renderBody(body, draft, onBodyChange);
-		el.appendChild(conflict);
-		this.updateConflict(conflict, draft);
+	/** Details column: option colors and count, relation target and cardinality, or a dash for native fields. */
+	private renderDetails(el: HTMLElement, draft: FieldDraft): void {
+		el.empty();
+		if (draft.type === "select") {
+			for (const option of draft.options.slice(0, 3)) el.createSpan({ cls: "improved-bases-color-dot", attr: { "data-color": option.color } });
+			el.createSpan({ text: plural(draft.options.length, "option") });
+		} else if (draft.type === "relation") {
+			if (draft.icon) el.createSpan({ cls: "improved-bases-details-icon", text: draft.icon });
+			el.createSpan({ cls: "improved-bases-details-target", text: draft.base ?? "No base chosen" });
+		} else {
+			el.createSpan({ cls: "improved-bases-details-muted", text: "—" });
+			return;
+		}
+		if (draft.multiple) el.createEl("em", { cls: "improved-bases-details-tag", text: "Multiple" });
 	}
 
 	/** Advises about other bases defining this field differently; saving stays possible. */
 	private updateConflict(hint: HTMLElement, draft: FieldDraft): void {
-		const text = conflictHint(draft, this.input.otherDefinitions(draft.name));
-		hint.setText(text ?? "");
-		hint.hidden = text === null;
+		this.setHint(hint, conflictHint(draft, this.input.otherDefinitions(draft.name)));
 	}
 
 	/** Warns that a renamed field is still referenced by filters or formulas. */
 	private updateHint(hint: HTMLElement, draft: FieldDraft): void {
 		const from = draft.originalName;
 		const show = from !== null && draft.name !== from && referencesName(this.input.expressions, from);
-		hint.setText(show ? `Filters or formulas reference '${from}', update them manually after saving` : "");
-		hint.hidden = !show;
+		this.setHint(hint, show ? `Filters or formulas reference '${from}', update them manually after saving` : null);
 	}
 
-	/** Type-dependent part of the editor; options stay in the draft when the type changes. */
-	private renderBody(el: HTMLElement, draft: FieldDraft, refresh: () => void): void {
-		el.empty();
-		if (draft.type === "relation" || draft.type === "select") {
-			new Setting(el).setName("Multiple values").addToggle((t) => {
-				t.toggleEl.addClass("improved-bases-field-multiple");
-				t.setValue(draft.multiple).onChange((v) => {
-					draft.multiple = v;
-					refresh();
-				});
-			});
-		}
+	private setHint(hint: HTMLElement, text: string | null): void {
+		hint.empty();
+		hint.hidden = text === null;
+		if (text === null) return;
+		setIcon(hint.createSpan({ cls: "improved-bases-warning-icon" }), "lucide-alert-triangle");
+		hint.createSpan({ text });
+	}
+
+	/** Type-dependent detail panel; options stay in the draft when the type changes. */
+	private renderEditor(el: HTMLElement, draft: FieldDraft, refresh: () => void): void {
 		if (draft.type === "relation") {
-			new Setting(el).setName("Target base").addButton((b) => {
-				b.buttonEl.addClass("improved-bases-field-base");
-				b.setButtonText(draft.base ?? "Choose base");
-				b.onClick(() => {
-					new BasePicker(this.app, this.input.basePaths, (p) => {
-						draft.base = p;
-						b.setButtonText(p);
-						refresh();
-					}).open();
-				});
+			const target = el.createEl("label", { cls: "improved-bases-editor-field" });
+			target.createSpan({ text: "Related base" });
+			const pick = target.createEl("button", { cls: "improved-bases-field-base", attr: { type: "button" } });
+			pick.setText(draft.base ?? "Choose base");
+			pick.addEventListener("click", () => {
+				new BasePicker(this.app, this.input.basePaths, (p) => {
+					draft.base = p;
+					pick.setText(p);
+					refresh();
+				}).open();
 			});
-			new Setting(el)
-				.setName("Entry icon")
-				.setDesc("Emoji for entries without an icon property. The system emoji picker opens with ctrl+cmd+space on macOS and with the Windows key + period on Windows.")
-				.addText((t) => {
-					t.inputEl.addClass("improved-bases-field-icon");
-					t.inputEl.placeholder = "📄";
-					t.setValue(draft.icon).onChange((v) => {
-						draft.icon = v;
-					});
-				});
+			const icon = el.createEl("label", { cls: "improved-bases-editor-field" });
+			icon.createSpan({ text: "Entry icon" });
+			const input = icon.createEl("input", {
+				cls: "improved-bases-field-icon",
+				attr: {
+					type: "text", placeholder: "📄", "aria-label": "Entry icon",
+					title: "Emoji for entries without an icon property. The system emoji picker opens with ctrl+cmd+space on macOS and with the Windows key + period on Windows.",
+				},
+			});
+			input.value = draft.icon;
+			input.addEventListener("input", () => {
+				draft.icon = input.value;
+				refresh();
+			});
 		}
-		if (draft.type === "select") {
-			const setting = new Setting(el).setName("Options");
-			setting.settingEl.addClass("improved-bases-options");
-			this.renderOptions(setting.controlEl, draft, refresh);
-		}
+		if (draft.type === "select") this.renderOptions(el.createDiv({ cls: "improved-bases-options" }), draft, refresh);
+		const toggle = el.createEl("label", { cls: "improved-bases-editor-field improved-bases-toggle" });
+		toggle.createSpan({ text: "Allow multiple" });
+		new ToggleComponent(toggle).setValue(draft.multiple).onChange((v) => {
+			draft.multiple = v;
+			refresh();
+		}).toggleEl.addClass("improved-bases-field-multiple");
 	}
 
 	private renderOptions(el: HTMLElement, draft: FieldDraft, refresh: () => void): void {
@@ -374,7 +465,7 @@ export class SchemaSettingsModal extends Modal {
 		};
 		const list = el.createDiv({ cls: "improved-bases-option-list" });
 		for (const option of draft.options) this.renderOption(list, draft, option, rerender);
-		const add = el.createDiv({ cls: "improved-bases-option-add" });
+		const add = list.createDiv({ cls: "improved-bases-option-add" });
 		const input = add.createEl("input", {
 			cls: "improved-bases-option-new",
 			attr: { type: "text", placeholder: "New option", "aria-label": "New option" },
@@ -391,20 +482,23 @@ export class SchemaSettingsModal extends Modal {
 			evt.preventDefault();
 			submit();
 		});
-		const button = add.createEl("button", { text: "Add", attr: { type: "button" } });
+		const button = add.createEl("button", { cls: "improved-bases-option-add-button", attr: { type: "button", "aria-label": "Add option" } });
+		setIcon(button.createSpan(), "lucide-plus");
+		button.createSpan({ text: "Option" });
 		button.addEventListener("click", submit);
 	}
 
 	private renderOption(list: HTMLElement, draft: FieldDraft, option: OptionDraft, rerender: () => void): void {
 		const row = list.createDiv({ cls: "improved-bases-option-row" });
-		const pill = row.createSpan({ cls: "improved-bases-pill", text: option.value, attr: { "data-color": option.color } });
+		const pill = row.createSpan({ cls: "improved-bases-pill", text: option.value, attr: { "data-color": option.color, "aria-label": "Change color" } });
 		pill.addEventListener("click", (evt) => {
 			openColorMenu(evt, (color) => {
 				option.color = color;
 				pill.setAttribute("data-color", color);
+				rerender();
 			}, this.input.overlays);
 		});
-		const edit = iconButton(row, "pencil", "Rename option", "improved-bases-option-edit");
+		const edit = iconButton(row, "lucide-pencil", "Rename option", "improved-bases-option-edit");
 		edit.addEventListener("click", () => {
 			const input = createEl("input", { cls: "improved-bases-option-input", attr: { type: "text", "aria-label": "Option value" } });
 			input.value = option.value;
@@ -426,11 +520,7 @@ export class SchemaSettingsModal extends Modal {
 			input.focus();
 			input.select();
 		});
-		const remove = row.createEl("button", {
-			cls: "clickable-icon improved-bases-option-remove",
-			text: "×",
-			attr: { type: "button", "aria-label": "Remove option" },
-		});
+		const remove = iconButton(row, "lucide-x", "Remove option", "improved-bases-option-remove");
 		remove.addEventListener("click", () => {
 			draft.options.remove(option);
 			rerender();
