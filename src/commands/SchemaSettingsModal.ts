@@ -163,7 +163,7 @@ export class SchemaSettingsModal extends Modal {
 		this.renderToolbar();
 		const table = contentEl.createDiv({ cls: "improved-bases-table" });
 		const head = table.createDiv({ cls: "improved-bases-column-head" });
-		for (const label of ["Field name", "Type", "Details", ""]) head.createSpan({ text: label });
+		for (const label of ["", "Field name", "Type", "Details", ""]) head.createSpan({ text: label });
 		this.listEl = table.createDiv({ cls: "improved-bases-field-list" });
 		this.renderList();
 		this.renderFooter((b) => {
