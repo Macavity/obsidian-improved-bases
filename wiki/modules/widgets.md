@@ -37,7 +37,7 @@ tags:
 - [icons.ts](../../src/widgets/icons.ts)
 - [values.ts](../../src/widgets/values.ts)
 - [types.ts](../../src/widgets/types.ts)
-- [styles.css](../../styles.css) — `.improved-bases-relation` (focus ring, pointer), `.improved-bases-chip`, `.improved-bases-icon`, `.improved-bases-entry` (picker rows), `.improved-bases-select`, `.improved-bases-pill[data-color]`, `.improved-bases-menu-*`
+- [styles.css](../../styles.css) — `.improved-bases-relation` (focus ring, pointer), `.improved-bases-chip`, `.improved-bases-icon`, `.improved-bases-entry` (picker rows), `.improved-bases-select`, `.improved-bases-pill[data-color]`, `.improved-bases-menu-*`. Relation and select share one cell layout: a single non-wrapping flex line with `overflow: hidden`, so a narrow column clips to the side and the row never grows. The pill's `×` and `+` buttons are plain buttons styled by the plugin, not `clickable-icon`: Obsidian's `.metadata-property-value .clickable-icon` and theme rules (Cupertino pads the class to 10px) outrank a plugin class and made the pills taller than the row. In table cells they appear on hover/focus of `.bases-td`, as Obsidian's own cell icons do.
 
 ## Dependencies
 

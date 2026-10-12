@@ -2,7 +2,7 @@
 title: Improved Bases — Overview
 description: "Home page and navigation hub for the Improved Bases codebase wiki: what the plugin is, how it is layered, and where every page lives."
 profile: internal/standard
-source_commit: "d82d44b"
+source_commit: "d3e654d"
 tags:
   - wiki
   - overview

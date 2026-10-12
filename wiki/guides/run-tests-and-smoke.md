@@ -19,7 +19,8 @@ Prove a change works at both levels the project supports: fast unit tests withou
 3. **Iterate**: `pnpm dev` in one terminal, `pnpm reload` after each rebuild.
 4. **Smoke**: `pnpm smoke` = `vault:reset` + `vault:link-test` + `build` + `reload` + [scripts/smoke.mjs](../../scripts/smoke.mjs). Keep the test-vault window visible; a hidden window throttles the collector and causes the 30 s CLI timeout.
 5. **Perf** (optional, for anything touching startup, membership or queries): `pnpm perf` generates 2000 notes and 10 schema bases, prints `ready` and first-render times, fails above 3 s, and resets the vault.
-6. **Recover** a hung Obsidian: `obsidian vault="test-vault" reload`, then `pnpm vault:reset`.
+6. **Themes**: anything touching `styles.css` is checked in the default theme and in every theme under `test-vault/.obsidian/themes/`: `pnpm vault:theme Cupertino`, look at the table and the schema dialog, `pnpm vault:theme default`. Use only Obsidian tokens and classes, and remember that theme rules on Obsidian classes (`clickable-icon`, `button`) outrank a single plugin class.
+7. **Recover** a hung Obsidian: `obsidian vault="test-vault" reload`, then `pnpm vault:reset`.
 
 ## Relevant code
 
