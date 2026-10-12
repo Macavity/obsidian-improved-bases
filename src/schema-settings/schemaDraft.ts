@@ -22,7 +22,7 @@ export interface FieldDraft {
 	type: DraftType;
 	/** Obsidian's type for this property ("text", "multitext", "tags", ...) or null. */
 	nativeLabel: string | null;
-	/** Hand-written native entry, written back unchanged. */
+	/** Pinned native entry, written back unchanged while its type is not changed. */
 	pinned: Record<string, unknown> | null;
 	removed: boolean;
 	multiple: boolean;
