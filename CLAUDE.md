@@ -29,12 +29,20 @@ Obsidian knowledge lives in `.claude/skills/` (`obsidian-dev`, `obsidian-ops`, `
 - Keep your output concise and focused, avoid unnecessary verbosity unless requested.
 
 ## Pull requests
-The PR is opened under the user's name and reviewed by nobody else; local verification already happened. Body, nothing more:
+Who opens the PR decides the body. Check once with `gh api user -q .login`.
+
+**Repository owner (`Macavity`)** – the PR carries the owner's name and nobody else reviews it; local verification already happened. Body, nothing more:
 - **What changed** – behaviour from the user's point of view, one paragraph.
 - **Why** – one to three sentences.
 - **Screenshot** of the visible change, taken in the test vault with `obsidian vault="test-vault" dev:screenshot path=<file>`. Push it as `pr-<branch>.png` to the orphan branch `screenshots` (never to `main`) and embed the `raw.githubusercontent.com` URL. Omit with a one-line note only for changes without UI.
 - One line linking the wiki pages changed in this PR; they hold the decisions. No "how to verify" and no "notable decisions" section.
 - Known, untouched problems may follow as a final line.
+
+**Anyone else** (fork or external maintainer) – the owner reviews without your context. Body:
+- **What changed** and **Why** as above.
+- **How to verify** – commands run and the manual steps in the test vault.
+- **Screenshot** of the visible change, attached to the PR (drag into the body, or a link you host); no `screenshots` branch.
+- **Decisions** the reviewer should know, including rejected alternatives, unless the wiki pages in the PR already say so.
 
 ## Terminology
 
