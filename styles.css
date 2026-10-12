@@ -173,6 +173,30 @@
 	font-size: var(--font-ui-small);
 }
 
+/* Header: the base's default entry icon next to the title; room for Obsidian's close button on the right */
+.improved-bases-schema-modal .modal-header {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-3);
+	padding-right: var(--size-4-8);
+}
+.improved-bases-schema-modal .modal-title {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+.improved-bases-base-icon {
+	display: flex;
+	flex: 0 0 auto;
+	align-items: center;
+	gap: var(--size-2-2);
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-normal);
+}
+.improved-bases-base-icon-input {
+	width: 5em;
+}
+
 /* Toolbar: search, target view, add */
 .improved-bases-schema .improved-bases-toolbar {
 	display: flex;

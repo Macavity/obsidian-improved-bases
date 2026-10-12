@@ -6,7 +6,7 @@ import { OverlayRegistry } from "../src/widgets/types";
 
 const d = (p: Partial<FieldDraft>): FieldDraft => ({
 	originalName: null, originalBase: null, name: "X", type: "native", nativeLabel: null,
-	pinned: null, removed: false, multiple: false, icon: "", options: [], ...p,
+	pinned: null, removed: false, multiple: false, options: [], ...p,
 });
 const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 const names = (el: HTMLElement) => Array.from(el.querySelectorAll<HTMLInputElement>(".improved-bases-field-name")).map((i) => i.value);
@@ -22,6 +22,7 @@ function open(state: SchemaSettingsInput["state"], { countAffected: count, ...op
 	const input: SchemaSettingsInput = {
 		basePath: "Teams/Mitarbeiter.base",
 		state,
+		icon: "",
 		propertyNames: ["Role"],
 		basePaths: ["Teams.base"],
 		overlays: new OverlayRegistry(),
@@ -53,7 +54,7 @@ describe("SchemaSettingsModal", () => {
 		const { modal, el, q } = open({
 			kind: "fields",
 			drafts: [
-				d({ name: "Lead", type: "relation", base: "Teams.base", multiple: true, icon: "👤" }),
+				d({ name: "Lead", type: "relation", base: "Teams.base", multiple: true }),
 				d({ name: "Status", type: "select", multiple: true, options: [{ value: "A", color: "red" }, { value: "B", color: "blue" }] }),
 				d({ name: " ", nativeLabel: "text" }),
 			],
@@ -61,7 +62,7 @@ describe("SchemaSettingsModal", () => {
 		expect(modal.titleEl.textContent).toBe("Schema settings – Mitarbeiter");
 		expect(modal.modalEl.classList.contains("improved-bases-schema-modal")).toBe(true);
 		expect(names(el)).toEqual(["Lead", "Status", " "]);
-		expect(details(el)).toEqual(["👤Teams.baseMultiple", "2 optionsMultiple", "—"]);
+		expect(details(el)).toEqual(["Teams.baseMultiple", "2 optionsMultiple", "—"]);
 		expect(Array.from(el.querySelectorAll(".improved-bases-color-dot")).map((x) => x.getAttribute("data-color"))).toEqual(["red", "blue"]);
 		expect(Array.from(el.querySelectorAll(".improved-bases-type-icon")).map((x) => x.getAttribute("data-icon"))).toEqual(["lucide-link", "lucide-circle-dot", "lucide-text"]);
 		expect(Array.from(el.querySelectorAll<HTMLButtonElement>(".improved-bases-field-disclosure")).map((x) => x.disabled)).toEqual([false, false, true]);
@@ -187,7 +188,7 @@ describe("SchemaSettingsModal", () => {
 		onSave.mockRejectedValueOnce(new Error("disk full"));
 		q<HTMLElement>(".improved-bases-save").click();
 		await tick();
-		expect(onSave).toHaveBeenCalledWith([expect.objectContaining({ originalName: "A", name: "B" })], 0);
+		expect(onSave).toHaveBeenCalledWith([expect.objectContaining({ originalName: "A", name: "B" })], 0, "");
 		expect(error()).toBe("disk full");
 		expect(q<HTMLButtonElement>(".improved-bases-save").disabled).toBe(false);
 		expect(document.body.contains(modal.modalEl)).toBe(true);
@@ -227,14 +228,14 @@ describe("SchemaSettingsModal", () => {
 		expect(sel.value).toBe("1");
 		two.q<HTMLElement>(".improved-bases-save").click();
 		await tick();
-		expect(two.onSave).toHaveBeenCalledWith([], 1);
+		expect(two.onSave).toHaveBeenCalledWith([], 1, "");
 		const three = open({ kind: "fields", drafts: [] }, { views: ["A", "B", "C"] });
 		const pick = three.q<HTMLSelectElement>(".improved-bases-add-view");
 		pick.value = "2";
 		pick.dispatchEvent(new Event("change"));
 		three.q<HTMLElement>(".improved-bases-save").click();
 		await tick();
-		expect(three.onSave).toHaveBeenCalledWith([], 2);
+		expect(three.onSave).toHaveBeenCalledWith([], 2, "");
 	});
 
 	it("labels native fields with their type and pin", () => {
@@ -378,7 +379,7 @@ describe("SchemaSettingsModal", () => {
 		const { q, onSave } = open({ kind: "fields", drafts: [d({ originalName: "S", name: "", removed: true }), d({ originalName: "T", name: "T" })] });
 		q<HTMLElement>(".improved-bases-save").click();
 		await tick();
-		expect(onSave).toHaveBeenCalledWith([expect.objectContaining({ originalName: "S", removed: true }), expect.objectContaining({ originalName: "T" })], 0);
+		expect(onSave).toHaveBeenCalledWith([expect.objectContaining({ originalName: "S", removed: true }), expect.objectContaining({ originalName: "T" })], 0, "");
 	});
 
 	it("refuses removals while members are unknown on save", async () => {
@@ -389,20 +390,29 @@ describe("SchemaSettingsModal", () => {
 		expect(onSave).not.toHaveBeenCalled();
 	});
 
-	it("edits the relation icon", async () => {
-		const { el, q, onSave } = open({ kind: "fields", drafts: [d({ name: "Lead", type: "relation", base: "Teams.base", icon: "👤" }), d({ name: "S", type: "select" })] });
-		const disclosures = () => Array.from(el.querySelectorAll<HTMLElement>(".improved-bases-field-disclosure"));
-		disclosures()[1]?.click();
-		expect(el.querySelector(".improved-bases-field-icon")).toBeNull();
-		disclosures()[0]?.click();
-		const input = q<HTMLInputElement>(".improved-bases-field-icon");
+	it("edits the base's default entry icon in the header and passes it trimmed to save", async () => {
+		const { modal, q, onSave } = open({ kind: "fields", drafts: [d({ name: "Lead", type: "relation", base: "Teams.base" })] }, { icon: "👤" });
+		const input = modal.modalEl.querySelector<HTMLInputElement>(".improved-bases-base-icon-input");
+		if (!input) throw new Error("missing icon input");
+		// Lives in the modal header next to the title, not in the content.
+		expect(input.closest(".improved-bases-base-icon")?.parentElement).toBe(modal.titleEl.parentElement);
 		expect(input.value).toBe("👤");
 		expect(input.placeholder).toBe("📄");
-		input.value = "👥";
+		input.value = " 👥 ";
 		input.dispatchEvent(new Event("input"));
-		expect(details(el)[0]).toBe("👥Teams.base");
 		q<HTMLElement>(".improved-bases-save").click();
 		await tick();
-		expect(onSave).toHaveBeenCalledWith([expect.objectContaining({ name: "Lead", icon: "👥" }), expect.objectContaining({ name: "S", icon: "" })], 0);
+		expect(onSave).toHaveBeenCalledWith([expect.objectContaining({ name: "Lead" })], 0, "👥");
+	});
+
+	it("passes an empty icon to save when cleared", async () => {
+		const { modal, q, onSave } = open({ kind: "fields", drafts: [] }, { icon: "👤" });
+		const input = modal.modalEl.querySelector<HTMLInputElement>(".improved-bases-base-icon-input");
+		if (!input) throw new Error("missing icon input");
+		input.value = "";
+		input.dispatchEvent(new Event("input"));
+		q<HTMLElement>(".improved-bases-save").click();
+		await tick();
+		expect(onSave).toHaveBeenCalledWith([], 0, "");
 	});
 });

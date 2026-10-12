@@ -114,7 +114,7 @@ const picker = run("Mitarbeiter.base",
 		`return JSON.stringify({ items, open, checked });`);
 assert(JSON.stringify(picker.items.map((i) => i.label)) === JSON.stringify(["Team Alpha", "Team Beta", "Team Delta", "Team Gamma"]), `picker entries: ${JSON.stringify(picker)}`);
 assert(JSON.stringify(picker.items.map((i) => i.checked)) === JSON.stringify([true, false, false, false]), `active first: ${JSON.stringify(picker)}`);
-assert(JSON.stringify(picker.items.map((i) => i.icon)) === JSON.stringify(["📄", "📄", "🚀", "📄"]), `picker icons: ${JSON.stringify(picker)}`);
+assert(JSON.stringify(picker.items.map((i) => i.icon)) === JSON.stringify(["👥", "👥", "🚀", "👥"]), `picker icons (Teams.base default, note icon wins): ${JSON.stringify(picker)}`);
 assert(picker.open && picker.checked, `toggle keeps the picker open: ${JSON.stringify(picker)}`);
 await waitFor(() => JSON.stringify(teamOf("Ada Albers")) === JSON.stringify(["[[Team Alpha]]", "[[Team Delta]]"]), 5000);
 obs("rename", { path: "Teams/Team Alpha.md", name: "Team Aurora" });
@@ -126,7 +126,7 @@ const panel = run("Mitarbeiter/Ada Albers.md",
 		`a.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, metaKey: true, ctrlKey: true })); await sleep(1200); app.workspace.offref(ref); ` +
 		`return JSON.stringify({ chips: [...p.querySelectorAll('.improved-bases-chip-body')].map((c) => c.textContent), icons: [...p.querySelectorAll('.improved-bases-chip .improved-bases-icon')].map((c) => c.textContent), removes: p.querySelectorAll('.improved-bases-chip-remove, .improved-bases-add').length, hov, popover: !!document.querySelector('.popover.hover-popover') });`);
 assert(JSON.stringify(panel.chips) === JSON.stringify(["Team Aurora", "Team Delta"]), `panel chips: ${JSON.stringify(panel)}`);
-assert(JSON.stringify(panel.icons) === JSON.stringify(["📄", "🚀"]) && panel.removes === 0, `panel icons / no buttons: ${JSON.stringify(panel)}`);
+assert(JSON.stringify(panel.icons) === JSON.stringify(["👥", "🚀"]) && panel.removes === 0, `panel icons / no buttons: ${JSON.stringify(panel)}`);
 assert(panel.hov === "Team Aurora", `hover-link event: ${JSON.stringify(panel)}`);
 console.log(`popover: ${panel.popover} (environment-dependent)`);
 run("Mitarbeiter.base",

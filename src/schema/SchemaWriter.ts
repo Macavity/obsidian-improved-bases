@@ -26,9 +26,9 @@ export class SchemaWriter {
 		return file;
 	}
 
-	/** Applies the schema mutation and, optionally, column edits in one write. */
-	async update(basePath: string, mutate: (fields: RawFields) => void, edits: ColumnEdits = EMPTY_EDITS): Promise<void> {
-		await this.app.vault.process(this.fileOf(basePath), (data) => updateBaseSource(data, edits, mutate));
+	/** Applies the schema mutation and, optionally, column edits and the base icon ("" = none) in one write. */
+	async update(basePath: string, mutate: (fields: RawFields) => void, edits: ColumnEdits = EMPTY_EDITS, icon?: string): Promise<void> {
+		await this.app.vault.process(this.fileOf(basePath), (data) => updateBaseSource(data, edits, mutate, icon));
 	}
 
 	async reset(basePath: string): Promise<void> {

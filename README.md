@@ -35,12 +35,12 @@ Add an `improved-bases:` key to a `.base` file, or edit it with the schema setti
 
 ```yaml
 improved-bases:
+  icon: 👤
   fields:
     Team:
       type: relation
       base: Referenzen/Teams/Teams.base
       multiple: true
-      icon: 👥
     Role:
       type: select
       multiple: false
@@ -57,7 +57,7 @@ views: ...
 - `multiple` (default `false`): `false` stores a string (`"[[X]]"` or `Value`), `true` stores a YAML list.
 - `options`: maps each value to a color: `red`, `orange`, `yellow`, `green`, `lime`, `cyan`, `blue`, `violet`, `pink`, `brown`, `grey`, `black`, `white`. Map order is display order. Unknown values show grey.
 - `base`: vault path of the target base. It needs no schema itself.
-- `icon` (optional, relations only): emoji shown next to each entry whose note has no `icon` property of its own. Default `📄`.
+- `icon` (optional, top level of the section): the default entry icon of this base. Every relation that targets this base shows it next to the entries whose note has no `icon` property of its own, so a base looks the same wherever it is referenced. A base may carry only an icon. Default `📄`.
 - Field names are the property names. Obsidian and Bases treat `Team` and `team` as one property, so the plugin resolves field names that way too; writes to notes (renames) always use the exact key.
 - A note belongs to a schema base when it is in the result of that base (its filters apply), regardless of folder.
 
@@ -65,7 +65,7 @@ A link outside the target base or a select value that is not an option is kept a
 
 ### Relations
 
-A relation shows its entries as plain links, each with an icon: the `icon` property of the linked note (an emoji, as written by icon plugins) if it has one, else the field's `icon`, else `📄`. Entries sit side by side on one line; what does not fit is cut off at the edge. Clicking the field beside the entries opens a picker over all entries of the target base with a filter box: active entries come first with a checked box, the rest below. Clicking a row toggles it and keeps the picker open; every toggle is saved immediately. With `multiple: false` the rows act like radio buttons, and unchecking the active one clears the field. Clicking an entry opens the linked note as usual (hover for a preview); the field is also focusable and opens the picker with Enter or Space.
+A relation shows its entries as plain links, each with an icon: the `icon` property of the linked note (an emoji, as written by icon plugins) if it has one, else the target base's `icon`, else `📄`. Entries sit side by side on one line; what does not fit is cut off at the edge. Clicking the field beside the entries opens a picker over all entries of the target base with a filter box: active entries come first with a checked box, the rest below. Clicking a row toggles it and keeps the picker open; every toggle is saved immediately. With `multiple: false` the rows act like radio buttons, and unchecking the active one clears the field. Clicking an entry opens the linked note as usual (hover for a preview); the field is also focusable and opens the picker with Enter or Space.
 
 ## Schema settings
 
@@ -75,7 +75,7 @@ A dialog edits all fields of a base without touching YAML. Open it via:
 - **Schema settings** in the tab menu, the more-options menu or the file explorer context menu of a `.base` file,
 - the command "Open schema settings".
 
-The dialog lists every field the base knows as a table: the columns of all views, the `properties:` keys and the property keys of the member notes. Rows follow the order of the current view (the one the dialog was opened from), the rest is alphabetical; the search box filters them by name. Each row edits the field name and type inline. A field without a plugin entry is native and shows Obsidian's detected type in the type dropdown (`native (text)`, ...). The other choices are `relation` and `select`; switching a field back to native deletes its plugin entry. Relation and select rows expand into a detail panel: the target base, the entry icon of a relation (an emoji; use the system emoji picker, ⌃⌘Space on macOS, Win+. on Windows), the options of a select with their colors, and "Allow multiple". The footer lists pending renames and removals. Save writes all changes at once in one write to the base file; a base without a schema becomes a schema base on first save.
+The dialog lists every field the base knows as a table: the columns of all views, the `properties:` keys and the property keys of the member notes. Rows follow the order of the current view (the one the dialog was opened from), the rest is alphabetical; the search box filters them by name. Each row edits the field name and type inline. A field without a plugin entry is native and shows Obsidian's detected type in the type dropdown (`native (text)`, ...). The other choices are `relation` and `select`; switching a field back to native deletes its plugin entry. Relation and select rows expand into a detail panel: the target base, the options of a select with their colors, and "Allow multiple". "Default entry icon" in the header sets the base's own `icon` (an emoji; use the system emoji picker, ⌃⌘Space on macOS, Win+. on Windows), shown for its entries in every relation that targets it. The footer lists pending renames and removals. Save writes all changes at once in one write to the base file; a base without a schema becomes a schema base on first save.
 
 **Add field** appends the property to the `order` of a view. With more than one view, "Add new fields to" picks it; it is preselected with the view the dialog was opened from (the first view when opened from a command or menu).
 

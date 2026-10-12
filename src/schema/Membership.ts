@@ -129,6 +129,11 @@ export class Membership extends Events {
 		return this.results.get(basePath) ?? null;
 	}
 
+	/** Default entry icon of a base (its schema's `icon`); null without one. */
+	baseIcon(basePath: string): string | null {
+		return this.registry.schemas().find((s) => s.basePath === basePath)?.icon ?? null;
+	}
+
 	knownFieldNames(): Set<string> {
 		const out = new Set<string>();
 		for (const s of this.registry.schemas()) for (const k of s.fields.keys()) out.add(k);

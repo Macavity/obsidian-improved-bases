@@ -162,6 +162,13 @@ describe("Membership", () => {
 		expect(m.resolve("m.md", "team")?.type).toBe("text");
 		expect(m.resolve("none.md", "team")).toBeNull();
 	});
+	it("reports the default icon of a base", () => {
+		const schema = (path: string, raw: Record<string, unknown>) => parseSchema(path, { "improved-bases": raw }).schema as BaseSchema;
+		const { m } = setup([schema("Teams.base", { icon: "👥", fields: {} }), schema("A-People.base", { fields: { Team: { type: "relation", base: "Teams.base" } } })]);
+		expect(m.baseIcon("Teams.base")).toBe("👥");
+		expect(m.baseIcon("A-People.base")).toBeNull();
+		expect(m.baseIcon("None.base")).toBeNull();
+	});
 	it("reports target entries; null until scanned", () => {
 		const { m, push } = setup();
 		expect(m.targetEntries("Teams.base")).toBeNull();

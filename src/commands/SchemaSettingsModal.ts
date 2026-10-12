@@ -7,6 +7,8 @@ import { conflictHint, removals, renames, TYPES, validateDrafts, type DraftType,
 export interface SchemaSettingsInput {
 	basePath: string;
 	state: { kind: "fields"; drafts: FieldDraft[] } | { kind: "error"; message: string; resettable: boolean };
+	/** Default icon of this base's entries in relations; "" = none (📄). */
+	icon: string;
 	/** Datalist suggestions for field names. */
 	propertyNames: string[];
 	/** Target base candidates (a base may relate to itself). */
@@ -24,7 +26,7 @@ export interface SchemaSettingsInput {
 }
 
 export interface SchemaSettingsHandlers {
-	onSave: (drafts: FieldDraft[], addView: number) => Promise<void>;
+	onSave: (drafts: FieldDraft[], addView: number, icon: string) => Promise<void>;
 	onReset: () => Promise<void>;
 	/** Number of member notes holding a value for `name`. */
 	countAffected: (name: string) => Promise<number>;
@@ -32,6 +34,7 @@ export interface SchemaSettingsHandlers {
 
 const MEMBERS_LOADING = "Base members are still loading, try again in a moment";
 const IDLE_STATUS = "Changes are written to the base on Save. Renames and removals also update the member notes.";
+const ICON_HELP = "Emoji shown for this base's entries in relations, unless a note has its own icon property. The system emoji picker opens with ctrl+cmd+space on macOS and with the Windows key + period on Windows.";
 
 /** Lucide icons for Obsidian's property types. */
 const NATIVE_ICONS: Record<string, string> = {
@@ -98,6 +101,7 @@ export class SchemaSettingsModal extends Modal {
 	private statusEl: HTMLElement | null = null;
 	private focusNext: FieldDraft | null = null;
 	private addView: number;
+	private icon: string;
 	private query = "";
 	/** Bumped on every list render and on close; pending confirmations of an older generation are stale. */
 	private generation = 0;
@@ -112,6 +116,7 @@ export class SchemaSettingsModal extends Modal {
 			? input.state.drafts.map((d) => ({ ...d, options: d.options.map((o) => ({ ...o })) }))
 			: [];
 		this.addView = input.defaultViewIndex;
+		this.icon = input.icon;
 	}
 
 	onOpen(): void {
@@ -160,6 +165,7 @@ export class SchemaSettingsModal extends Modal {
 		const { contentEl } = this;
 		const datalist = contentEl.createEl("datalist", { attr: { id: this.listId } });
 		for (const name of this.input.propertyNames) datalist.createEl("option", { attr: { value: name } });
+		this.renderHeader();
 		this.renderToolbar();
 		const table = contentEl.createDiv({ cls: "improved-bases-table" });
 		const head = table.createDiv({ cls: "improved-bases-column-head" });
@@ -170,6 +176,21 @@ export class SchemaSettingsModal extends Modal {
 			b.setButtonText("Save").setCta();
 			b.buttonEl.addClass("improved-bases-save");
 			b.onClick(() => void this.save(b));
+		});
+	}
+
+	/** The base's default entry icon, next to the modal title. */
+	private renderHeader(): void {
+		const header = this.titleEl.parentElement ?? this.contentEl;
+		const field = header.createEl("label", { cls: "improved-bases-base-icon", attr: { title: ICON_HELP } });
+		field.createSpan({ text: "Default entry icon" });
+		const input = field.createEl("input", {
+			cls: "improved-bases-base-icon-input",
+			attr: { type: "text", placeholder: "📄", "aria-label": "Default entry icon" },
+		});
+		input.value = this.icon;
+		input.addEventListener("input", () => {
+			this.icon = input.value;
 		});
 	}
 
@@ -189,7 +210,7 @@ export class SchemaSettingsModal extends Modal {
 		add.addEventListener("click", () => {
 			const draft: FieldDraft = {
 				originalName: null, originalBase: null, name: "", type: "native", nativeLabel: null,
-				pinned: null, removed: false, multiple: false, icon: "", options: [],
+				pinned: null, removed: false, multiple: false, options: [],
 			};
 			this.drafts.push(draft);
 			this.focusNext = draft;
@@ -390,7 +411,6 @@ export class SchemaSettingsModal extends Modal {
 			for (const option of draft.options.slice(0, 3)) el.createSpan({ cls: "improved-bases-color-dot", attr: { "data-color": option.color } });
 			el.createSpan({ text: plural(draft.options.length, "option") });
 		} else if (draft.type === "relation") {
-			if (draft.icon) el.createSpan({ cls: "improved-bases-details-icon", text: draft.icon });
 			el.createSpan({ cls: "improved-bases-details-target", text: draft.base ?? "No base chosen" });
 		} else {
 			el.createSpan({ cls: "improved-bases-details-muted", text: "—" });
@@ -432,20 +452,6 @@ export class SchemaSettingsModal extends Modal {
 					pick.setText(p);
 					refresh();
 				}).open();
-			});
-			const icon = el.createEl("label", { cls: "improved-bases-editor-field" });
-			icon.createSpan({ text: "Entry icon" });
-			const input = icon.createEl("input", {
-				cls: "improved-bases-field-icon",
-				attr: {
-					type: "text", placeholder: "📄", "aria-label": "Entry icon",
-					title: "Emoji for entries without an icon property. The system emoji picker opens with ctrl+cmd+space on macOS and with the Windows key + period on Windows.",
-				},
-			});
-			input.value = draft.icon;
-			input.addEventListener("input", () => {
-				draft.icon = input.value;
-				refresh();
 			});
 		}
 		if (draft.type === "select") this.renderOptions(el.createDiv({ cls: "improved-bases-options" }), draft, refresh);
@@ -539,7 +545,7 @@ export class SchemaSettingsModal extends Modal {
 		this.errorEl?.setText("");
 		button.setDisabled(true);
 		try {
-			await this.handlers.onSave(this.drafts, this.addView);
+			await this.handlers.onSave(this.drafts, this.addView, this.icon.trim());
 		} catch (e) {
 			button.setDisabled(false);
 			this.errorEl?.setText(errorText(e));

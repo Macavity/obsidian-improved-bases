@@ -207,6 +207,7 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 	const input: SchemaSettingsInput = {
 		basePath,
 		state,
+		icon: env.membership.baseIcon(basePath) ?? "",
 		propertyNames: memberKeys,
 		basePaths,
 		overlays: env.overlays,
@@ -216,9 +217,9 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 		defaultViewIndex,
 		expressions,
 	};
-	const onSave = async (drafts: FieldDraft[], addView: number): Promise<void> => {
+	const onSave = async (drafts: FieldDraft[], addView: number, icon: string): Promise<void> => {
 		const { edits, mutate } = draftsToEdits(drafts, originalNames, addView);
-		await env.writer.update(basePath, mutate, edits);
+		await env.writer.update(basePath, mutate, edits, icon);
 		const pairs = renames(drafts);
 		const removedNames = removals(drafts);
 		if (!pairs.length && !removedNames.length) {

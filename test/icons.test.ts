@@ -5,15 +5,14 @@ import { DEFAULT_ICON, entryIcon, renderIcon } from "../src/widgets/icons";
 
 const appWith = (fm: Record<string, unknown> | undefined) =>
   ({ metadataCache: { getFileCache: () => (fm ? { frontmatter: fm } : null) } }) as unknown as App;
-const field = { type: "relation", base: "T.base", multiple: false } as const;
-
 describe("entryIcon", () => {
-  it("prefers the file property, then the field default, then 📄", () => {
+  it("prefers the file property, then the base default, then 📄", () => {
     const f = new TFile();
-    expect(entryIcon(appWith({ icon: "👤" }), f, { ...field, icon: "👥" })).toBe("👤");
-    expect(entryIcon(appWith({ icon: "  " }), f, { ...field, icon: "👥" })).toBe("👥");
-    expect(entryIcon(appWith({ icon: ["x"] }), f, field)).toBe(DEFAULT_ICON);
-    expect(entryIcon(appWith(undefined), null, field)).toBe(DEFAULT_ICON);
+    expect(entryIcon(appWith({ icon: "👤" }), f, "👥")).toBe("👤");
+    expect(entryIcon(appWith({ icon: "  " }), f, "👥")).toBe("👥");
+    expect(entryIcon(appWith({ icon: ["x"] }), f, null)).toBe(DEFAULT_ICON);
+    expect(entryIcon(appWith({ icon: ["x"] }), f, " ")).toBe(DEFAULT_ICON);
+    expect(entryIcon(appWith(undefined), null, null)).toBe(DEFAULT_ICON);
   });
 });
 describe("renderIcon", () => {

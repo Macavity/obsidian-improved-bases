@@ -78,7 +78,7 @@ export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, fiel
 			return;
 		}
 		const items = buildItems();
-		new EntryPicker(app, items, (i) => entryIcon(app, i.file, field), (i) => toggle(items, i), env.overlays).open();
+		new EntryPicker(app, items, (i) => entryIcon(app, i.file, membership.baseIcon(field.base)), (i) => toggle(items, i), env.overlays).open();
 	};
 
 	const draw = (): void => {
@@ -101,7 +101,7 @@ export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, fiel
 				chip.addClass("is-foreign");
 				chip.setAttribute("title", NOT_IN_TARGET);
 			}
-			renderIcon(chip.createSpan(), entryIcon(app, dest, field));
+			renderIcon(chip.createSpan(), entryIcon(app, dest, membership.baseIcon(field.base)));
 			const link = LinkValue.parseFromString(app, raw, ctx.sourcePath);
 			const body = chip.createSpan({ cls: "improved-bases-chip-body" });
 			if (link) link.renderTo(body, app.renderContext);
