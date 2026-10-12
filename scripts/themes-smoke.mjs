@@ -60,28 +60,33 @@ function check(label, m) {
 	}
 }
 
-for (const name of names) {
-	const active = name === "default" ? "" : await ensureTheme(name);
-	await activateTheme(active);
-	for (const [mode, obsidianMode] of Object.entries(MODES)) {
-		const label = `${name}/${mode}`;
-		evalJs(`app.changeTheme(${JSON.stringify(obsidianMode)})`);
-		await sleep(600);
-		check(label, json(MEASURE));
-		const file = (what) => join(OUT, `${name.replace(/\s+/g, "-")}-${mode}-${what}.png`);
-		screenshot(file("table"));
-		evalJs("app.commands.executeCommandById('improved-bases:open-schema-settings')");
-		await waitFor(() => evalJs(FOOTER) !== "null", 5000);
-		const bg = evalJs(FOOTER);
-		if (bg !== "rgba(0, 0, 0, 0)") failures.push(`${label}: dialog footer paints its own background (${bg})`);
-		screenshot(file("dialog"));
-		evalJs("document.querySelector('.improved-bases-footer-buttons .improved-bases-close')?.click()");
-		await waitFor(() => evalJs(FOOTER) === "null", 5000);
-		console.log(`${failures.some((f) => f.startsWith(label)) ? "FAIL" : "ok  "} ${label}`);
+try {
+	for (const name of names) {
+		const active = name === "default" ? "" : await ensureTheme(name);
+		await activateTheme(active);
+		for (const [mode, obsidianMode] of Object.entries(MODES)) {
+			const label = `${name}/${mode}`;
+			evalJs(`app.changeTheme(${JSON.stringify(obsidianMode)})`);
+			await sleep(600);
+			check(label, json(MEASURE));
+			const file = (what) => join(OUT, `${name.replace(/\s+/g, "-")}-${mode}-${what}.png`);
+			screenshot(file("table"));
+			evalJs("app.commands.executeCommandById('improved-bases:open-schema-settings')");
+			await waitFor(() => evalJs(FOOTER) !== "null", 5000);
+			const bg = evalJs(FOOTER);
+			if (bg !== "rgba(0, 0, 0, 0)") failures.push(`${label}: dialog footer paints its own background (${bg})`);
+			screenshot(file("dialog"));
+			evalJs("document.querySelector('.improved-bases-footer-buttons .improved-bases-close')?.click()");
+			await waitFor(() => evalJs(FOOTER) === "null", 5000);
+			console.log(`${failures.some((f) => f.startsWith(label)) ? "FAIL" : "ok  "} ${label}`);
+		}
 	}
+} finally {
+	// Leave Obsidian as found even after a failed assert: dialog closed, default theme, original light/dark setting.
+	evalJs("document.querySelector('.improved-bases-footer-buttons .improved-bases-close')?.click()");
+	await activateTheme("");
+	evalJs(`app.changeTheme(${JSON.stringify(originalMode)})`);
 }
-await activateTheme("");
-evalJs(`app.changeTheme(${JSON.stringify(originalMode)})`);
 console.log(`screenshots in ${OUT}`);
 if (failures.length) {
 	console.error(failures.join("\n"));

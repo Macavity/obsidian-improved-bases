@@ -1,9 +1,9 @@
 // Restores this checkout's test-vault/ to HEAD, removes untracked files and, from a worktree, mirrors the result into the
 // registered vault (the main checkout's test-vault). Obsidian's local state (plugins/, themes/, workspace*.json, cache, .trash)
-// stays; a running Obsidian is switched back to the default theme.
+// stays. A running Obsidian picks up the restored appearance.json itself and switches back to the default theme.
 import { execFileSync } from "node:child_process";
 import { realpathSync } from "node:fs";
-import { evalJs, FIXTURES, REPO, VAULT_PATH } from "./lib/cli.mjs";
+import { FIXTURES, REPO, VAULT_PATH } from "./lib/cli.mjs";
 import { syncVault } from "./lib/vault-sync.mjs";
 
 const git = (...a) => execFileSync("git", a, { cwd: REPO, stdio: "inherit" });
@@ -14,9 +14,4 @@ if (realpathSync(VAULT_PATH) === realpathSync(FIXTURES)) {
 } else {
 	syncVault(FIXTURES, VAULT_PATH);
 	console.log(`test-vault reset and mirrored into ${VAULT_PATH}`);
-}
-try {
-	evalJs("app.customCss.setTheme('')");
-} catch {
-	// Obsidian not running; appearance.json is restored by git anyway.
 }
