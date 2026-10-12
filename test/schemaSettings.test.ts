@@ -219,9 +219,8 @@ describe("buildSchemaSettings", () => {
     const none = await build();
     expect(none.input.icon).toBe("");
   });
-  it("collects property names and other bases", async () => {
+  it("collects the other bases", async () => {
     const { input } = await build();
-    expect(input.propertyNames).toEqual(["Old", "Other", "Status"]);
     expect(input.basePaths).toEqual(["A.base", "M.base", "Z.base"]);
   });
   it("throws for a missing base", async () => {

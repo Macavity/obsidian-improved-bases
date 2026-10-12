@@ -208,7 +208,6 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 		basePath,
 		state,
 		icon: env.membership.baseIcon(basePath) ?? "",
-		propertyNames: memberKeys,
 		basePaths,
 		overlays: env.overlays,
 		membersKnown: () => env.membership.targetEntries(basePath) !== null,

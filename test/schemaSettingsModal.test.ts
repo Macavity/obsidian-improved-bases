@@ -30,7 +30,6 @@ function open(state: SchemaSettingsInput["state"], { countAffected: count, ...op
 		basePath: "Teams/Mitarbeiter.base",
 		state,
 		icon: "",
-		propertyNames: ["Role"],
 		basePaths: ["Teams.base"],
 		overlays: new OverlayRegistry(),
 		membersKnown: () => true,

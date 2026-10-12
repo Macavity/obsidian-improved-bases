@@ -9,8 +9,6 @@ export interface SchemaSettingsInput {
 	state: { kind: "fields"; drafts: FieldDraft[] } | { kind: "error"; message: string; resettable: boolean };
 	/** Default icon of this base's entries in relations; "" = none (📄). */
 	icon: string;
-	/** Datalist suggestions for field names. */
-	propertyNames: string[];
 	/** Target base candidates (a base may relate to itself). */
 	basePaths: string[];
 	overlays: OverlayRegistry;
@@ -60,8 +58,6 @@ const NATIVE_ICONS: Record<string, string> = {
 	date: "lucide-calendar",
 	datetime: "lucide-clock",
 };
-
-let instances = 0;
 
 function basename(path: string): string {
 	return (path.split("/").pop() ?? path).replace(/\.base$/, "");
@@ -116,7 +112,6 @@ function iconButton(parent: HTMLElement, icon: string, label: string, cls: strin
 export class SchemaSettingsModal extends Modal {
 	private readonly drafts: FieldDraft[];
 	private readonly expanded = new Set<FieldDraft>();
-	private readonly listId = `improved-bases-property-names-${++instances}`;
 	private listEl: HTMLElement | null = null;
 	private errorEl: HTMLElement | null = null;
 	private statusEl: HTMLElement | null = null;
@@ -193,8 +188,6 @@ export class SchemaSettingsModal extends Modal {
 
 	private renderFields(): void {
 		const { contentEl } = this;
-		const datalist = contentEl.createEl("datalist", { attr: { id: this.listId } });
-		for (const name of this.input.propertyNames) datalist.createEl("option", { attr: { value: name } });
 		this.renderHeader();
 		this.renderToolbar();
 		const table = contentEl.createDiv({ cls: "improved-bases-table" });
@@ -403,7 +396,7 @@ export class SchemaSettingsModal extends Modal {
 		setIcon(disclosure, "lucide-chevron-right");
 		const name = main.createEl("input", {
 			cls: "improved-bases-field-name",
-			attr: { type: "text", placeholder: "Field name", "aria-label": "Field name", list: this.listId },
+			attr: { type: "text", placeholder: "Field name", "aria-label": "Field name" },
 		});
 		name.value = draft.name;
 		const typeWrap = main.createEl("label", { cls: "improved-bases-type-select" });

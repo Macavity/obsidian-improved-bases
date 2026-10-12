@@ -327,10 +327,6 @@
 	border-color: var(--background-modifier-border-focus);
 	box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
 }
-/* The datalist's picker arrow is noise next to the name. */
-.improved-bases-schema .improved-bases-field-name::-webkit-calendar-picker-indicator {
-	display: none;
-}
 
 /* Type: one box holding icon, select and chevron; plain text until hovered or focused */
 .improved-bases-schema .improved-bases-type-select {
