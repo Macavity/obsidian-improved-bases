@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { TFile, type App, type Plugin } from "obsidian";
-import { buildSchemaSettings, countNotesWithKey, migrateRenames, removeProperties, renameSummary, saveSummary, schemaState } from "../src/commands/schemaSettings";
-import type { FieldDraft } from "../src/commands/schemaDraft";
+import { buildSchemaSettings, countNotesWithKey, migrateRenames, removeProperties, renameSummary, saveSummary, schemaState } from "../src/schema-settings/schemaSettings";
+import type { FieldDraft } from "../src/schema-settings/schemaDraft";
 import type { SchemaRegistry } from "../src/schema/SchemaRegistry";
 import type { WidgetEnv } from "../src/widgets/types";
 

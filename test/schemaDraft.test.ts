@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parse } from "yaml";
-import { conflictHint, draftsToEdits, knownFieldDrafts, removals, renameKey, renames, TYPES, validateDrafts, type FieldDraft, type OtherDefinition } from "../src/commands/schemaDraft";
+import { conflictHint, draftsToEdits, knownFieldDrafts, removals, renameKey, renames, TYPES, validateDrafts, type FieldDraft, type OtherDefinition } from "../src/schema-settings/schemaDraft";
 import { updateSchemaSource } from "../src/schema/SchemaWriter";
 import type { BaseColumns, RawFields } from "../src/schema/baseDoc";
 import { parseSchema } from "../src/schema/parse";

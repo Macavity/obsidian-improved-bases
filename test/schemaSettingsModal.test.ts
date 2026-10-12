@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { App } from "obsidian";
-import { SchemaSettingsModal, type SchemaSettingsInput } from "../src/commands/SchemaSettingsModal";
-import type { FieldDraft } from "../src/commands/schemaDraft";
+import { SchemaSettingsModal, type SchemaSettingsInput } from "../src/schema-settings/SchemaSettingsModal";
+import type { FieldDraft } from "../src/schema-settings/schemaDraft";
 import { OverlayRegistry } from "../src/widgets/types";
 import { openOptionEditMenu } from "../src/widgets/pickers";
 import type { Color } from "../src/schema/types";
