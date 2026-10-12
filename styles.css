@@ -501,9 +501,6 @@
 .improved-bases-schema .improved-bases-toggle {
 	margin-left: auto;
 }
-.improved-bases-schema .improved-bases-field-icon {
-	width: 5em;
-}
 .improved-bases-schema .improved-bases-options {
 	flex: 1 1 100%;
 	min-width: 0;
