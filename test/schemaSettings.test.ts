@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { TFile, type App, type Plugin } from "obsidian";
-import { buildSchemaSettings, countNotesWithKey, migrateRenames, removeProperties, renameSummary, saveSummary, schemaState } from "../src/commands/schemaSettings";
-import type { FieldDraft } from "../src/commands/schemaDraft";
+import { buildSchemaSettings, countNotesWithKey, migrateRenames, removeProperties, renameSummary, saveSummary, schemaState } from "../src/schema-settings/schemaSettings";
+import type { FieldDraft } from "../src/schema-settings/schemaDraft";
 import type { SchemaRegistry } from "../src/schema/SchemaRegistry";
 import type { WidgetEnv } from "../src/widgets/types";
 
@@ -16,7 +16,7 @@ const fmText = (f: TFile) => {
   const fm = (f as unknown as { frontmatter?: Record<string, unknown> }).frontmatter;
   return fm ? `---\n${Object.entries(fm).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join("\n")}\n---\n` : "";
 };
-const d = (o: Partial<FieldDraft>): FieldDraft => ({ originalName: null, originalBase: null, name: "", type: "native", nativeLabel: null, pinned: null, removed: false, multiple: false, icon: "", options: [], ...o });
+const d = (o: Partial<FieldDraft>): FieldDraft => ({ originalName: null, originalBase: null, name: "", type: "native", nativeLabel: null, pinned: null, removed: false, multiple: false, options: [], ...o });
 
 const registry = (schemas: { basePath: string; fields: Map<string, { name: string; field: { type: "text" } }> }[], errors: Record<string, string[]>) =>
   ({ schemas: () => schemas, errors: () => new Map(Object.entries(errors)) }) as unknown as SchemaRegistry;
@@ -159,7 +159,7 @@ describe("countNotesWithKey / removeProperties", () => {
 
 describe("buildSchemaSettings", () => {
   const baseFile = (path: string) => Object.assign(new TFile(), { path, extension: path.split(".").pop() });
-  function setup(opts: { base?: string; viewName?: string | null; memberKeys?: string[]; error?: boolean; members?: TFile[] | null } = {}) {
+  function setup(opts: { base?: string; viewName?: string | null; memberKeys?: string[]; error?: boolean; members?: TFile[] | null; icon?: string } = {}) {
     const members = opts.members === undefined ? [mdFile("a.md", { Status: "x", Old: "y" }), mdFile("b.md", { Other: "z" })] : opts.members;
     const all = opts.memberKeys ? [...(members ?? []), mdFile("k.md", Object.fromEntries(opts.memberKeys.map((k) => [k, 1])))] : members;
     const reg = registry([], opts.error ? { "M.base": ["bad"] } : {});
@@ -178,7 +178,7 @@ describe("buildSchemaSettings", () => {
       fileManager: { processFrontMatter },
     } as unknown as App;
     const writer = { update: vi.fn(() => Promise.resolve()), reset: vi.fn(() => Promise.resolve()) };
-    const membership = { targetEntries: () => all };
+    const membership = { targetEntries: () => all, baseIcon: (p: string) => (p === "M.base" ? opts.icon ?? null : p === "Z.base" ? "🏢" : null) };
     const env = { app, writer, membership, overlays: {} } as unknown as WidgetEnv;
     return { app, env, reg, writer, membership, processFrontMatter, viewName: opts.viewName ?? null };
   }
@@ -211,9 +211,18 @@ describe("buildSchemaSettings", () => {
     const r2 = await buildSchemaSettings({ app: t.app } as unknown as Plugin, t.env, reg2, "M.base", null);
     expect(r2.input.otherDefinitions("team")).toEqual([{ basePath: "Z.base", field: { type: "text" }, shared: 0 }]);
   });
-  it("collects property names and other bases", async () => {
+  it("prefills the base icon and passes the saved one to the writer", async () => {
+    const { input, handlers, writer } = await build({ icon: "🏢" });
+    expect(input.icon).toBe("🏢");
+    await handlers.onSave([], 0, "👥");
+    expect(writer.update).toHaveBeenCalledWith("M.base", expect.any(Function), { add: [], remove: [], rename: [] }, "👥");
+    const none = await build();
+    expect(none.input.icon).toBe("");
+    expect(input.baseIcon("Z.base")).toBe("🏢");
+    expect(input.baseIcon("A.base")).toBeNull();
+  });
+  it("collects the other bases", async () => {
     const { input } = await build();
-    expect(input.propertyNames).toEqual(["Old", "Other", "Status"]);
     expect(input.basePaths).toEqual(["A.base", "M.base", "Z.base"]);
   });
   it("throws for a missing base", async () => {
@@ -236,7 +245,7 @@ describe("buildSchemaSettings", () => {
   });
   it("saves with a plain notice when nothing is renamed or removed", async () => {
     const { handlers, writer } = await build();
-    await handlers.onSave([], 0);
+    await handlers.onSave([], 0, "");
     expect(writer.update).toHaveBeenCalledTimes(1);
     expect(lastNotice()).toBe("Schema saved");
   });
@@ -245,7 +254,7 @@ describe("buildSchemaSettings", () => {
     await t.handlers.onSave([
       d({ originalName: "Status", name: "Stand", type: "select", options: [] }),
       d({ originalName: "Old", name: "Old", removed: true }),
-    ], 0);
+    ], 0, "");
     expect(t.writer.update).toHaveBeenCalledTimes(1);
     expect(t.processFrontMatter).toHaveBeenCalledTimes(2); // rename pass + removal pass on the first note only
     expect(lastNotice()).toMatch(/Renamed Status → Stand in 1 note/);
@@ -254,8 +263,8 @@ describe("buildSchemaSettings", () => {
   });
   it("writes the base edits and a mutation that renames the schema entry", async () => {
     const t = await build();
-    await t.handlers.onSave([d({ originalName: "Status", name: "Stand", type: "select", options: [] }), d({ originalName: "Old", name: "Old", removed: true })], 0);
-    expect(t.writer.update).toHaveBeenCalledWith("M.base", expect.any(Function), { add: [], remove: ["Old"], rename: [{ from: "Status", to: "Stand" }] });
+    await t.handlers.onSave([d({ originalName: "Status", name: "Stand", type: "select", options: [] }), d({ originalName: "Old", name: "Old", removed: true })], 0, "");
+    expect(t.writer.update).toHaveBeenCalledWith("M.base", expect.any(Function), { add: [], remove: ["Old"], rename: [{ from: "Status", to: "Stand" }] }, "");
     const mutate = (t.writer.update.mock.calls[0] as unknown as [string, (f: Record<string, Record<string, unknown>>) => void])[1];
     const fields: Record<string, Record<string, unknown>> = { Status: { type: "text" }, Unrelated: { type: "relation", base: "X.base" } };
     mutate(fields);
@@ -273,31 +282,31 @@ describe("buildSchemaSettings", () => {
       log.push(Object.hasOwn(fm, "Stand") ? "rename" : "remove");
       return Promise.resolve();
     });
-    await t.handlers.onSave([d({ originalName: "Status", name: "Stand" }), d({ originalName: "Old", name: "Old", removed: true })], 0);
+    await t.handlers.onSave([d({ originalName: "Status", name: "Stand" }), d({ originalName: "Old", name: "Old", removed: true })], 0, "");
     expect(log).toEqual(["base", "rename", "remove"]);
   });
   it("rejects without touching notes when the base write fails", async () => {
     const t = await build();
     t.writer.update.mockImplementation(() => Promise.reject(new Error("disk")));
     const before = notices.length;
-    await expect(t.handlers.onSave([d({ originalName: "Status", name: "Stand" }), d({ originalName: "Old", name: "Old", removed: true })], 0)).rejects.toThrow("disk");
+    await expect(t.handlers.onSave([d({ originalName: "Status", name: "Stand" }), d({ originalName: "Old", name: "Old", removed: true })], 0, "")).rejects.toThrow("disk");
     expect(t.processFrontMatter).not.toHaveBeenCalled();
     expect(notices.length).toBe(before);
   });
   it("reports removals as not done when members are unknown", async () => {
     const t = await build({ members: null });
-    await t.handlers.onSave([d({ originalName: "Old", name: "Old", removed: true })], 0);
+    await t.handlers.onSave([d({ originalName: "Old", name: "Old", removed: true })], 0, "");
     expect(t.processFrontMatter).not.toHaveBeenCalled();
     expect(lastNotice()).toContain("Properties not removed: base members unknown");
   });
   it("warns when filters or formulas reference a removed field", async () => {
     const t = await build({ base: 'filters: \'Old == "y"\'\nviews:\n  - type: table\n    name: A\n' });
-    await t.handlers.onSave([d({ originalName: "Old", name: "Old", removed: true })], 0);
+    await t.handlers.onSave([d({ originalName: "Old", name: "Old", removed: true })], 0, "");
     expect(lastNotice()).toMatch(/Filters or formulas still reference 'Old'/);
   });
   it("does not touch notes when members are unknown", async () => {
     const t = await build({ members: null });
-    await t.handlers.onSave([d({ originalName: "Old", name: "Old", removed: true }), d({ originalName: "A", name: "B" })], 0);
+    await t.handlers.onSave([d({ originalName: "Old", name: "Old", removed: true }), d({ originalName: "A", name: "B" })], 0, "");
     expect(t.processFrontMatter).not.toHaveBeenCalled();
     expect(lastNotice()).toMatch(/Properties not renamed/);
     expect(lastNotice()).toMatch(/Properties not removed/);

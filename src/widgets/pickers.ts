@@ -78,22 +78,6 @@ export class EntryPicker extends FuzzySuggestModal<PickerItem> {
 }
 
 /** Picks one of the given base paths. */
-export class BasePicker extends FuzzySuggestModal<string> {
-	constructor(app: App, private readonly paths: string[], private readonly onPick: (p: string) => void) {
-		super(app);
-		this.setPlaceholder("Select a target base");
-	}
-	getItems(): string[] {
-		return this.paths;
-	}
-	getItemText(p: string): string {
-		return p;
-	}
-	onChooseItem(p: string): void {
-		this.onPick(p);
-	}
-}
-
 const COLOR_LABELS: Record<Color, string> = {
 	red: "Red", orange: "Orange", yellow: "Yellow", green: "Green", lime: "Lime", cyan: "Cyan", blue: "Blue",
 	violet: "Violet", pink: "Pink", brown: "Brown", grey: "Grey", black: "Black", white: "White",
@@ -171,6 +155,29 @@ export function openOptionMenu(
 }
 
 /** DOM menu with the color palette. */
+/** Menu on an option chip in the schema dialog: rename, remove, then the colors (the current one checked). */
+export function openOptionEditMenu(
+	evt: MouseEvent,
+	current: Color,
+	handlers: { onRename: () => void; onRemove: () => void; onColor: (c: Color) => void },
+	overlays: OverlayRegistry,
+): void {
+	const menu = new Menu();
+	menu.setUseNativeMenu(false);
+	track(menu, overlays);
+	menu.addItem((item) => item.setTitle("Rename").setIcon("lucide-pencil").onClick(handlers.onRename));
+	menu.addItem((item) => item.setTitle("Remove").setIcon("lucide-trash-2").onClick(handlers.onRemove));
+	menu.addSeparator();
+	for (const color of COLORS) {
+		menu.addItem((item) => {
+			colorItem(item, COLOR_LABELS[color], color);
+			item.setChecked(color === current);
+			item.onClick(() => handlers.onColor(color));
+		});
+	}
+	menu.showAtMouseEvent(evt);
+}
+
 export function openColorMenu(evt: MouseEvent, onPick: (c: Color) => void, overlays: OverlayRegistry): void {
 	const menu = new Menu();
 	menu.setUseNativeMenu(false);

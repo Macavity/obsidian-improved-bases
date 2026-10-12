@@ -3,7 +3,7 @@ import type { EventRef } from "obsidian";
 import { parseSchema } from "./parse";
 import type { BaseSchema } from "./types";
 
-const sig = (s: BaseSchema): string => JSON.stringify([s.basePath, [...s.fields]]);
+const sig = (s: BaseSchema): string => JSON.stringify([s.basePath, s.icon ?? null, [...s.fields]]);
 
 type Parsed = ReturnType<typeof parseSchema>;
 

@@ -40,3 +40,6 @@ test-vault/.trash/
 .claude/worktrees
 .fallow/
 coverage/
+
+# Design inputs (not part of the plugin)
+*.zip

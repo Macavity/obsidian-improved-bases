@@ -23,16 +23,19 @@ describe("parseSchema", () => {
       options: [{ value: "Developer", color: "blue" }, { value: "Product Owner", color: "orange" }] });
     expect(schema!.fields.get("notes")!.field).toEqual({ type: "text" });
   });
-  it("parses the optional relation icon", () => {
-    const withIcon = parseSchema("A.base", { "improved-bases": { fields: { Team: { type: "relation", base: "T.base", icon: " 👥 " } } } });
-    expect(withIcon.schema?.fields.get("team")?.field).toEqual({ type: "relation", base: "T.base", multiple: false, icon: "👥" });
+  it("parses the optional base icon", () => {
+    const withIcon = parseSchema("A.base", { "improved-bases": { icon: " 👥 ", fields: { Team: { type: "relation", base: "T.base" } } } });
+    expect(withIcon.schema?.icon).toBe("👥");
+    expect(withIcon.schema?.fields.get("team")?.field).toEqual({ type: "relation", base: "T.base", multiple: false });
     const none = parseSchema("A.base", { "improved-bases": { fields: { Team: { type: "relation", base: "T.base" } } } });
-    expect(none.schema?.fields.get("team")?.field).not.toHaveProperty("icon");
-    // A blank, null or non-string icon is cosmetic: ignored, the field stays valid.
+    expect(none.schema).not.toHaveProperty("icon");
+    // A base may carry only an icon; it is then a schema base without fields.
+    expect(parseSchema("A.base", { "improved-bases": { icon: "👥" } }).schema).toEqual({ basePath: "A.base", icon: "👥", fields: new Map() });
+    // A blank, null or non-string icon is cosmetic: ignored, the schema stays valid.
     for (const icon of ["", "  ", null, 5]) {
-      const lenient = parseSchema("A.base", { "improved-bases": { fields: { Team: { type: "relation", base: "T.base", icon } } } });
+      const lenient = parseSchema("A.base", { "improved-bases": { icon, fields: { Team: { type: "relation", base: "T.base" } } } });
       expect(lenient.errors).toEqual([]);
-      expect(lenient.schema?.fields.get("team")?.field).toEqual({ type: "relation", base: "T.base", multiple: false });
+      expect(lenient.schema).not.toHaveProperty("icon");
     }
   });
   it.each([

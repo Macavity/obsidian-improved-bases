@@ -12,5 +12,6 @@
       { "files": ["scripts/**"], "maxCrap": 60, "reason": "Obsidian CLI scripts need a live app; no unit coverage possible" }
     ]
   },
-  "audit": { "gate": "new-only" }
+  "audit": { "gate": "new-only" },
+  "rules": { "css-dead-surface": "off" }
 }

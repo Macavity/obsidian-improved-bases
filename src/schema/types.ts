@@ -2,13 +2,15 @@ export const COLORS = ["red", "orange", "yellow", "green", "lime", "cyan", "blue
 export type Color = typeof COLORS[number];
 export const isColor = (v: unknown): v is Color => typeof v === "string" && (COLORS as readonly string[]).includes(v);
 export type NativeType = "text" | "list" | "number" | "checkbox" | "date" | "datetime";
-export interface RelationField { type: "relation"; base: string; multiple: boolean; icon?: string }
+export interface RelationField { type: "relation"; base: string; multiple: boolean }
 export interface SelectOption { value: string; color: Color }
 export interface SelectField { type: "select"; multiple: boolean; options: SelectOption[] }
 export interface NativeField { type: NativeType }
 export type FieldSchema = RelationField | SelectField | NativeField;
 export interface BaseSchema {
 	basePath: string;
+	/** Default icon of this base's entries wherever a relation shows them; undefined = 📄. */
+	icon?: string;
 	/** key = lowercased property name */
 	fields: Map<string, { name: string; field: FieldSchema }>;
 }

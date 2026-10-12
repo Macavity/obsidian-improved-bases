@@ -17,15 +17,17 @@ const args = process.argv.slice(2);
 const hasFix = args.includes('--fix');
 
 // Mimic the Obsidian bot: every eslint-disable needs a description, some rules may never be disabled
-try {
-	execSync('node scripts/check-eslint-disables.mjs', {
-		stdio: 'inherit',
-		shell: true,
-		cwd: join(__dirname, '..')
-	});
-} catch (error) {
-	// Script will have already printed the error
-	process.exit(1);
+for (const script of ['scripts/check-eslint-disables.mjs', 'scripts/check-css-classes.mjs']) {
+	try {
+		execSync(`node ${script}`, {
+			stdio: 'inherit',
+			shell: true,
+			cwd: join(__dirname, '..')
+		});
+	} catch (error) {
+		// Script will have already printed the error
+		process.exit(1);
+	}
 }
 
 // Detect which package manager to use

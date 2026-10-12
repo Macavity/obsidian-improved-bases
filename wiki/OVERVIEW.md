@@ -2,7 +2,7 @@
 title: Improved Bases — Overview
 description: "Home page and navigation hub for the Improved Bases codebase wiki: what the plugin is, how it is layered, and where every page lives."
 profile: internal/standard
-source_commit: "a26466d"
+source_commit: "d82d44b"
 tags:
   - wiki
   - overview
@@ -47,7 +47,7 @@ Read the diagram top-down: [`SchemaRegistry`](./modules/schema.md) finds every `
 - [Query](./modules/query.md) — `BaseQuery` watch abstraction and the hidden collector view.
 - [Internals](./modules/internals.md) — feature detection, the `getTypeInfo` patch, CLI query, menu internals, the Bases toolbar button.
 - [Widgets](./modules/widgets.md) — relation and select widgets, pickers, value helpers.
-- [Commands](./modules/commands.md) — schema settings dialog and the command, menu item and toolbar button that open it.
+- [Schema settings](modules/schema-settings.md) — the schema settings dialog and the command, menu item and toolbar button that open it.
 - [Tooling](./modules/tooling.md) — build, lint, unit tests, test vault, smoke and perf scripts.
 
 ### Flows

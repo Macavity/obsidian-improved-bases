@@ -154,88 +154,495 @@
 	margin-top: var(--size-4-2);
 }
 
-.improved-bases-schema .improved-bases-field-row {
-	border-bottom: 1px solid var(--background-modifier-border);
+/* Schema settings dialog: a dense field table. Only Obsidian tokens, so themes restyle it instead of breaking it. */
+.improved-bases-schema-modal {
+	--dialog-width: 860px;
+	--dialog-max-width: calc(100vw - var(--size-4-12));
+	--dialog-max-height: min(720px, calc(100vh - var(--size-4-16)));
+	min-height: min(420px, var(--dialog-max-height));
+	display: flex;
+	flex-direction: column;
 }
-.improved-bases-schema .improved-bases-field-summary {
+.improved-bases-schema-modal .modal-content.improved-bases-schema {
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
+	min-height: 0;
+	padding: 0;
+	overflow: hidden;
+	font-size: var(--font-ui-small);
+}
+
+/* Header: the base's default entry icon next to the title; room for Obsidian's close button on the right */
+.improved-bases-schema-modal .modal-header {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-3);
+	padding-right: var(--size-4-8);
+}
+.improved-bases-schema-modal .modal-title {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+.improved-bases-base-icon {
+	display: flex;
+	flex: 0 0 auto;
+	align-items: center;
+	gap: var(--size-2-2);
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-normal);
+}
+.improved-bases-base-icon-input {
+	width: 5em;
+}
+
+/* Toolbar: search, target view, add */
+.improved-bases-schema .improved-bases-toolbar {
 	display: flex;
 	align-items: center;
 	gap: var(--size-4-2);
-	padding: var(--size-4-2) 0;
-	cursor: pointer;
+	padding: var(--size-4-2) var(--size-4-4);
+	border-bottom: 1px solid var(--background-modifier-border);
 }
-.improved-bases-schema .improved-bases-field-chevron {
+.improved-bases-schema .improved-bases-search {
+	flex: 0 1 230px;
+	min-width: 0;
+}
+.improved-bases-schema .improved-bases-search input {
+	width: 100%;
+}
+.improved-bases-schema .improved-bases-add-view-label {
+	display: flex;
+	align-items: center;
+	gap: var(--size-2-2);
+	margin-left: auto;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+.improved-bases-schema .improved-bases-add-view {
+	min-width: 8em;
+}
+.improved-bases-schema .improved-bases-add-field {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--size-2-2);
+}
+.improved-bases-schema .improved-bases-add-view-label + .improved-bases-add-field {
+	margin-left: 0;
+}
+.improved-bases-schema .improved-bases-search + .improved-bases-add-field {
+	margin-left: auto;
+}
+.improved-bases-schema .improved-bases-add-field-icon {
+	display: inline-flex;
+	--icon-size: var(--icon-s);
+}
+
+/* Table */
+.improved-bases-schema .improved-bases-table {
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
+	min-height: 0;
+}
+.improved-bases-schema .improved-bases-column-head,
+.improved-bases-schema .improved-bases-field-main {
+	display: grid;
+	grid-template-columns: var(--size-4-6) minmax(160px, 1fr) 170px minmax(140px, 0.85fr) 28px;
+	align-items: center;
+	gap: var(--size-2-2);
+}
+.improved-bases-schema .improved-bases-column-head {
+	padding: var(--size-2-3) var(--size-4-4) var(--size-2-2);
+	border-bottom: 1px solid var(--background-modifier-border);
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-semibold);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+.improved-bases-schema .improved-bases-field-list {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	padding-bottom: var(--size-4-2);
+}
+.improved-bases-schema .improved-bases-field-empty {
+	padding: var(--size-4-6);
+	text-align: center;
+	color: var(--text-faint);
+}
+.improved-bases-schema .improved-bases-field-row {
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+.improved-bases-schema .improved-bases-field-main {
+	min-height: 40px;
+	padding: var(--size-2-1) var(--size-4-3) var(--size-2-1) var(--size-4-2);
+}
+.improved-bases-schema .improved-bases-field-main:hover {
+	background-color: var(--background-modifier-hover);
+}
+.improved-bases-schema .improved-bases-field-row.has-warning {
+	background-color: rgba(var(--color-orange-rgb), 0.04);
+}
+
+/* Disclosure */
+.improved-bases-schema .improved-bases-field-disclosure {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	height: 28px;
+	padding: 0;
+	border: 0;
+	box-shadow: none;
+	background: transparent;
+	color: var(--text-muted);
+	--icon-size: var(--icon-s);
+}
+.improved-bases-schema .improved-bases-field-disclosure:disabled {
+	visibility: hidden;
+}
+.improved-bases-schema .improved-bases-field-disclosure svg {
+	transition: transform 150ms ease;
+}
+.improved-bases-schema .improved-bases-field-disclosure.is-open svg {
+	transform: rotate(90deg);
+}
+
+/* Name: looks like text until hovered or focused */
+.improved-bases-schema .improved-bases-field-name {
+	min-width: 0;
+	background: transparent;
+	border-color: transparent;
+	box-shadow: none;
+	font-weight: var(--font-medium);
+}
+.improved-bases-schema .improved-bases-field-name:hover,
+.improved-bases-schema .improved-bases-field-name:focus {
+	background-color: var(--background-modifier-form-field);
+	border-color: var(--background-modifier-border);
+}
+.improved-bases-schema .improved-bases-field-name:focus {
+	border-color: var(--background-modifier-border-focus);
+	box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+}
+
+/* Type: one box; the select covers it entirely so every click opens it, icon and chevron float above without taking clicks */
+.improved-bases-schema .improved-bases-type-select {
+	position: relative;
+	display: flex;
+	align-items: center;
+	min-width: 0;
+	height: var(--input-height);
+	border: 1px solid transparent;
+	border-radius: var(--radius-s);
+}
+.improved-bases-schema .improved-bases-type-select:hover,
+.improved-bases-schema .improved-bases-type-select:focus-within {
+	background-color: var(--background-modifier-form-field);
+	border-color: var(--background-modifier-border);
+}
+.improved-bases-schema .improved-bases-type-select:focus-within {
+	border-color: var(--background-modifier-border-focus);
+	box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+}
+.improved-bases-schema .improved-bases-type-icon,
+.improved-bases-schema .improved-bases-type-chevron {
+	position: absolute;
+	top: 50%;
+	transform: translateY(-50%);
 	display: inline-flex;
 	color: var(--text-muted);
+	--icon-size: var(--icon-s);
+	pointer-events: none;
 }
-.improved-bases-schema .improved-bases-field-summary-text {
+.improved-bases-schema .improved-bases-type-icon {
+	left: var(--size-2-3);
+}
+.improved-bases-schema .improved-bases-type-chevron {
+	right: var(--size-2-3);
+}
+.improved-bases-schema .improved-bases-base-select {
+	min-width: 14em;
+}
+.improved-bases-schema .improved-bases-base-select .improved-bases-type-icon.is-text {
+	font-size: var(--font-ui-small);
+	line-height: 1;
+}
+.improved-bases-schema .improved-bases-details-icon {
+	display: inline-flex;
+	flex: 0 0 auto;
+	--icon-size: var(--icon-s);
+}
+.improved-bases-schema .improved-bases-details-icon.is-text {
+	font-size: var(--font-ui-small);
+	line-height: 1;
+}
+.improved-bases-schema .improved-bases-field-type,
+.improved-bases-schema .improved-bases-field-base {
+	width: 100%;
+	height: 100%;
+	padding: 0 calc(var(--size-2-3) + var(--icon-s) + var(--size-2-2));
+	border: 0;
+	background: transparent;
+	box-shadow: none;
+	appearance: none;
+	-webkit-appearance: none;
+	color: var(--text-normal);
+	font-size: var(--font-ui-small);
+	cursor: pointer;
+}
+.improved-bases-schema .improved-bases-field-type:focus,
+.improved-bases-schema .improved-bases-field-base:focus {
+	outline: none;
+	box-shadow: none;
+}
+
+/* Details */
+.improved-bases-schema .improved-bases-field-details {
+	display: flex;
+	align-items: center;
+	gap: var(--size-2-2);
+	min-width: 0;
+	overflow: hidden;
+	white-space: nowrap;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+.improved-bases-schema .improved-bases-details-target {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.improved-bases-schema .improved-bases-details-muted {
+	color: var(--text-faint);
+}
+.improved-bases-schema .improved-bases-details-tag {
+	flex: 0 0 auto;
+	padding: 0 var(--size-2-2);
+	border-radius: var(--radius-s);
+	background-color: var(--background-modifier-hover);
+	font-style: normal;
+	font-size: var(--font-smallest);
+	text-transform: uppercase;
+}
+.improved-bases-schema .improved-bases-color-dot {
+	flex: 0 0 auto;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background-color: rgb(var(--ib-rgb));
+}
+.improved-bases-schema .improved-bases-field-remove {
+	justify-self: end;
+}
+.improved-bases-schema .improved-bases-field-remove:hover {
+	color: var(--text-error);
+	background-color: rgba(var(--color-red-rgb), 0.1);
+}
+
+/* Warnings under a row: rename references, conflicting definitions */
+.improved-bases-schema .improved-bases-field-hint,
+.improved-bases-schema .improved-bases-field-confirm {
+	display: flex;
+	align-items: center;
+	gap: var(--size-2-3);
+	margin: 0 var(--size-4-3) var(--size-2-2) 40px;
+	padding: var(--size-2-2) var(--size-2-3);
+	border-radius: var(--radius-s);
+	font-size: var(--font-ui-smaller);
+}
+.improved-bases-schema .improved-bases-field-hint {
+	color: var(--text-warning);
+	background-color: rgba(var(--color-orange-rgb), 0.1);
+}
+.improved-bases-schema .improved-bases-field-hint[hidden] {
+	display: none;
+}
+.improved-bases-schema .improved-bases-warning-icon {
+	display: inline-flex;
+	flex: 0 0 auto;
+	--icon-size: var(--icon-s);
+}
+.improved-bases-schema .improved-bases-field-confirm {
+	margin: var(--size-2-2) var(--size-4-3) var(--size-2-2) var(--size-4-2);
+	color: var(--text-warning);
+	background-color: rgba(var(--color-orange-rgb), 0.1);
+}
+.improved-bases-schema .improved-bases-field-confirm > span:not(.improved-bases-warning-icon) {
 	flex: 1;
 	min-width: 0;
+}
+
+/* Detail panel */
+.improved-bases-schema .improved-bases-field-editor {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--size-4-2) var(--size-4-4);
+	margin: 0 var(--size-4-3) var(--size-4-2) 40px;
+	padding: var(--size-4-2) var(--size-4-3);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	background-color: var(--background-secondary);
+}
+.improved-bases-schema .improved-bases-field-editor[hidden] {
+	display: none;
+}
+.improved-bases-schema .improved-bases-editor-field {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	white-space: nowrap;
+}
+.improved-bases-schema .improved-bases-toggle {
+	margin-left: auto;
+}
+.improved-bases-schema .improved-bases-options {
+	flex: 1 1 100%;
+	min-width: 0;
+}
+.improved-bases-schema .improved-bases-option-list {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--size-2-2);
+}
+/* Option chips: dot plus value; the click menu holds rename, remove and the colors */
+.improved-bases-schema .improved-bases-option-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--size-2-2);
+	height: auto;
+	padding: var(--size-2-1) var(--size-2-3);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	background-color: var(--background-primary);
+	box-shadow: none;
+	color: var(--text-normal);
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-normal);
+	cursor: pointer;
+}
+.improved-bases-schema .improved-bases-option-chip:hover {
+	border-color: var(--background-modifier-border-hover);
+	background-color: var(--background-modifier-hover);
+}
+.improved-bases-schema .improved-bases-option-input,
+.improved-bases-schema .improved-bases-option-new {
+	width: 9em;
+}
+.improved-bases-schema .improved-bases-option-add-button {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--size-2-1);
+	padding: 0 var(--size-2-2);
+	border: 0;
+	box-shadow: none;
+	background: transparent;
+	color: var(--text-muted);
+	--icon-size: var(--icon-xs);
+}
+
+/* Removed rows */
+.improved-bases-schema .improved-bases-field-removed .improved-bases-field-removed-name {
+	text-decoration: line-through;
+	color: var(--text-muted);
+}
+.improved-bases-schema .improved-bases-field-removed .improved-bases-field-details {
+	grid-column: 3 / 5;
+}
+.improved-bases-schema .improved-bases-undo {
+	grid-column: 5;
+	padding: 0 var(--size-2-2);
+	border: 0;
+	box-shadow: none;
+	background: transparent;
+	color: var(--text-accent);
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-semibold);
+}
+
+/* Footer */
+.improved-bases-schema .improved-bases-footer {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	min-height: 56px;
+	padding: var(--size-4-2) var(--size-4-4);
+	border-top: 1px solid var(--background-modifier-border);
+	background-color: var(--background-primary);
+}
+.improved-bases-schema .improved-bases-footer-status {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+.improved-bases-schema .improved-bases-rename-status {
+	display: flex;
+	align-items: center;
+	gap: var(--size-2-3);
+	min-width: 0;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+.improved-bases-schema .improved-bases-status-icon {
+	display: inline-flex;
+	flex: 0 0 auto;
+	--icon-size: var(--icon-s);
+}
+.improved-bases-schema .improved-bases-status-badge {
+	flex: 0 0 auto;
+	padding: var(--size-2-1) var(--size-2-3);
+	border-radius: var(--radius-s);
+	background-color: var(--background-modifier-hover);
+	color: var(--text-accent);
+	font-weight: var(--font-semibold);
+}
+.improved-bases-schema .improved-bases-status-text {
+	min-width: 0;
+}
+.improved-bases-schema .improved-bases-status-text b {
+	color: var(--text-normal);
+}
+.improved-bases-schema .improved-bases-status-text p {
+	margin: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
-.improved-bases-schema .improved-bases-field-editor {
-	padding-left: var(--size-4-6);
-	padding-bottom: var(--size-4-2);
+.improved-bases-schema .improved-bases-form-error:empty {
+	display: none;
 }
-.improved-bases-schema .improved-bases-options .setting-item-control {
-	flex-direction: column;
-	align-items: flex-end;
+.improved-bases-schema .improved-bases-form-error {
+	margin-top: var(--size-2-1);
+}
+.improved-bases-schema .improved-bases-footer-buttons {
+	display: flex;
+	flex: 0 0 auto;
 	gap: var(--size-4-2);
-}
-.improved-bases-schema .improved-bases-option-list {
-	display: flex;
-	flex-direction: column;
-	align-items: flex-end;
-	gap: var(--size-2-2);
-}
-.improved-bases-schema .improved-bases-option-row,
-.improved-bases-schema .improved-bases-option-add {
-	display: flex;
-	align-items: center;
-	gap: var(--size-2-2);
-}
-.improved-bases-schema .improved-bases-option-row .improved-bases-pill {
-	cursor: pointer;
 }
 .improved-bases-schema .improved-bases-schema-error {
+	flex: 1 1 auto;
+	padding: var(--size-4-4);
 	color: var(--text-error);
 }
-.improved-bases-schema .improved-bases-add-view {
-	min-width: 10em;
-}
-.improved-bases-schema .improved-bases-field-confirm {
-	display: flex;
-	align-items: center;
-	gap: var(--size-4-2);
-	padding: var(--size-4-2) 0;
-}
-.improved-bases-schema .improved-bases-field-confirm > span {
-	flex: 1;
-	min-width: 0;
-}
-.improved-bases-schema .improved-bases-field-removed .improved-bases-field-summary {
-	cursor: default;
-}
-.improved-bases-schema .improved-bases-field-removed .improved-bases-field-summary-text {
-	text-decoration: line-through;
-	opacity: 0.7;
-}
-.improved-bases-schema .improved-bases-undo {
-	font-size: var(--font-ui-smaller);
-}
-.improved-bases-schema .improved-bases-field-hint {
-	color: var(--text-muted);
-	font-size: var(--font-ui-smaller);
-	padding-bottom: var(--size-4-2);
-}
-.improved-bases-schema .improved-bases-add-field {
-	margin-top: var(--size-4-3);
-	display: inline-flex;
-	align-items: center;
-	gap: var(--size-2-2);
-}
-.improved-bases-schema .improved-bases-add-field-icon {
-	display: inline-flex;
+
+@media (max-width: 700px) {
+	.improved-bases-schema .improved-bases-column-head,
+	.improved-bases-schema .improved-bases-field-main {
+		grid-template-columns: var(--size-4-6) minmax(100px, 1fr) 130px 28px;
+	}
+	.improved-bases-schema .improved-bases-column-head span:nth-child(4),
+	.improved-bases-schema .improved-bases-field-details {
+		display: none;
+	}
+	.improved-bases-schema .improved-bases-field-removed .improved-bases-field-details {
+		display: none;
+	}
+	.improved-bases-schema .improved-bases-undo {
+		grid-column: 4;
+	}
 }

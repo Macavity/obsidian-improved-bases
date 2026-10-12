@@ -27,10 +27,11 @@ function setup(value: unknown, opts: { multiple?: boolean; members?: TFile[] | n
 		},
 		renderContext: {},
 	} as unknown as App;
-	const env = { app, membership: { targetEntries: () => members }, overlays: new OverlayRegistry(), writer: {} } as unknown as WidgetEnv;
+	const baseIcon = vi.fn((p: string) => (p === "Teams.base" ? opts.icon ?? null : null));
+	const env = { app, membership: { targetEntries: () => members, baseIcon }, overlays: new OverlayRegistry(), writer: {} } as unknown as WidgetEnv;
 	const onChange = vi.fn();
 	const ctx = { app, key: "lead", sourcePath: "n.md", onChange, blur: vi.fn() } as PropertyRenderContext;
-	const field: RelationField = { type: "relation", base: "Teams.base", multiple: opts.multiple ?? true, ...(opts.icon ? { icon: opts.icon } : {}) };
+	const field: RelationField = { type: "relation", base: "Teams.base", multiple: opts.multiple ?? true };
 	const el = document.body.createDiv();
 	const handle = RelationWidget(el, value, ctx, field, env);
 	return { el, onChange, handle, chips: () => Array.from(el.querySelectorAll(".improved-bases-chip")) };
@@ -42,14 +43,14 @@ beforeEach(() => {
 });
 
 describe("RelationWidget", () => {
-	it("renders chips with icon and link, no remove button, no add button", () => {
+	it("renders chips with the note icon or the target base icon and the link, no remove button, no add button", () => {
 		const { el, chips } = setup(["[[A]]", "[[B]]", "plain"], { icons: { "Teams/A.md": "👤" }, icon: "👥" });
 		expect(chips().map((c) => c.querySelector(".improved-bases-icon")?.textContent)).toEqual(["👤", "👥", "👥"]);
 		expect(chips().map((c) => c.querySelector(".improved-bases-chip-body")?.textContent)).toEqual(["[[A]]", "[[B]]", "plain"]);
 		expect(chips().map((c) => c.classList.contains("is-foreign"))).toEqual([false, true, true]);
 		expect(el.querySelector(".improved-bases-chip-remove, .improved-bases-add")).toBeNull();
 	});
-	it("falls back to 📄 without a field icon", () => {
+	it("falls back to 📄 when the target base has no icon", () => {
 		const { chips } = setup(["[[A]]"]);
 		expect(chips()[0]?.querySelector(".improved-bases-icon")?.textContent).toBe("📄");
 	});

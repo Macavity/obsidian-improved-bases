@@ -114,7 +114,7 @@ const picker = run("Mitarbeiter.base",
 		`return JSON.stringify({ items, open, checked });`);
 assert(JSON.stringify(picker.items.map((i) => i.label)) === JSON.stringify(["Team Alpha", "Team Beta", "Team Delta", "Team Gamma"]), `picker entries: ${JSON.stringify(picker)}`);
 assert(JSON.stringify(picker.items.map((i) => i.checked)) === JSON.stringify([true, false, false, false]), `active first: ${JSON.stringify(picker)}`);
-assert(JSON.stringify(picker.items.map((i) => i.icon)) === JSON.stringify(["📄", "📄", "🚀", "📄"]), `picker icons: ${JSON.stringify(picker)}`);
+assert(JSON.stringify(picker.items.map((i) => i.icon)) === JSON.stringify(["👥", "👥", "🚀", "👥"]), `picker icons (Teams.base default, note icon wins): ${JSON.stringify(picker)}`);
 assert(picker.open && picker.checked, `toggle keeps the picker open: ${JSON.stringify(picker)}`);
 await waitFor(() => JSON.stringify(teamOf("Ada Albers")) === JSON.stringify(["[[Team Alpha]]", "[[Team Delta]]"]), 5000);
 obs("rename", { path: "Teams/Team Alpha.md", name: "Team Aurora" });
@@ -126,7 +126,7 @@ const panel = run("Mitarbeiter/Ada Albers.md",
 		`a.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, metaKey: true, ctrlKey: true })); await sleep(1200); app.workspace.offref(ref); ` +
 		`return JSON.stringify({ chips: [...p.querySelectorAll('.improved-bases-chip-body')].map((c) => c.textContent), icons: [...p.querySelectorAll('.improved-bases-chip .improved-bases-icon')].map((c) => c.textContent), removes: p.querySelectorAll('.improved-bases-chip-remove, .improved-bases-add').length, hov, popover: !!document.querySelector('.popover.hover-popover') });`);
 assert(JSON.stringify(panel.chips) === JSON.stringify(["Team Aurora", "Team Delta"]), `panel chips: ${JSON.stringify(panel)}`);
-assert(JSON.stringify(panel.icons) === JSON.stringify(["📄", "🚀"]) && panel.removes === 0, `panel icons / no buttons: ${JSON.stringify(panel)}`);
+assert(JSON.stringify(panel.icons) === JSON.stringify(["👥", "🚀"]) && panel.removes === 0, `panel icons / no buttons: ${JSON.stringify(panel)}`);
 assert(panel.hov === "Team Aurora", `hover-link event: ${JSON.stringify(panel)}`);
 console.log(`popover: ${panel.popover} (environment-dependent)`);
 run("Mitarbeiter.base",
@@ -201,11 +201,11 @@ const closeModals = async () => {
 const SCHEMA = "document.querySelector('.modal .improved-bases-schema')";
 const openSchemaFromToolbar = async (scope) => {
 	await waitFor(() => page(`return JSON.stringify(el.querySelectorAll('${scope} .improved-bases-toolbar-item').length);`) === 1, 10000);
-	page(`el.querySelector('${scope} .improved-bases-toolbar-item').click(); return JSON.stringify(1);`);
+	page(`el.querySelector('${scope} .improved-bases-toolbar-item .text-icon-button').click(); return JSON.stringify(1);`);
 	await waitFor(() => evalJs(`!!${SCHEMA}`) === "true", 5000);
 };
 const rowNames = () =>
-	page(`return JSON.stringify([...${SCHEMA}.querySelectorAll('.improved-bases-field-row .improved-bases-field-summary-text')].map((t) => t.textContent.split(' · ')[0]));`);
+	page(`return JSON.stringify([...${SCHEMA}.querySelectorAll('.improved-bases-field-row .improved-bases-field-name')].map((i) => i.value));`);
 const editorOf = (name) =>
 	`const row = [...${SCHEMA}.querySelectorAll('.improved-bases-field-row')].find((r) => r.querySelector('.improved-bases-field-name')?.value === ${JSON.stringify(name)});`;
 const setFieldName = (from, to) =>
@@ -230,7 +230,8 @@ await closeModals();
 OPEN_ACTIVE("Mitarbeiter.base");
 await openSchemaFromToolbar("");
 const leafRows = rowNames();
-assert(JSON.stringify(leafRows) === JSON.stringify(["Team", "Role"]), `Mitarbeiter.base rows: ${JSON.stringify(leafRows)}`);
+// Schema fields in view order, then the members' own properties (native rows).
+assert(JSON.stringify(leafRows) === JSON.stringify(["Team", "Role", "Status"]), `Mitarbeiter.base rows: ${JSON.stringify(leafRows)}`);
 await closeModals();
 
 // 2. Toolbar button inside an embedded base (reading mode) resolves the embedded file.
@@ -255,16 +256,12 @@ assert(readYaml("Departments.base")["improved-bases"] === undefined, "Department
 obs("property:set", { path: "Departments/Engineering.md", name: "Lead", value: "[[Ada Albers]]" });
 evalJs("(app.commands.executeCommandById('improved-bases:open-schema-settings'), 'ok')");
 await waitFor(() => evalJs(`!!${SCHEMA}`) === "true", 5000);
-assert(rowNames().length === 0, "Departments.base dialog must start empty");
-page(`${SCHEMA}.querySelector('.improved-bases-add-field').click(); return JSON.stringify(1);`);
-await waitFor(() => page(`return JSON.stringify(!!${SCHEMA}.querySelector('.improved-bases-field-editor .improved-bases-field-name'));`) === true, 5000);
-setFieldName("", "Lead");
+// No schema yet: the dialog lists the members' properties as native rows, among them the Lead just set.
+assert(rowNames().includes("Lead") && readYaml("Departments.base")["improved-bases"] === undefined, `Departments.base rows: ${JSON.stringify(rowNames())}`);
 page(`${editorOf("Lead")} const t = row.querySelector('.improved-bases-field-type'); t.value = 'relation'; t.dispatchEvent(new Event('change', { bubbles: true })); return JSON.stringify(1);`);
 await waitFor(() => page(`${editorOf("Lead")} return JSON.stringify(!!row.querySelector('.improved-bases-field-base'));`) === true, 5000);
-page(`${editorOf("Lead")} row.querySelector('.improved-bases-field-base').click(); return JSON.stringify(1);`);
-await waitFor(() => evalJs("[...document.querySelectorAll('.suggestion-item')].some((i) => i.textContent === 'Mitarbeiter.base')") === "true", 5000);
-evalJs("([...document.querySelectorAll('.suggestion-item')].find((i) => i.textContent === 'Mitarbeiter.base').click(), 'ok')");
-await waitFor(() => page(`${editorOf("Lead")} return JSON.stringify(row.querySelector('.improved-bases-field-base').textContent);`) === "Mitarbeiter.base", 5000);
+page(`${editorOf("Lead")} const b = row.querySelector('.improved-bases-field-base'); b.value = 'Mitarbeiter.base'; b.dispatchEvent(new Event('change', { bubbles: true })); return JSON.stringify(1);`);
+await waitFor(() => page(`${editorOf("Lead")} return JSON.stringify(row.querySelector('.improved-bases-field-base').value);`) === "Mitarbeiter.base", 5000);
 await saveSchema();
 await waitFor(() => readYaml("Departments.base")?.["improved-bases"]?.fields?.Lead?.type === "relation", 5000);
 const depFields = readYaml("Departments.base")["improved-bases"].fields;
@@ -282,8 +279,6 @@ const renameField = async (from, to) => {
 	clearNotices();
 	OPEN_ACTIVE("Mitarbeiter.base");
 	await openSchemaFromToolbar("");
-	page(`const row = [...${SCHEMA}.querySelectorAll('.improved-bases-field-row')].find((r) => r.querySelector('.improved-bases-field-summary-text').textContent.split(' · ')[0] === ${JSON.stringify(from)}); ` +
-		"row.querySelector('.improved-bases-field-summary').click(); return JSON.stringify(1);");
 	await waitFor(() => page(`${editorOf(from)} return JSON.stringify(!!row);`) === true, 5000);
 	setFieldName(from, to);
 	await saveSchema();

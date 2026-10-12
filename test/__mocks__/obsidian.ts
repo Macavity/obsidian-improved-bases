@@ -330,6 +330,9 @@ export class MenuItem {
 	setSection(_section: string): this {
 		return this;
 	}
+	setChecked(_checked: boolean): this {
+		return this;
+	}
 	onClick(cb: () => unknown): this {
 		this.clickHandler = cb;
 		return this;
@@ -348,6 +351,9 @@ export class Menu {
 		return this;
 	}
 	setUseNativeMenu(_flag: boolean): this {
+		return this;
+	}
+	addSeparator(): this {
 		return this;
 	}
 	showAtMouseEvent(_evt: MouseEvent): this {

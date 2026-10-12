@@ -236,15 +236,29 @@ function applySchemaMutation(doc: Document, mutate: (fields: RawFields) => void)
 	}
 }
 
+/** Sets `improved-bases.icon` (trimmed) or deletes it when empty; the section is created when needed and dropped when it ends up empty. */
+function applyIcon(doc: Document, icon: string): void {
+	const value = icon.trim();
+	const section = doc.get(SCHEMA_KEY, true);
+	if (value) {
+		if (isMap(section)) section.set("icon", value);
+		else doc.set(SCHEMA_KEY, doc.createNode({ icon: value }));
+	} else if (isMap(section)) {
+		section.delete("icon");
+		if (section.items.length === 0) doc.delete(SCHEMA_KEY);
+	}
+}
+
 /**
- * Applies column edits (view orders, properties, summaries, sort, groupBy) and the
- * schema mutation in one pass. Untouched nodes keep their formatting and comments;
- * filter and formula expressions are never rewritten.
+ * Applies column edits (view orders, properties, summaries, sort, groupBy), the
+ * schema mutation and, when given, the base icon in one pass. Untouched nodes keep
+ * their formatting and comments; filter and formula expressions are never rewritten.
  */
-export function updateBaseSource(source: string, edits: ColumnEdits, mutate: (fields: RawFields) => void): string {
+export function updateBaseSource(source: string, edits: ColumnEdits, mutate: (fields: RawFields) => void, icon?: string): string {
 	const doc = parseDocument(source);
 	const before = doc.toJSON() as unknown;
 	applyColumnEdits(doc, edits);
 	applySchemaMutation(doc, mutate);
+	if (icon !== undefined) applyIcon(doc, icon);
 	return same(before, doc.toJSON()) ? source : doc.toString();
 }

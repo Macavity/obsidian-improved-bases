@@ -7,7 +7,7 @@ import { SchemaWriter } from "./schema/SchemaWriter";
 import { OverlayRegistry, WidgetEnv } from "./widgets/types";
 import { RelationWidget } from "./widgets/RelationWidget";
 import { SelectWidget } from "./widgets/SelectWidget";
-import { registerSchemaSettings } from "./commands/schemaSettings";
+import { registerSchemaSettings } from "./schema-settings/schemaSettings";
 import { getMetadataTypeManager } from "./internals/detect";
 import { ImprovedBasesSettings, ImprovedBasesSettingTab, mergeSettings } from "./settings";
 

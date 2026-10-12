@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { parse } from "yaml";
-import { conflictHint, draftsToEdits, knownFieldDrafts, removals, renameKey, renames, TYPES, validateDrafts, type FieldDraft, type OtherDefinition } from "../src/commands/schemaDraft";
+import { conflictHint, draftsToEdits, knownFieldDrafts, removals, renameKey, renames, TYPES, validateDrafts, type FieldDraft, type OtherDefinition } from "../src/schema-settings/schemaDraft";
 import { updateSchemaSource } from "../src/schema/SchemaWriter";
 import type { BaseColumns, RawFields } from "../src/schema/baseDoc";
 import { parseSchema } from "../src/schema/parse";
 
-const d = (p: Partial<FieldDraft>): FieldDraft => ({ originalName: null, originalBase: null, name: "X", type: "native", nativeLabel: null, pinned: null, removed: false, multiple: false, icon: "", options: [], ...p });
+const d = (p: Partial<FieldDraft>): FieldDraft => ({ originalName: null, originalBase: null, name: "X", type: "native", nativeLabel: null, pinned: null, removed: false, multiple: false, options: [], ...p });
 const mutation = (drafts: FieldDraft[], originals: string[]) => draftsToEdits(drafts, originals, 0).mutate;
 const leadOf = (src: string): unknown => (parse(src) as { "improved-bases": { fields: Record<string, unknown> } })["improved-bases"].fields.Lead;
 const none: BaseColumns = { views: [], orderByView: [], configured: [], expressions: [] };
@@ -17,13 +17,9 @@ describe("schemaDraft", () => {
 		const rel = new Map([["lead", { name: "Lead", field: { type: "relation" as const, base: "M.base", multiple: false } }]]);
 		expect(knownFieldDrafts({ columns: none, schemaFields: rel, memberKeys: [], nativeLabel: () => null, currentView: 0 })).toEqual([d({ originalName: "Lead", originalBase: "M.base", name: "Lead", type: "relation", base: "M.base" })]);
 	});
-	it("round-trips the relation icon and drops it when empty", () => {
-		const rel = new Map([["lead", { name: "Lead", field: { type: "relation" as const, base: "M.base", multiple: false, icon: "👤" } }]]);
-		expect(knownFieldDrafts({ columns: none, schemaFields: rel, memberKeys: [], nativeLabel: () => null, currentView: 0 })[0]?.icon).toBe("👤");
-		const withIcon = updateSchemaSource("improved-bases:\n  fields: {}\n", mutation([d({ name: "Lead", type: "relation", base: "M.base", icon: " 👤 " })], []));
-		expect(leadOf(withIcon)).toEqual({ type: "relation", base: "M.base", multiple: false, icon: "👤" });
-		const cleared = updateSchemaSource(withIcon, mutation([d({ originalName: "Lead", name: "Lead", type: "relation", base: "M.base", icon: "  " })], ["Lead"]));
-		expect(leadOf(cleared)).not.toHaveProperty("icon");
+	it("writes a relation without an icon", () => {
+		const out = updateSchemaSource("improved-bases:\n  fields: {}\n", mutation([d({ name: "Lead", type: "relation", base: "M.base" })], []));
+		expect(leadOf(out)).toEqual({ type: "relation", base: "M.base", multiple: false });
 	});
 	it("validates names, duplicates, bases, options", () => {
 		expect(validateDrafts([d({ name: "" })], [])).toHaveLength(1);
@@ -163,8 +159,8 @@ describe("schemaDraft", () => {
 		expect(conflictHint(relation, [{ basePath: "Meetings.base", field: { type: "text" }, shared: 0 }])).toBe("Also defined in Meetings.base as text; no note is in both bases yet.");
 		expect(conflictHint(relation, [{ basePath: "Meetings.base", field: { type: "text" }, shared: 3 }, { basePath: "X.base", field: { type: "relation", base: "Other.base", multiple: true }, shared: 0 }]))
 			.toBe("Also defined in Meetings.base as text; 3 notes are in both bases. Also defined in X.base as relation to Other.base (multiple); no note is in both bases yet.");
-		// Compatible: same type, multiple and target; select options, colors and icons do not count.
-		expect(conflictHint(relation, [{ basePath: "X.base", field: { type: "relation", base: "Teams.base", multiple: true, icon: "x" }, shared: 2 }])).toBeNull();
+		// Compatible: same type, multiple and target; select options and colors do not count.
+		expect(conflictHint(relation, [{ basePath: "X.base", field: { type: "relation", base: "Teams.base", multiple: true }, shared: 2 }])).toBeNull();
 		const select = d({ name: "Status", type: "select", multiple: false, options: [{ value: "A", color: "red" }] });
 		expect(conflictHint(select, [{ basePath: "X.base", field: { type: "select", multiple: false, options: [{ value: "B", color: "blue" }] }, shared: 2 }])).toBeNull();
 		expect(conflictHint(select, [{ basePath: "X.base", field: { type: "select", multiple: true, options: [] }, shared: 2 }])).toBe("Also defined in X.base as select (multiple); 2 notes are in both bases.");

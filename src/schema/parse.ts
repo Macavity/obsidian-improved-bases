@@ -17,9 +17,7 @@ function parseRelation(name: string, raw: Record<string, unknown>, multiple: boo
 		errors.push(`field "${name}": base must be a vault-relative path ending in .base (no "..", no absolute path)`);
 		return null;
 	}
-	// The icon is cosmetic: a blank, null or non-string value means "no default icon", never an invalid field.
-	const icon = typeof raw.icon === "string" ? raw.icon.trim() : "";
-	return icon ? { type: "relation", base: raw.base, multiple, icon } : { type: "relation", base: raw.base, multiple };
+	return { type: "relation", base: raw.base, multiple };
 }
 
 function parseOptions(name: string, raw: unknown, errors: string[]): SelectOption[] | null {
@@ -87,5 +85,7 @@ export function parseSchema(basePath: string, raw: unknown): { schema: BaseSchem
 		if (field) fields.set(key, { name, field });
 	}
 	if (errors.length) return { schema: null, errors };
-	return { schema: { basePath, fields }, errors: [] };
+	// The icon is cosmetic: a blank, null or non-string value means "no default icon", never an invalid schema.
+	const icon = typeof section.icon === "string" ? section.icon.trim() : "";
+	return { schema: icon ? { basePath, icon, fields } : { basePath, fields }, errors: [] };
 }

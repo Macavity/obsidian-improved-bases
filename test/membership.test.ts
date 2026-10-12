@@ -162,6 +162,27 @@ describe("Membership", () => {
 		expect(m.resolve("m.md", "team")?.type).toBe("text");
 		expect(m.resolve("none.md", "team")).toBeNull();
 	});
+	it("marks relation fields as changed when their target base changes its icon", () => {
+		const schema = (path: string, raw: Record<string, unknown>) => parseSchema(path, { "improved-bases": raw }).schema as BaseSchema;
+		const teams = (icon?: string) => schema("Teams.base", { ...(icon ? { icon } : {}), fields: {} });
+		const people = schema("A-People.base", { fields: { Team: { type: "relation", base: "Teams.base" } } });
+		const { m, push, setSchemas } = setup([teams(), people]);
+		push("A-People.base", []);
+		push("Teams.base", []);
+		settle();
+		const cb = vi.fn();
+		m.on("changed", cb);
+		setSchemas([teams("👥"), people]);
+		expect(cb).toHaveBeenCalledWith(["team"]);
+		expect(m.baseIcon("Teams.base")).toBe("👥");
+	});
+	it("reports the default icon of a base", () => {
+		const schema = (path: string, raw: Record<string, unknown>) => parseSchema(path, { "improved-bases": raw }).schema as BaseSchema;
+		const { m } = setup([schema("Teams.base", { icon: "👥", fields: {} }), schema("A-People.base", { fields: { Team: { type: "relation", base: "Teams.base" } } })]);
+		expect(m.baseIcon("Teams.base")).toBe("👥");
+		expect(m.baseIcon("A-People.base")).toBeNull();
+		expect(m.baseIcon("None.base")).toBeNull();
+	});
 	it("reports target entries; null until scanned", () => {
 		const { m, push } = setup();
 		expect(m.targetEntries("Teams.base")).toBeNull();

@@ -14,7 +14,7 @@ A **field schema** (`FieldSchema` in [types.ts](../../src/schema/types.ts)) desc
 
 | Shape | Keys | Storage |
 |---|---|---|
-| `RelationField` | `type: relation`, `base` (vault-relative `.base` path), `multiple`, optional `icon` (string, stored trimmed; the default emoji for entries whose note has no `icon` property; a blank, null or non-string value is ignored rather than invalidating the field) | `"[[X]]"` or a list of wikilinks |
+| `RelationField` | `type: relation`, `base` (vault-relative `.base` path), `multiple`. The icon shown next to an entry is not part of the field: it comes from the entry's note (`icon` property) or from the target base's own default icon (`BaseSchema.icon`, see [Schema base](./schema-base.md)) | `"[[X]]"` or a list of wikilinks |
 | `SelectField` | `type: select`, `multiple`, `options` (value → one of 13 `COLORS`, map order = display order) | `Value` or a list of values |
 | `NativeField` | `type` in `text`, `list`, `number`, `checkbox`, `date`, `datetime` | native |
 
@@ -28,7 +28,7 @@ It is the contract between the three sides of the plugin: the parser guarantees 
 
 - Types and `COLORS`/`NATIVE_TYPES` constants: [types.ts](../../src/schema/types.ts).
 - Validation: `parseField()` in [parse.ts](../../src/schema/parse.ts) (`isValidBasePath()` for relation targets).
-- Creation: `draftsToEdits()` in [schemaDraft.ts](../../src/commands/schemaDraft.ts) (edited in the schema settings dialog), option mutations in [values.ts](../../src/widgets/values.ts).
+- Creation: `draftsToEdits()` in [schemaDraft.ts](../../src/schema-settings/schemaDraft.ts) (edited in the schema settings dialog), option mutations in [values.ts](../../src/widgets/values.ts).
 - Consumption: `RelationWidget` / `SelectWidget` ([Widgets](../modules/widgets.md)).
 
 ## Related
