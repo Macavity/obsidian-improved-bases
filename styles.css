@@ -64,9 +64,10 @@
 	pointer-events: none;
 	margin: 0;
 }
-/* Not `clickable-icon`: themes pad that class (Cupertino 10px) and `.metadata-property-value .clickable-icon` outranks a plugin class, which made the pills taller than the row. */
-.improved-bases-chip-remove,
-.improved-bases-add {
+/* Not `clickable-icon`: themes pad that class (Cupertino 10px) and `.metadata-property-value .clickable-icon` outranks a plugin class, which made the pills taller than the row.
+   Two plugin classes, because themes also pad plain buttons via `button:not(.clickable-icon)` (Primary), which outranks one class. */
+.improved-bases-select .improved-bases-chip-remove,
+.improved-bases-select .improved-bases-add {
 	flex: 0 0 auto;
 	height: auto;
 	min-height: 0;
@@ -80,13 +81,13 @@
 	line-height: 1.4;
 	cursor: var(--cursor);
 }
-.improved-bases-chip-remove:hover,
-.improved-bases-add:hover {
+.improved-bases-select .improved-bases-chip-remove:hover,
+.improved-bases-select .improved-bases-add:hover {
 	background-color: var(--background-modifier-hover);
 	color: var(--text-normal);
 }
-.improved-bases-chip-remove:focus-visible,
-.improved-bases-add:focus-visible {
+.improved-bases-select .improved-bases-chip-remove:focus-visible,
+.improved-bases-select .improved-bases-add:focus-visible {
 	box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
 }
 /* Table cells show the buttons only on hover or focus, as Obsidian does for its own cell icons */

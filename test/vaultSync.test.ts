@@ -10,8 +10,8 @@ function file(root: string, rel: string, content = rel) {
 }
 
 describe("isLocalState", () => {
-  it("keeps plugins, cache, workspace files and the trash", () => {
-    for (const p of [".obsidian/plugins", ".obsidian/plugins/x/main.js", ".obsidian/cache", ".obsidian/workspace.json", ".obsidian/workspace-mobile.json", ".trash", ".trash/a.md"]) {
+  it("keeps plugins, themes, cache, workspace files and the trash", () => {
+    for (const p of [".obsidian/plugins", ".obsidian/plugins/x/main.js", ".obsidian/themes", ".obsidian/themes/Minimal/theme.css", ".obsidian/cache", ".obsidian/workspace.json", ".obsidian/workspace-mobile.json", ".trash", ".trash/a.md"]) {
       expect(isLocalState(p), p).toBe(true);
     }
   });

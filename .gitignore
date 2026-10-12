@@ -44,3 +44,6 @@ coverage/
 
 # Design inputs (not part of the plugin)
 *.zip
+
+# Agent session memory (local)
+session-log.md

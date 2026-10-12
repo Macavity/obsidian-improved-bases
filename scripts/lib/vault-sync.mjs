@@ -6,7 +6,7 @@ import { basename, join, relative, sep } from "node:path";
 export function isLocalState(rel) {
 	const p = rel.split(sep).join("/");
 	const under = (dir) => p === dir || p.startsWith(`${dir}/`);
-	return under(".trash") || under(".obsidian/plugins") || under(".obsidian/cache") || /^\.obsidian\/workspace[^/]*\.json$/.test(p);
+	return under(".trash") || under(".obsidian/plugins") || under(".obsidian/themes") || under(".obsidian/cache") || /^\.obsidian\/workspace[^/]*\.json$/.test(p);
 }
 
 /** Deletes everything at the top level and inside `.obsidian` of `vault` that is not local state. */
