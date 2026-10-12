@@ -10,7 +10,7 @@ tags:
 
 ## Summary
 
-Every schema change, whether from the [schema settings dialog](../modules/commands.md) or from a [select widget](../modules/widgets.md) creating an option, is a pure mutation applied by `SchemaWriter.update()` through `vault.process()`. The resulting `modify` event is what the rest of the system reacts to: the registry re-parses, membership re-syncs, the patch refreshes, and widgets are rebuilt with the new [field schema](../concepts/field-schema.md).
+Every schema change, whether from the [schema settings dialog](../modules/schema-settings.md) or from a [select widget](../modules/widgets.md) creating an option, is a pure mutation applied by `SchemaWriter.update()` through `vault.process()`. The resulting `modify` event is what the rest of the system reacts to: the registry re-parses, membership re-syncs, the patch refreshes, and widgets are rebuilt with the new [field schema](../concepts/field-schema.md).
 
 ## Trigger
 
@@ -45,13 +45,13 @@ sequenceDiagram
 
 ## Steps
 
-1. The caller builds a mutation `(fields: RawFields) => void` and optional `ColumnEdits`: `draftsToEdits()` ([schemaDraft.ts](../../src/commands/schemaDraft.ts)), `addOptionMutation()` / `setColorMutation()` ([values.ts](../../src/widgets/values.ts)).
+1. The caller builds a mutation `(fields: RawFields) => void` and optional `ColumnEdits`: `draftsToEdits()` ([schemaDraft.ts](../../src/schema-settings/schemaDraft.ts)), `addOptionMutation()` / `setColorMutation()` ([values.ts](../../src/widgets/values.ts)).
 2. `SchemaWriter.update(basePath, mutate, edits, icon?)` ([SchemaWriter.ts](../../src/schema/SchemaWriter.ts)) runs `updateBaseSource()` ([baseDoc.ts](../../src/schema/baseDoc.ts)) inside one `vault.process()`: parse with the `yaml` document API, apply the column edits to every view's `order`, `summaries`, `sort`, `groupBy` and to `properties:`, snapshot `improved-bases.fields`, mutate a clone, write only changed field nodes, and set or delete `improved-bases.icon` when the dialog passes one. Filter and formula expressions are left alone. Identical result → identical string → no disk write.
 3. `BaseQuery` also sees the `modify` event on the same path and remounts the collector for that base ([Base query watch](./base-query-watch.md)), because filters or views may have changed.
 4. `SchemaRegistry.refresh()` re-parses; a sequence number drops a stale read if another modify arrived meanwhile. `changed` fires only on a real signature or error change; a new error also shows a `Notice`.
 5. `Membership.sync()` compares per-base signatures (fields plus the base icon) with the previous run, collects the union of old and new field names of changed bases as `affected`, together with every relation field in any schema that targets a changed base (its chips show that base's default icon), starts watching newly referenced relation targets, and stops watching bases no longer needed. If latched, it emits `changed(affected)` immediately; otherwise it re-arms the readiness quiet timer.
 6. `typeInfoPatch.refresh(affected)` bumps the generation so `hullFor()` yields new hull objects, and triggers Obsidian's `changed` per field name. Obsidian rebuilds those cells; the next render goes through [Widget render](./widget-render.md) with the updated field.
-7. After a dialog save with renamed or removed fields, `migrateRenames()` and `removeProperties()` ([schemaSettings.ts](../../src/commands/schemaSettings.ts)) rename (exact key) or delete (case-insensitive) the property keys in the member notes whose frontmatter on disk has them through `fileManager.processFrontMatter`, one file at a time; notes with both keys are skipped on rename. A `Notice` reports renamed, skipped, failed and removed counts, and warns "Filters or formulas still reference 'X', update them manually" when `referencesName()` finds a renamed or removed name in filter or formula expressions. This happens after the base write, so the notes follow the new field names. Both are skipped, with a notice, when the members are unknown.
+7. After a dialog save with renamed or removed fields, `migrateRenames()` and `removeProperties()` ([schemaSettings.ts](../../src/schema-settings/schemaSettings.ts)) rename (exact key) or delete (case-insensitive) the property keys in the member notes whose frontmatter on disk has them through `fileManager.processFrontMatter`, one file at a time; notes with both keys are skipped on rename. A `Notice` reports renamed, skipped, failed and removed counts, and warns "Filters or formulas still reference 'X', update them manually" when `referencesName()` finds a renamed or removed name in filter or formula expressions. This happens after the base write, so the notes follow the new field names. Both are skipped, with a notice, when the members are unknown.
 8. In the select widget, the local `options` copy is updated optimistically right after the write resolves so the new pill shows its color before the refresh lands.
 
 ## Failure modes
@@ -62,6 +62,6 @@ sequenceDiagram
 ## Related
 
 - [Schema](../modules/schema.md)
-- [Commands](../modules/commands.md)
+- [Schema settings](../modules/schema-settings.md)
 - [Membership](../concepts/membership.md)
 - [Schema base](../concepts/schema-base.md)

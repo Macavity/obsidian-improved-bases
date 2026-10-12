@@ -52,5 +52,5 @@ tags:
 
 - [Schema base](../concepts/schema-base.md)
 - [Field schema](../concepts/field-schema.md)
-- [Commands](./commands.md)
+- [Schema settings](schema-settings.md)
 - [Add a field type](../guides/add-a-field-type.md)

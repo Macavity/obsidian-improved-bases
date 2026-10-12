@@ -10,7 +10,7 @@ tags:
 
 ## Summary
 
-`ImprovedBasesPlugin` in [main.ts](../../src/main.ts) is the composition root: it wires the [schema](./schema.md), [query](./query.md), membership, patch, [widgets](./widgets.md) and [commands](./commands.md) together and owns their lifetimes through `this.register(...)`. [settings.ts](../../src/settings.ts) holds the user setting and the settings tab.
+`ImprovedBasesPlugin` in [main.ts](../../src/main.ts) is the composition root: it wires the [schema](./schema.md), [query](./query.md), membership, patch, [widgets](./widgets.md) and [schema settings](schema-settings.md) together and owns their lifetimes through `this.register(...)`. [settings.ts](../../src/settings.ts) holds the user setting and the settings tab.
 
 ## Responsibilities
 
