@@ -26,14 +26,19 @@ function run(args) {
 	try {
 		return execFileSync("obsidian", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, timeout: CLI_TIMEOUT_MS, killSignal: "SIGKILL" });
 	} catch (e) {
-		if (e && (e.code === "ETIMEDOUT" || e.killed)) {
-			throw new Error(
-				`obsidian ${args.slice(1, 2).join(" ")} timed out after ${CLI_TIMEOUT_MS / 1000}s. ` +
-					"Obsidian is probably hung or its window is hidden: run `obsidian vault=\"test-vault\" reload`, then `pnpm vault:reset`.",
-			);
-		}
+		if (e?.code === "ETIMEDOUT" || e?.killed) return afterTimeout(args, e);
 		throw e;
 	}
+}
+
+/** The CLI occasionally prints its result and then never exits; that answer is still good. Otherwise Obsidian is stuck. */
+function afterTimeout(args, e) {
+	const out = String(e.stdout ?? "");
+	if (out.trim() !== "" && !out.trimStart().startsWith("Error:")) return out;
+	throw new Error(
+		`obsidian ${args.slice(1, 2).join(" ")} timed out after ${CLI_TIMEOUT_MS / 1000}s. ` +
+			"Obsidian is probably hung or its window is hidden: run `obsidian vault=\"test-vault\" reload`, then `pnpm vault:reset`.",
+	);
 }
 
 /** Runs `obsidian vault="test-vault" <cmd> key=value ...`. Throws if the output starts with "Error:". */
@@ -46,7 +51,7 @@ export function obs(cmd, args = {}) {
 }
 
 export function evalJs(code) {
-	return obs("eval", { code }).trim().replace(/^=> /, ""); // eval prints "=> <result>"
+	return obs("eval", { code }).trim().replace(/^=> ?/, ""); // eval prints "=> <result>"
 }
 
 export function assert(cond, msg) {

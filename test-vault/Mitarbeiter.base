@@ -24,3 +24,4 @@ views:
       - Status
     columnSize:
       note.team: 237
+      note.Role: 133

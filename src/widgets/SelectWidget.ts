@@ -98,7 +98,7 @@ export const SelectWidget: PluginWidget<SelectField> = (el, value, ctx, field, e
 				recolor(evt, picked);
 			});
 			const remove = pill.createEl("button", {
-				cls: "improved-bases-chip-remove clickable-icon",
+				cls: "improved-bases-chip-remove",
 				text: "×",
 				attr: { type: "button", "aria-label": "Remove" },
 			});
@@ -109,7 +109,7 @@ export const SelectWidget: PluginWidget<SelectField> = (el, value, ctx, field, e
 			});
 		}
 		const add = root.createEl("button", {
-			cls: "improved-bases-add clickable-icon",
+			cls: "improved-bases-add",
 			text: "+",
 			attr: { type: "button", "aria-label": "Add" },
 		});

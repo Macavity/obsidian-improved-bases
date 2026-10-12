@@ -38,7 +38,9 @@ Test vault setup (once):
 
 `pnpm perf` generates 2000 notes and 10 schema bases in `test-vault/_perf/`, prints `membership.ready` and table render times and resets the vault; it fails if `ready` exceeds 3 s. CLI calls time out after 30 s; keep the test-vault window visible while running `pnpm perf` or `pnpm smoke`, otherwise Chromium throttling causes timeouts. If Obsidian hangs, run `obsidian vault="test-vault" reload` and `pnpm vault:reset`.
 
-`pnpm vault:reset` restores `test-vault/` to `HEAD`, removes untracked files and, from a worktree, mirrors the result into the registered vault (the plugin symlink, `workspace*.json`, cache and `.trash` stay). Change fixtures only in a commit.
+`pnpm vault:reset` restores `test-vault/` to `HEAD`, removes untracked files and, from a worktree, mirrors the result into the registered vault (the plugin symlink, themes, `workspace*.json`, cache and `.trash` stay). Change fixtures only in a commit.
+
+Themes: `pnpm themes:smoke` checks the select cells and the schema dialog in the default theme and in every theme listed in `scripts/themes.json`, light and dark, and saves screenshots (path printed at the end). Themes are downloaded into `test-vault/.obsidian/themes/` on first use and are not versioned. `pnpm vault:theme <label|default>` switches manually. Run it for any change to `styles.css`.
 
 ## Code quality
 

@@ -64,11 +64,42 @@
 	pointer-events: none;
 	margin: 0;
 }
-.improved-bases-chip-remove,
-.improved-bases-add {
+/* Not `clickable-icon`: themes pad that class (Cupertino 10px) and `.metadata-property-value .clickable-icon` outranks a plugin class, which made the pills taller than the row.
+   Two plugin classes, because themes also pad plain buttons via `button:not(.clickable-icon)` (Primary), which outranks one class. */
+.improved-bases-select .improved-bases-chip-remove,
+.improved-bases-select .improved-bases-add {
+	flex: 0 0 auto;
 	height: auto;
+	min-height: 0;
 	padding: 0 var(--size-2-2);
+	border: 0;
+	border-radius: var(--radius-s);
+	box-shadow: none;
+	background: transparent;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
 	line-height: 1.4;
+	cursor: var(--cursor);
+}
+.improved-bases-select .improved-bases-chip-remove:hover,
+.improved-bases-select .improved-bases-add:hover {
+	background-color: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+.improved-bases-select .improved-bases-chip-remove:focus-visible,
+.improved-bases-select .improved-bases-add:focus-visible {
+	box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+}
+/* Table cells show the buttons only on hover or focus, as Obsidian does for its own cell icons */
+.bases-td .improved-bases-chip-remove,
+.bases-td .improved-bases-add {
+	opacity: 0;
+}
+.bases-td:hover .improved-bases-chip-remove,
+.bases-td:hover .improved-bases-add,
+.bases-td:focus-within .improved-bases-chip-remove,
+.bases-td:focus-within .improved-bases-add {
+	opacity: 1;
 }
 
 /* Conflict marker: a note is in several schema bases defining this field; the info icon explains which one applies. */
@@ -91,11 +122,15 @@
 }
 
 /* Select widget: palette → Obsidian color variables (no variable exists for lime, brown, grey, black, white). */
+/* Same single-line layout as the relation: pills stay side by side and overflow to the side, the cell never grows. */
 .improved-bases-select {
 	display: flex;
-	flex-wrap: wrap;
+	flex-wrap: nowrap;
 	align-items: center;
 	gap: var(--size-2-2);
+	width: 100%;
+	min-width: 0;
+	overflow: hidden;
 }
 [data-color] {
 	--ib-rgb: var(--mono-rgb-100);
@@ -115,7 +150,9 @@
 [data-color="white"] { --ib-rgb: 235, 235, 235; }
 .improved-bases-pill {
 	display: inline-flex;
+	flex: 0 0 auto;
 	align-items: center;
+	white-space: nowrap;
 	gap: var(--size-2-1);
 	padding: 0 var(--size-2-3);
 	border-radius: var(--radius-s);
@@ -574,7 +611,6 @@
 	min-height: 56px;
 	padding: var(--size-4-2) var(--size-4-4);
 	border-top: 1px solid var(--background-modifier-border);
-	background-color: var(--background-primary);
 }
 .improved-bases-schema .improved-bases-footer-status {
 	flex: 1 1 auto;

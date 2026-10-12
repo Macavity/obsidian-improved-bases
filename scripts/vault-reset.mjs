@@ -1,5 +1,6 @@
 // Restores this checkout's test-vault/ to HEAD, removes untracked files and, from a worktree, mirrors the result into the
-// registered vault (the main checkout's test-vault). Obsidian's local state (plugins/, workspace*.json, cache, .trash) stays.
+// registered vault (the main checkout's test-vault). Obsidian's local state (plugins/, themes/, workspace*.json, cache, .trash)
+// stays. A running Obsidian picks up the restored appearance.json itself and switches back to the default theme.
 import { execFileSync } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { FIXTURES, REPO, VAULT_PATH } from "./lib/cli.mjs";
