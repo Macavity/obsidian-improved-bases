@@ -1,11 +1,11 @@
-filters:
-  or:
-    - file.inFolder("Meetings")
-    - file.name == "Cora Conrad"
 improved-bases:
   fields:
     Team:
       type: text
+filters:
+  or:
+    - file.inFolder("Meetings")
+    - file.name == "Cora Conrad"
 views:
   - type: table
     name: Tabelle

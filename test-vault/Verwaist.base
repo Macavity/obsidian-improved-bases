@@ -1,12 +1,12 @@
-filters:
-  and:
-    - file.inFolder("Verwaist")
 improved-bases:
   fields:
     Team:
       type: relation
       base: Nirgendwo/Gibt es nicht.base
       multiple: true
+filters:
+  and:
+    - file.inFolder("Verwaist")
 views:
   - type: table
     name: Tabelle

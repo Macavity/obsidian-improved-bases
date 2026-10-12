@@ -1,6 +1,7 @@
 ---
-Role: "Product Owner"
+Role: Product Owner
 Status: Aktiv
-Team: ["[[Team Beta]]"]
+Team:
+  - "[[Team Beta]]"
 ---
 Fixture.

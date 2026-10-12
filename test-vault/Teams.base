@@ -1,13 +1,13 @@
-filters:
-  and:
-    - file.inFolder("Teams")
-    - status != "archived"
 improved-bases:
   fields:
     Department:
       type: relation
       base: Departments.base
       multiple: false
+filters:
+  and:
+    - file.inFolder("Teams")
+    - status != "archived"
 views:
   - type: table
     name: Tabelle
