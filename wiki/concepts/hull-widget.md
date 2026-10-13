@@ -20,7 +20,7 @@ Hulls are cached per `(expected, inferred, lowercase field name)` and per **gene
 
 ## Where it lives
 
-- `makeHull()`, `hullFor()`, `renderPlugin()`, `NATIVE_WIDGET` in [typeInfoPatch.ts](../../src/internals/typeInfoPatch.ts).
+- `makeHull()`, `hullFor()`, `renderPlugin()` in [typeInfoPatch.ts](../../src/internals/typeInfoPatch.ts).
 - Shapes `TypeWidget` / `TypeInfo` in [detect.ts](../../src/internals/detect.ts).
 - Installed from `applyWidgetsEnabled()` in [main.ts](../../src/main.ts); removed by `uninstall()` which also re-triggers `changed` so Obsidian rebuilds native widgets.
 

@@ -45,7 +45,7 @@ Read the diagram top-down: [`SchemaRegistry`](./modules/schema.md) finds every `
 - [Plugin core](./modules/plugin-core.md) — `main.ts` lifecycle and `settings.ts`.
 - [Schema](./modules/schema.md) — types, parser, registry, base document editor, writer, key safety.
 - [Query](./modules/query.md) — `BaseQuery` watch abstraction and the hidden collector view.
-- [Internals](./modules/internals.md) — feature detection, the `getTypeInfo` patch, CLI query, menu internals, the Bases toolbar button.
+- [Internals](./modules/internals.md) — feature detection, the `getTypeInfo` patch, the property type registry, CLI query, menu internals, the Bases toolbar button.
 - [Widgets](./modules/widgets.md) — relation and select widgets, pickers, value helpers.
 - [Schema settings](modules/schema-settings.md) — the schema settings dialog and the command, menu item and toolbar button that open it.
 - [Tooling](./modules/tooling.md) — build, lint, unit tests, test vault, smoke and perf scripts.
