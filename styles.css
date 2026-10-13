@@ -809,13 +809,14 @@
 	grid-template-columns: repeat(7, 1fr);
 	gap: var(--size-2-3);
 }
-/* `button[data-color]` outranks Obsidian's button radius and height, so the swatches stay circles. */
+/* `button[data-color]` outranks Obsidian's button radius, height and squircle corner shape, so the swatches stay circles. */
 .improved-bases-option-editor-colors button[data-color] {
 	width: 22px;
 	height: 22px;
 	padding: 0;
 	border: none;
 	border-radius: 50%;
+	corner-shape: round;
 	box-shadow: none;
 	background-color: rgb(var(--ib-rgb));
 }
