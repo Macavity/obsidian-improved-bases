@@ -66,8 +66,7 @@
 }
 /* Not `clickable-icon`: themes pad that class (Cupertino 10px) and `.metadata-property-value .clickable-icon` outranks a plugin class, which made the pills taller than the row.
    Two plugin classes, because themes also pad plain buttons via `button:not(.clickable-icon)` (Primary), which outranks one class. */
-.improved-bases-select .improved-bases-chip-remove,
-.improved-bases-select .improved-bases-add {
+.improved-bases-option-picker .improved-bases-chip-remove {
 	flex: 0 0 auto;
 	height: auto;
 	min-height: 0;
@@ -81,27 +80,13 @@
 	line-height: 1.4;
 	cursor: var(--cursor);
 }
-.improved-bases-select .improved-bases-chip-remove:hover,
-.improved-bases-select .improved-bases-add:hover {
+.improved-bases-option-picker .improved-bases-chip-remove:hover {
 	background-color: var(--background-modifier-hover);
 	color: var(--text-normal);
 }
-.improved-bases-select .improved-bases-chip-remove:focus-visible,
-.improved-bases-select .improved-bases-add:focus-visible {
+.improved-bases-option-picker .improved-bases-chip-remove:focus-visible {
 	box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
 }
-/* Table cells show the buttons only on hover or focus, as Obsidian does for its own cell icons */
-.bases-td .improved-bases-chip-remove,
-.bases-td .improved-bases-add {
-	opacity: 0;
-}
-.bases-td:hover .improved-bases-chip-remove,
-.bases-td:hover .improved-bases-add,
-.bases-td:focus-within .improved-bases-chip-remove,
-.bases-td:focus-within .improved-bases-add {
-	opacity: 1;
-}
-
 /* Conflict marker: a note is in several schema bases defining this field; the info icon explains which one applies. */
 .improved-bases-has-conflict {
 	display: flex;
@@ -169,21 +154,6 @@
 	margin-right: var(--size-4-2);
 	border-radius: 50%;
 	background-color: rgb(var(--ib-rgb));
-}
-.improved-bases-menu-search {
-	padding: var(--size-2-2) var(--size-4-2);
-}
-.improved-bases-menu-search input {
-	width: 100%;
-}
-.improved-bases-menu-create {
-	padding: var(--size-2-3) var(--size-4-3);
-	cursor: pointer;
-	color: var(--text-accent);
-}
-.improved-bases-menu-item.is-hidden,
-.improved-bases-menu-create.is-hidden {
-	display: none;
 }
 
 /* Option picker: popover at body, placed once at open (see placePopover). */

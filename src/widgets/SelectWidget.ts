@@ -1,10 +1,10 @@
 import { Notice } from "obsidian";
-import type { Color, SelectField } from "../schema/types";
-import { openColorMenu, openOptionMenu } from "./pickers";
+import type { Color, SelectField, SelectOption } from "../schema/types";
+import { openOptionPicker, type OptionPickerHost } from "./OptionPicker";
 import type { PluginWidget, SchemaSource } from "./types";
 import { addOptionMutation, colorOf, nextOptionColor, selectOutput, setColorMutation, toList } from "./values";
 
-/** Colored pills; options come from the schema, unknown values are shown grey and never dropped. */
+/** Colored pills; options come from the schema, unknown values are shown grey and never dropped. Clicking the field opens the option picker. */
 export const SelectWidget: PluginWidget<SelectField> = (el, value, ctx, field, env, source) => {
 	const { membership, writer } = env;
 	let values = toList(value);
@@ -16,13 +16,11 @@ export const SelectWidget: PluginWidget<SelectField> = (el, value, ctx, field, e
 	// Writes follow the base whose definition is displayed (the patch passes it); the fallback matches the display rule without context.
 	const sourceOf = (): SchemaSource | null => source ?? membership.resolveWithBase(ctx.sourcePath, ctx.key);
 
-	const root = el.createDiv({ cls: "improved-bases-select", attr: { "data-improved-bases": "select" } });
-
-	const commit = (next: string[]): void => {
-		values = next;
-		draw();
-		ctx.onChange(selectOutput(next, field.multiple));
-	};
+	const root = el.createDiv({
+		cls: "improved-bases-select",
+		attr: { "data-improved-bases": "select", tabindex: "0", role: "button", "aria-haspopup": "dialog" },
+	});
+	let picker: { close(): void } | null = null;
 
 	const writeSchema = async (mutate: ReturnType<typeof addOptionMutation>): Promise<boolean> => {
 		const src = sourceOf();
@@ -37,42 +35,47 @@ export const SelectWidget: PluginWidget<SelectField> = (el, value, ctx, field, e
 		}
 	};
 
-	const choose = (picked: string): void => {
-		if (field.multiple) {
-			commit(values.includes(picked) ? values.filter((v) => v !== picked) : [...values, picked]);
-		} else {
-			commit([picked]);
-		}
-	};
-
-	const create = (created: string): void => {
-		const src = sourceOf();
-		if (!src) return;
-		const color = nextOptionColor(options.length);
-		void writeSchema(addOptionMutation(src.name, created, color)).then((ok) => {
-			if (!ok) return;
-			if (!options.some((o) => o.value === created)) options.push({ value: created, color });
-			if (field.multiple) {
-				if (!values.includes(created)) commit([...values, created]);
-			} else {
-				commit([created]);
-			}
-		});
-	};
-
-	const recolor = (evt: MouseEvent, picked: string): void => {
-		openColorMenu(evt, (color: Color) => {
+	const host = (): OptionPickerHost => ({
+		options: options.map((o) => ({ ...o })),
+		values: [...values],
+		multiple: field.multiple,
+		commit(next) {
+			values = [...next];
+			draw();
+			ctx.onChange(selectOutput(next, field.multiple));
+		},
+		async create(created): Promise<SelectOption | null> {
 			const src = sourceOf();
-			if (!src) return;
-			void writeSchema(setColorMutation(src.name, picked, color)).then((ok) => {
-				if (!ok) return;
-				const existing = options.find((o) => o.value === picked);
-				if (existing) existing.color = color;
-				else options.push({ value: picked, color });
-				draw();
-			});
-		}, env.overlays);
+			if (!src) return null;
+			const color = nextOptionColor(options.length);
+			if (!(await writeSchema(addOptionMutation(src.name, created, color)))) return null;
+			if (!options.some((o) => o.value === created)) options.push({ value: created, color });
+			return { value: created, color };
+		},
+		async recolor(picked: string, color: Color): Promise<boolean> {
+			const src = sourceOf();
+			if (!src || !(await writeSchema(setColorMutation(src.name, picked, color)))) return false;
+			const existing = options.find((o) => o.value === picked);
+			if (existing) existing.color = color;
+			else options.push({ value: picked, color });
+			draw();
+			return true;
+		},
+		rename: () => Promise.resolve(false),
+		remove: () => Promise.resolve(false),
+	});
+
+	const openPicker = (): void => {
+		picker?.close();
+		picker = openOptionPicker(root, host(), env.overlays);
 	};
+
+	root.addEventListener("click", openPicker);
+	root.addEventListener("keydown", (evt) => {
+		if (evt.target !== root || (evt.key !== "Enter" && evt.key !== " ")) return;
+		evt.preventDefault();
+		openPicker();
+	});
 
 	const draw = (): void => {
 		try {
@@ -86,46 +89,21 @@ export const SelectWidget: PluginWidget<SelectField> = (el, value, ctx, field, e
 
 	const render = (): void => {
 		root.empty();
-		for (const [index, picked] of values.entries()) {
+		for (const picked of values) {
 			const pill = root.createSpan({
 				cls: "improved-bases-pill",
 				attr: { "data-color": colorOf(local, picked) },
 			});
 			if (!options.some((o) => o.value === picked)) pill.setAttribute("title", "Not in options");
 			pill.createSpan({ cls: "improved-bases-pill-body", text: picked });
-			pill.addEventListener("contextmenu", (evt) => {
-				evt.preventDefault();
-				evt.stopPropagation();
-				recolor(evt, picked);
-			});
-			const remove = pill.createEl("button", {
-				cls: "improved-bases-chip-remove",
-				text: "×",
-				attr: { type: "button", "aria-label": "Remove" },
-			});
-			remove.addEventListener("click", (evt) => {
-				evt.preventDefault();
-				evt.stopPropagation();
-				commit(values.filter((_, i) => i !== index));
-			});
 		}
-		const add = root.createEl("button", {
-			cls: "improved-bases-add",
-			text: "+",
-			attr: { type: "button", "aria-label": "Add" },
-		});
-		add.addEventListener("click", (evt) => {
-			evt.preventDefault();
-			evt.stopPropagation();
-			openOptionMenu(evt, local, values, choose, create, env.overlays);
-		});
 	};
 
 	draw();
 	return {
 		type: "select",
 		focus() {
-			root.querySelector<HTMLElement>(".improved-bases-add")?.focus();
+			root.focus();
 		},
 	};
 };

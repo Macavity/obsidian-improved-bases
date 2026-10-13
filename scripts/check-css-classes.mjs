@@ -20,7 +20,6 @@ export const OBSIDIAN_CLASSES = [
 	{ cls: "modal-title", reason: "Modal title rendered by Obsidian" },
 	{ cls: "modal-header", reason: "Modal header rendered by Obsidian" },
 	{ cls: "menu-item", reason: "Menu items rendered by Obsidian's Menu" },
-	{ cls: "bases-td", reason: "Bases table cell; the widget buttons show on hover like Obsidian's own" },
 ];
 
 export function sourceFiles(dir = join(root, "src")) {
