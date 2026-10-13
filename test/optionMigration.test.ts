@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type { App, TFile } from "obsidian";
-import { migrateOptionValues, optionValueEdit } from "../src/schema/optionMigration";
-import { renameValue } from "../src/widgets/values";
+import { migrateOptionValues, optionValueEdit, renameInList } from "../src/schema/optionMigration";
 
 function fakeApp(fms: Record<string, Record<string, unknown>>, opts: { fail?: string; cache?: Record<string, Record<string, unknown>> } = {}) {
   const processFrontMatter = vi.fn((f: { path: string }, fn: (fm: Record<string, unknown>) => void) => {
@@ -27,7 +26,7 @@ describe("migrateOptionValues", () => {
     };
     const { app, files } = fakeApp(fms, { fail: "d.md" });
     vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const res = await migrateOptionValues(app, files, "Status", (v) => renameValue(v, "A", "B"));
+    const res = await migrateOptionValues(app, files, "Status", optionValueEdit([{ from: "A", to: "B" }], []));
     expect(res).toEqual({ changed: 2, failed: 1 });
     expect(fms["a.md"]).toEqual({ Status: "B" });
     expect(fms["b.md"]).toEqual({ status: ["B", "C"] });
@@ -36,22 +35,22 @@ describe("migrateOptionValues", () => {
   });
   it("does not write notes the cache shows nothing to change in", async () => {
     const { app, files, processFrontMatter } = fakeApp({ "a.md": { Status: "A" }, "b.md": { Status: "X" }, "c.md": { Other: "A" } });
-    await migrateOptionValues(app, files, "Status", (v) => renameValue(v, "A", "B"));
+    await migrateOptionValues(app, files, "Status", optionValueEdit([{ from: "A", to: "B" }], []));
     expect(processFrontMatter.mock.calls.map((c) => (c[0] as TFile).path)).toEqual(["a.md"]);
   });
   it("recomputes on the live frontmatter and counts only actual changes", async () => {
     // The cache says A, the note on disk already says X.
     const { app, files } = fakeApp({ "a.md": { Status: "X" } }, { cache: { "a.md": { Status: "A" } } });
-    expect(await migrateOptionValues(app, files, "Status", (v) => renameValue(v, "A", "B"))).toEqual({ changed: 0, failed: 0 });
+    expect(await migrateOptionValues(app, files, "Status", optionValueEdit([{ from: "A", to: "B" }], []))).toEqual({ changed: 0, failed: 0 });
   });
   it("counts a throwing note only as failed", async () => {
     const { app, files } = fakeApp({ "a.md": { Status: "A" } }, { fail: "a.md" });
     vi.spyOn(console, "error").mockImplementation(() => undefined);
-    expect(await migrateOptionValues(app, files, "Status", (v) => renameValue(v, "A", "B"))).toEqual({ changed: 0, failed: 1 });
+    expect(await migrateOptionValues(app, files, "Status", optionValueEdit([{ from: "A", to: "B" }], []))).toEqual({ changed: 0, failed: 1 });
   });
   it("finds the value in a stale cache under the key's previous name", async () => {
     const { app, files } = fakeApp({ "a.md": { Stand: "A" } }, { cache: { "a.md": { Status: "A" } } });
-    expect(await migrateOptionValues(app, files, "Stand", (v) => renameValue(v, "A", "B"), "Status")).toEqual({ changed: 1, failed: 0 });
+    expect(await migrateOptionValues(app, files, "Stand", optionValueEdit([{ from: "A", to: "B" }], []), "Status")).toEqual({ changed: 1, failed: 0 });
   });
 });
 
@@ -73,6 +72,18 @@ describe("optionValueEdit", () => {
     expect(e("Done")).toBeNull();
     expect(e("Finished")).toBe("Done");
     expect(e(["Done", "Finished"])).toEqual(["Done"]);
+  });
+  it("ignores non-strings and keeps other list elements", () => {
+    expect(edit([["A", "B"]])(3)).toBeUndefined();
+    expect(edit([], ["A"])(["A", 3, null])).toEqual([3, null]);
+  });
+  it("renames in a plain list the same way", () => {
+    expect(renameInList(["X", "X", "A", "B"], "A", "B")).toEqual(["X", "B"]);
+    expect(renameInList(["X"], "A", "B")).toEqual(["X"]);
+  });
+  it("leaves a list without duplicates once it touches it", () => {
+    expect(edit([["A", "B"]])(["X", "X", "A", "B"])).toEqual(["X", "B"]);
+    expect(edit([], ["A"])(["X", "A", "X"])).toEqual(["X"]);
   });
   it("leaves untouched values alone", () => {
     const e = edit([["A", "B"]], ["C"]);

@@ -4,7 +4,8 @@ import type { OverlayRegistry } from "./types";
 import { openOptionEditor, OPTION_EDITOR_CLASS } from "./OptionEditor";
 import { placePopover } from "./placePopover";
 import { dismissOnOutside } from "./popover";
-import { colorOf, renameValue } from "./values";
+import { renameInList } from "../schema/optionMigration";
+import { colorOf } from "./values";
 
 /** What the picker needs from the widget; the picker keeps working on its own copies after the cell re-renders. */
 export interface OptionPickerHost {
@@ -176,8 +177,14 @@ export function openOptionPicker(anchor: HTMLElement, host: OptionPickerHost, ov
 	const editOption = (anchorEl: HTMLElement, option: SelectOption): void => {
 		editor?.close();
 		const value = option.value;
+		// A rejected host action closes the picker like any other picker failure instead of escaping the editor's `void` calls.
 		const done = async (ok: Promise<boolean>, apply: () => void, closeEditor: boolean): Promise<boolean> => {
-			if (!(await ok)) return false;
+			try {
+				if (!(await ok)) return false;
+			} catch (e) {
+				fail(e);
+				return false;
+			}
 			apply();
 			if (closeEditor) editor?.close();
 			if (!closed) render();
@@ -190,7 +197,7 @@ export function openOptionPicker(anchor: HTMLElement, host: OptionPickerHost, ov
 				rename: (to) =>
 					done(host.rename(value, to), () => {
 						option.value = to;
-						host.values = (renameValue(host.values, value, to) as string[] | undefined) ?? host.values;
+						host.values = renameInList(host.values, value, to);
 					}, true),
 				recolor: (color) => done(host.recolor(value, color), () => (option.color = color), false),
 				remove: () => done(host.remove(value), () => (host.options = host.options.filter((o) => o !== option)), true),

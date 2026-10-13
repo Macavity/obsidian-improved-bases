@@ -6,7 +6,8 @@ export type ValueEdit = (value: unknown) => unknown;
 
 /**
  * One edit for all option renames and removals of a field: each original value is mapped at most once,
- * so swaps and chains stay intact. A removed string becomes null, removed list elements are dropped.
+ * so swaps and chains stay intact. A removed string becomes null, removed list elements are dropped,
+ * and an edited list never holds a value twice.
  */
 export function optionValueEdit(renames: readonly { from: string; to: string }[], removals: readonly string[]): ValueEdit {
 	const map = new Map<string, string | null>(renames.map((r) => [r.from, r.to]));
@@ -15,9 +16,14 @@ export function optionValueEdit(renames: readonly { from: string; to: string }[]
 	return (value) => {
 		if (typeof value === "string") return hit(value) ? map.get(value) : undefined;
 		if (!Array.isArray(value) || !value.some(hit)) return undefined;
-		const mapped = (value as unknown[]).map((v) => (hit(v) ? map.get(v) : v)).filter((v) => v !== null);
+		const mapped = (value as unknown[]).flatMap((v) => (hit(v) ? (map.get(v) ?? []) : [v]));
 		return [...new Set(mapped)];
 	};
+}
+
+/** `values` with `from` renamed to `to`, without duplicates; the same rule the notes get. */
+export function renameInList(values: string[], from: string, to: string): string[] {
+	return (optionValueEdit([{ from, to }], [])(values) as string[] | undefined) ?? values;
 }
 
 /** Value of `key` (any case) in the frontmatter, or undefined when the key is missing. */

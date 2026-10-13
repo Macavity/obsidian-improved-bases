@@ -1,12 +1,12 @@
 import { Notice, type TFile } from "obsidian";
-import { migrateOptionValues } from "../schema/optionMigration";
+import { migrateOptionValues, optionValueEdit, renameInList } from "../schema/optionMigration";
 import { MEMBERS_LOADING } from "../schema/messages";
 import type { Color, SelectField, SelectOption } from "../schema/types";
 import { findOwnKey, isUnsafeKey } from "../schema/keys";
 import { confirmOptionDelete } from "./OptionDeleteModal";
 import { openOptionPicker, type OptionPickerHost } from "./OptionPicker";
 import type { PluginWidget, SchemaSource } from "./types";
-import { addOptionMutation, colorOf, countNotesWithValue, nextOptionColor, removeOptionMutation, removeValue, renameOptionMutation, renameValue, selectOutput, setColorMutation, StaleOptionError, toList } from "./values";
+import { addOptionMutation, colorOf, countNotesWithValue, nextOptionColor, removeOptionMutation, renameOptionMutation, selectOutput, setColorMutation, StaleOptionError, toList } from "./values";
 
 /** Colored pills; options come from the schema, unknown values are shown grey and never dropped. Clicking the field opens the option picker. */
 export const SelectWidget: PluginWidget<SelectField> = (el, value, ctx, field, env, source) => {
@@ -65,7 +65,7 @@ export const SelectWidget: PluginWidget<SelectField> = (el, value, ctx, field, e
 		const choice = count === 0 ? "schema" : await confirmOptionDelete(env.app, value, count, env.overlays);
 		if (!choice || !(await writeSchema(removeOptionMutation(src.name, value)))) return false;
 		if (choice === "notes") {
-			const { changed, failed } = await migrateOptionValues(env.app, files, src.name, (v) => removeValue(v, value));
+			const { changed, failed } = await migrateOptionValues(env.app, files, src.name, optionValueEdit([], [value]));
 			new Notice(`Removed from ${changed} ${changed === 1 ? "note" : "notes"}${failed > 0 ? `, ${failed} failed` : ""}`);
 			values = values.filter((v) => v !== value);
 			h.values = h.values.filter((v) => v !== value);
@@ -99,7 +99,6 @@ export const SelectWidget: PluginWidget<SelectField> = (el, value, ctx, field, e
 				if (!src || !(await writeSchema(setColorMutation(src.name, picked, color)))) return false;
 				const existing = options.find((o) => o.value === picked);
 				if (existing) existing.color = color;
-				else options.push({ value: picked, color });
 				draw();
 				return true;
 			},
@@ -113,11 +112,11 @@ export const SelectWidget: PluginWidget<SelectField> = (el, value, ctx, field, e
 				const files = src && membership.targetEntries(src.basePath);
 				if (src && !files) new Notice(MEMBERS_LOADING);
 				if (!src || !files || !(await writeSchema(renameOptionMutation(src.name, from, to)))) return false;
-				const { changed, failed } = await migrateOptionValues(env.app, files, src.name, (v) => renameValue(v, from, to));
+				const { changed, failed } = await migrateOptionValues(env.app, files, src.name, optionValueEdit([{ from, to }], []));
 				const count = `${changed} ${changed === 1 ? "note" : "notes"}`;
 				new Notice(`Renamed in ${count}${failed > 0 ? `, ${failed} failed` : ""}`);
 				for (const o of options) if (o.value === from) o.value = to;
-				values = (renameValue(values, from, to) as string[] | undefined) ?? values;
+				values = renameInList(values, from, to);
 				draw();
 				return true;
 			},

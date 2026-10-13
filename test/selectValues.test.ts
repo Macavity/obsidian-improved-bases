@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { RawFields } from "../src/schema/SchemaWriter";
 import type { SelectField } from "../src/schema/types";
-import { selectOutput, colorOf, addOptionMutation, nextOptionColor, setColorMutation, renameValue, removeValue, countNotesWithValue, renameOptionMutation, removeOptionMutation, StaleOptionError } from "../src/widgets/values";
+import { selectOutput, colorOf, addOptionMutation, nextOptionColor, setColorMutation, countNotesWithValue, renameOptionMutation, removeOptionMutation, StaleOptionError } from "../src/widgets/values";
 
 const field: SelectField = { type: "select", multiple: false, options: [{ value: "Dev", color: "blue" }] };
 const fresh = (): RawFields => ({ Role: { type: "select", options: { Dev: "blue" } } });
@@ -10,6 +10,7 @@ describe("select values", () => {
   it("writes schema format", () => {
     expect(selectOutput(["Dev"], false)).toBe("Dev");
     expect(selectOutput(["Dev", "PO"], true)).toEqual(["Dev", "PO"]);
+    expect(selectOutput(["Dev", "PO", "Dev"], true)).toEqual(["Dev", "PO"]);
     expect(selectOutput([], false)).toBeNull();
   });
   it("colors unknown values grey", () => {
@@ -22,6 +23,9 @@ describe("select values", () => {
     expect(f.Role?.options).toEqual({ Dev: "blue", PO: "grey" });
     setColorMutation("Role", "PO", "green")(f);
     expect((f.Role?.options as Record<string, string>).PO).toBe("green");
+    // An option removed elsewhere is not brought back by a recolor.
+    expect(() => setColorMutation("Role", "Gone", "green")(f)).toThrow(StaleOptionError);
+    expect(f.Role?.options).not.toHaveProperty("Gone");
   });
   it("keeps an existing color when adding", () => {
     const f = fresh();
@@ -56,23 +60,6 @@ describe("select values", () => {
 });
 
 describe("option value edits", () => {
-  it("renames values", () => {
-    expect(renameValue("A", "A", "B")).toBe("B");
-    expect(renameValue(["A", "B"], "A", "B")).toEqual(["B"]);
-    expect(renameValue("X", "A", "B")).toBeUndefined();
-    expect(renameValue(3, "A", "B")).toBeUndefined();
-    expect(renameValue(["X"], "A", "B")).toBeUndefined();
-  });
-  it("only dedupes the renamed value, leaving other duplicates", () => {
-    expect(renameValue(["X", "X", "A"], "A", "B")).toEqual(["X", "X", "B"]);
-    expect(renameValue(["X", "X", "A", "B"], "A", "B")).toEqual(["X", "X", "B"]);
-  });
-  it("removes values", () => {
-    expect(removeValue("A", "A")).toBeNull();
-    expect(removeValue(["A", "C"], "A")).toEqual(["C"]);
-    expect(removeValue(3, "A")).toBeUndefined();
-    expect(removeValue("X", "A")).toBeUndefined();
-  });
   it("counts notes with a value", () => {
     expect(countNotesWithValue(["A", ["A", "B"], "B", null], "A")).toBe(2);
   });

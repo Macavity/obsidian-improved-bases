@@ -76,7 +76,9 @@ const LIST_TYPES = ["multitext", "tags", "aliases"];
 /** Distinct note values that are not options yet, with their counts: most frequent first, ties alphabetical. Values about to be removed from the notes are left out. */
 export function optionSuggestions(values: readonly unknown[], options: readonly OptionDraft[]): { value: string; count: number }[] {
 	const removed = options.filter((o) => o.removal === "notes").map((o) => o.original ?? o.value);
-	const known = new Set([...liveOptions(options).map((o) => o.value), ...removed]);
+	// Notes hold a renamed option's old name until Save migrates them, so it is known too.
+	const renamed = liveOptions(options).flatMap((o) => (o.original === null ? [] : [o.original]));
+	const known = new Set([...liveOptions(options).map((o) => o.value), ...renamed, ...removed]);
 	const counts = new Map<string, number>();
 	for (const v of values.flatMap(toList)) if (!known.has(v)) counts.set(v, (counts.get(v) ?? 0) + 1);
 	return [...counts].map(([value, count]) => ({ value, count })).sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));

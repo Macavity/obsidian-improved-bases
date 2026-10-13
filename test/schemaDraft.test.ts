@@ -156,6 +156,9 @@ describe("schemaDraft", () => {
 		expect(validateDrafts([draft], [])).toEqual([]);
 		expect(optionSuggestions(["B", "A"], draft.options)).toEqual([{ value: "B", count: 1 }]);
 	});
+	it("does not suggest the old name of a renamed option", () => {
+		expect(optionSuggestions(["A", "C"], [o("B", "red", { original: "A" })])).toEqual([{ value: "C", count: 1 }]);
+	});
 	it("rejects live names that a removed field still holds", () => {
 		const gone = d({ originalName: "Status", name: "Status", removed: true });
 		expect(validateDrafts([gone, d({ originalName: "X", name: "Status" })], []).join()).toMatch(/removed field/i);

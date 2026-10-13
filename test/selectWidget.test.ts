@@ -138,8 +138,8 @@ describe("SelectWidget", () => {
 		expect(await host.recolor("A", "blue")).toBe(true);
 		expect(update).toHaveBeenCalledTimes(1);
 		expect(pill(0)?.getAttribute("data-color")).toBe("blue");
-		expect(await host.recolor("Z", "green")).toBe(true);
-		expect(pill(1)?.getAttribute("data-color")).toBe("green");
+		// A value without option stays grey; only the schema write (stale guard) could have added it.
+		expect(pill(1)?.getAttribute("data-color")).toBe("grey");
 	});
 	it("does not recolor when the write fails", async () => {
 		const { el, open } = setup(["A"], { writeFails: true });

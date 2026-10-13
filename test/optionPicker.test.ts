@@ -341,6 +341,22 @@ describe("openOptionPicker", () => {
 			expect(labels()).toEqual(["Beta", "Gamma"]);
 			expect(editorEl()).toBeNull();
 		});
+		it("closes the picker instead of leaking the error when a host action rejects", async () => {
+			const error = vi.spyOn(console, "error").mockImplementation(() => {});
+			const { rows, popover } = setup({ rename: vi.fn(() => Promise.reject(new Error("boom"))) });
+			pencil(rows()[0]).click();
+			await rename("Zeta");
+			expect(popover()).toBeNull();
+			expect(error).toHaveBeenCalledWith("Improved Bases: option picker failed", expect.any(Error));
+		});
+		it("stays open while a confirm modal is clicked", () => {
+			const { rows, popover } = setup();
+			pencil(rows()[0]).click();
+			const modal = document.body.createDiv({ cls: "modal-container" }).createEl("button");
+			modal.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+			expect(popover()).not.toBeNull();
+			expect(editorEl()).not.toBeNull();
+		});
 		it("mousedown inside the editor does not close the picker; Escape closes only the editor", () => {
 			const { rows, popover } = setup();
 			pencil(rows()[0]).click();

@@ -24,9 +24,9 @@ export function linkTarget(raw: string): string | null {
 	return target ? target : null;
 }
 
-/** Value in schema format: `multiple` writes a list, otherwise the first value or null. */
+/** Value in schema format: `multiple` writes a list without duplicates, otherwise the first value or null. */
 export function selectOutput(values: string[], multiple: boolean): string | string[] | null {
-	if (multiple) return values;
+	if (multiple) return [...new Set(values)];
 	return values[0] ?? null;
 }
 
@@ -61,33 +61,13 @@ export function addOptionMutation(fieldName: string, value: string, color: Color
 	};
 }
 
-/** Sets the color of an option (creating the option when missing). */
+/** Sets the color of an option; throws `StaleOptionError` when the option is gone (removed elsewhere). */
 export function setColorMutation(fieldName: string, value: string, color: Color): (f: RawFields) => void {
 	return (fields) => {
 		const options = optionsOf(fields, fieldName);
-		if (options) setOption(options, value, color);
+		if (!options || !Object.hasOwn(options, value)) throw new StaleOptionError(`Option "${value}" is gone`);
+		setOption(options, value, color);
 	};
-}
-
-/** Value with `from` replaced by `to` (a list drops the renamed entry when it already holds `to`); undefined when nothing matches. */
-export function renameValue(value: unknown, from: string, to: string): unknown {
-	if (typeof value === "string") return value === from ? to : undefined;
-	if (!Array.isArray(value) || !value.includes(from)) return undefined;
-	// Only the renamed value is deduplicated: when `to` was already listed, the renamed occurrence is dropped.
-	const hadTo = value.includes(to);
-	const out: unknown[] = [];
-	for (const v of value) {
-		if (v !== from) out.push(v);
-		else if (!hadTo && !out.includes(to)) out.push(to);
-	}
-	return out;
-}
-
-/** Value without `target`: a matching string becomes null, lists drop the element; undefined when nothing matches. */
-export function removeValue(value: unknown, target: string): unknown {
-	if (typeof value === "string") return value === target ? null : undefined;
-	if (!Array.isArray(value) || !value.includes(target)) return undefined;
-	return value.filter((v) => v !== target);
 }
 
 /** Number of notes (one entry each) whose value contains `target`. */
