@@ -95,8 +95,8 @@ describe("saveSummary", () => {
     expect(saveSummary({ renames: "R", removed: [], referenced: [], options: "O" })).toBe("R\nO");
   });
   it("formats option migrations", () => {
-    expect(optionSummary({ renamed: 1, removed: 2, failed: 0 })).toBe("Options: renamed in 1 note, removed from 2 notes");
-    expect(optionSummary({ renamed: 0, removed: 0, failed: 3 })).toBe("Options: renamed in 0 notes, removed from 0 notes, 3 failed");
+    expect(optionSummary({ changed: 1, failed: 0, conflict: 0 })).toBe("Option values updated in 1 note");
+    expect(optionSummary({ changed: 0, failed: 3, conflict: 2 })).toBe("Option values updated in 0 notes, 3 failed, 2 skipped (field rename conflict)");
     expect(optionSummary(null)).toBe("Option values not migrated: base members unknown");
   });
 });
@@ -274,13 +274,28 @@ describe("buildSchemaSettings", () => {
     expect(lastNotice()).toMatch(/Removed 'Old' from 1 note/);
     expect(lastNotice()).toMatch(/Filters or formulas still reference 'Status'/);
   });
+  const opt = (value: string, original: string, removal: "notes" | "schema" | null = null) => ({ value, color: "red" as const, original, removal });
+  const fmAt = (t: { membership: { targetEntries: () => TFile[] | null } }, i: number) => (t.membership.targetEntries()?.[i] as unknown as { frontmatter: Record<string, unknown> }).frontmatter;
   it("migrates renamed and removed option values under the new field name after the field rename", async () => {
     const t = await build({ members: [mdFile("a.md", { Status: ["Open", "Done"] }), mdFile("b.md", { Status: "Open" }), mdFile("c.md", { Status: "Done" })] });
-    const opt = (value: string, original: string, removal: "notes" | "schema" | null = null) => ({ value, color: "red" as const, original, removal });
     await t.handlers.onSave([d({ originalName: "Status", name: "Stand", type: "select", options: [opt("Offen", "Open"), opt("Done", "Done", "notes")] })], 0, "");
     const fm = (i: number) => (t.membership.targetEntries()?.[i] as unknown as { frontmatter: Record<string, unknown> }).frontmatter;
     expect([fm(0), fm(1), fm(2)]).toEqual([{ Stand: ["Offen"] }, { Stand: "Offen" }, { Stand: null }]);
-    expect(lastNotice()).toContain("Options: renamed in 2 notes, removed from 2 notes");
+    expect(lastNotice()).toContain("Option values updated in 3 notes");
+  });
+  it("migrates all option changes of a field in one pass per note", async () => {
+    const t = await build({ members: [mdFile("a.md", { S: "Open" }), mdFile("b.md", { S: "Done" }), mdFile("c.md", { S: ["Todo", "Finished", "Open"] }), mdFile("d.md", { S: "X" })] });
+    // Swap Open/Done, chain Todo → Open, remove Old from notes and rename Finished onto its name.
+    await t.handlers.onSave([d({ originalName: "S", name: "S", type: "select", options: [opt("Done", "Open"), opt("Open", "Done"), opt("Open2", "Todo"), opt("Old", "Old", "notes"), opt("Old", "Finished")] })], 0, "");
+    expect([fmAt(t, 0), fmAt(t, 1), fmAt(t, 2), fmAt(t, 3)]).toEqual([{ S: "Done" }, { S: "Open" }, { S: ["Open2", "Old", "Done"] }, { S: "X" }]);
+    expect(t.processFrontMatter).toHaveBeenCalledTimes(3);
+  });
+  it("skips option values in notes whose field rename hit a conflict", async () => {
+    const t = await build({ members: [mdFile("a.md", { Status: "Open", Stand: "Open" }), mdFile("b.md", { Status: "Open" })] });
+    await t.handlers.onSave([d({ originalName: "Status", name: "Stand", type: "select", options: [opt("Offen", "Open")] })], 0, "");
+    expect(fmAt(t, 0)).toEqual({ Status: "Open", Stand: "Open" });
+    expect(fmAt(t, 1)).toEqual({ Stand: "Offen" });
+    expect(lastNotice()).toContain("Option values updated in 1 note, 1 skipped (field rename conflict)");
   });
   it("reports option values as not migrated when members are unknown", async () => {
     const t = await build({ members: null });

@@ -487,7 +487,7 @@ describe("SchemaSettingsModal", () => {
 			expect(confirmOptionDelete).toHaveBeenCalledWith(expect.anything(), "Open", 2, expect.anything());
 			expect(chips(t.el)).toEqual(["Done"]);
 			expect(details(t.el)).toEqual(["1 option"]);
-			expect(t.status()).toBe("11 removalOpen removed");
+			expect(t.status()).toBe("11 option removalStatus: Open removed");
 			t.q<HTMLElement>(".improved-bases-save").click();
 			await tick();
 			expect(t.onSave.mock.calls[0]?.[0][0]?.options[0]).toEqual(opt("Open", "red", { original: "Open", removal: "notes" }));
@@ -513,7 +513,7 @@ describe("SchemaSettingsModal", () => {
 			const input = t.q<HTMLInputElement>(".improved-bases-option-input");
 			input.value = "Offen";
 			input.dispatchEvent(new Event("blur"));
-			expect(t.q(".improved-bases-rename-status").textContent).toBe("11 pending renameOpen → Offen");
+			expect(t.q(".improved-bases-rename-status").textContent).toBe("11 pending option renameStatus: Open → Offen");
 			t.q<HTMLElement>(".improved-bases-save").click();
 			await tick();
 			expect(t.error()).toMatch(/still loading/);

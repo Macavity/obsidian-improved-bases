@@ -293,9 +293,10 @@ export class SchemaSettingsModal extends Modal {
 		const pending = renames(this.drafts.map((d) => ({ ...d, name: d.name.trim() }))).filter((r) => r.to !== "");
 		const removed = removals(this.drafts);
 		const options = optionMigrations(this.drafts);
-		pending.push(...options.flatMap((m) => m.renames));
-		removed.push(...options.flatMap((m) => m.removals));
-		if (!pending.length && !removed.length) {
+		const optionRenames = options.flatMap((m) => m.renames.map((r) => `${m.field}: ${r.from} → ${r.to}`));
+		const optionRemovals = options.flatMap((m) => m.removals.map((v) => `${m.field}: ${v} removed`));
+		const total = pending.length + removed.length + optionRenames.length + optionRemovals.length;
+		if (!total) {
 			el.removeClass("has-pending");
 			setIcon(el.createSpan({ cls: "improved-bases-status-icon" }), "lucide-info");
 			el.createSpan({ text: IDLE_STATUS });
@@ -305,10 +306,12 @@ export class SchemaSettingsModal extends Modal {
 		const parts = [];
 		if (pending.length) parts.push(plural(pending.length, "pending rename"));
 		if (removed.length) parts.push(plural(removed.length, "removal"));
-		el.createSpan({ cls: "improved-bases-status-badge", text: String(pending.length + removed.length) });
+		if (optionRenames.length) parts.push(plural(optionRenames.length, "pending option rename"));
+		if (optionRemovals.length) parts.push(plural(optionRemovals.length, "option removal"));
+		el.createSpan({ cls: "improved-bases-status-badge", text: String(total) });
 		const text = el.createDiv({ cls: "improved-bases-status-text" });
 		text.createEl("b", { text: parts.join(", ") });
-		const details = [...pending.map((r) => `${r.from} → ${r.to}`), ...removed.map((name) => `${name} removed`)];
+		const details = [...pending.map((r) => `${r.from} → ${r.to}`), ...removed.map((name) => `${name} removed`), ...optionRenames, ...optionRemovals];
 		const shown = details.slice(0, 2);
 		if (details.length > 2) shown.push(`+${details.length - 2} more`);
 		text.createEl("p", { text: shown.join(" · ") });

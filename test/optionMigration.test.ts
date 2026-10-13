@@ -1,7 +1,20 @@
 import { describe, it, expect, vi } from "vitest";
 import type { App, TFile } from "obsidian";
-import { migrateOptionValues } from "../src/schema/optionMigration";
+import { migrateOptionValues, optionValueEdit } from "../src/schema/optionMigration";
 import { renameValue } from "../src/widgets/values";
+
+function fakeApp(fms: Record<string, Record<string, unknown>>, opts: { fail?: string; cache?: Record<string, Record<string, unknown>> } = {}) {
+  const processFrontMatter = vi.fn((f: { path: string }, fn: (fm: Record<string, unknown>) => void) => {
+    if (f.path === opts.fail) return Promise.reject(new Error("boom"));
+    fn(fms[f.path] as Record<string, unknown>);
+    return Promise.resolve();
+  });
+  const app = {
+    fileManager: { processFrontMatter },
+    metadataCache: { getFileCache: (f: { path: string }) => ({ frontmatter: (opts.cache ?? fms)[f.path] }) },
+  } as unknown as App;
+  return { app, processFrontMatter, files: Object.keys(fms).map((path) => ({ path }) as TFile) };
+}
 
 describe("migrateOptionValues", () => {
   it("edits the key case-insensitively and counts changed and failed notes", async () => {
@@ -12,22 +25,63 @@ describe("migrateOptionValues", () => {
       "d.md": { Status: "A" },
       "e.md": { Other: "A" },
     };
-    const app = {
-      fileManager: {
-        processFrontMatter: (f: { path: string }, fn: (fm: Record<string, unknown>) => void) => {
-          if (f.path === "d.md") return Promise.reject(new Error("boom"));
-          fn(fms[f.path] as Record<string, unknown>);
-          return Promise.resolve();
-        },
-      },
-    } as unknown as App;
+    const { app, files } = fakeApp(fms, { fail: "d.md" });
     vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const files = Object.keys(fms).map((path) => ({ path }) as TFile);
     const res = await migrateOptionValues(app, files, "Status", (v) => renameValue(v, "A", "B"));
     expect(res).toEqual({ changed: 2, failed: 1 });
     expect(fms["a.md"]).toEqual({ Status: "B" });
     expect(fms["b.md"]).toEqual({ status: ["B", "C"] });
     expect(fms["c.md"]).toEqual({ Status: "X" });
     expect(fms["e.md"]).toEqual({ Other: "A" });
+  });
+  it("does not write notes the cache shows nothing to change in", async () => {
+    const { app, files, processFrontMatter } = fakeApp({ "a.md": { Status: "A" }, "b.md": { Status: "X" }, "c.md": { Other: "A" } });
+    await migrateOptionValues(app, files, "Status", (v) => renameValue(v, "A", "B"));
+    expect(processFrontMatter.mock.calls.map((c) => (c[0] as TFile).path)).toEqual(["a.md"]);
+  });
+  it("recomputes on the live frontmatter and counts only actual changes", async () => {
+    // The cache says A, the note on disk already says X.
+    const { app, files } = fakeApp({ "a.md": { Status: "X" } }, { cache: { "a.md": { Status: "A" } } });
+    expect(await migrateOptionValues(app, files, "Status", (v) => renameValue(v, "A", "B"))).toEqual({ changed: 0, failed: 0 });
+  });
+  it("counts a throwing note only as failed", async () => {
+    const { app, files } = fakeApp({ "a.md": { Status: "A" } }, { fail: "a.md" });
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    expect(await migrateOptionValues(app, files, "Status", (v) => renameValue(v, "A", "B"))).toEqual({ changed: 0, failed: 1 });
+  });
+  it("finds the value in a stale cache under the key's previous name", async () => {
+    const { app, files } = fakeApp({ "a.md": { Stand: "A" } }, { cache: { "a.md": { Status: "A" } } });
+    expect(await migrateOptionValues(app, files, "Stand", (v) => renameValue(v, "A", "B"), "Status")).toEqual({ changed: 1, failed: 0 });
+  });
+});
+
+describe("optionValueEdit", () => {
+  const edit = (renames: [string, string][], removals: string[] = []) => optionValueEdit(renames.map(([from, to]) => ({ from, to })), removals);
+  it("swaps values without collapsing them", () => {
+    const swap = edit([["Open", "Done"], ["Done", "Open"]]);
+    expect(swap("Open")).toBe("Done");
+    expect(swap("Done")).toBe("Open");
+    expect(swap(["Open", "Done"])).toEqual(["Done", "Open"]);
+  });
+  it("maps each value at most once in a chain", () => {
+    const chain = edit([["Todo", "Open"], ["Open", "Backlog"]]);
+    expect(chain("Todo")).toBe("Open");
+    expect(chain("Open")).toBe("Backlog");
+  });
+  it("removes a value and renames another onto its name", () => {
+    const e = edit([["Finished", "Done"]], ["Done"]);
+    expect(e("Done")).toBeNull();
+    expect(e("Finished")).toBe("Done");
+    expect(e(["Done", "Finished"])).toEqual(["Done"]);
+  });
+  it("leaves untouched values alone", () => {
+    const e = edit([["A", "B"]], ["C"]);
+    expect(e("X")).toBeUndefined();
+    expect(e(["X", "Y"])).toBeUndefined();
+    expect(e(3)).toBeUndefined();
+    expect(e(null)).toBeUndefined();
+  });
+  it("maps lists element-wise, drops removed elements and dedupes", () => {
+    expect(edit([["A", "B"]], ["C"])(["A", "X", "C", "B"])).toEqual(["B", "X"]);
   });
 });

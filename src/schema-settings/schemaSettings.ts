@@ -4,8 +4,7 @@ import type { SchemaRegistry } from "../schema/SchemaRegistry";
 import type { WidgetEnv } from "../widgets/types";
 import { SchemaSettingsModal, type SchemaSettingsHandlers, type SchemaSettingsInput } from "./SchemaSettingsModal";
 import { draftsToEdits, knownFieldDrafts, optionMigrations, removals, renameKey, renames, type FieldDraft, type OptionMigration, type OtherDefinition } from "./schemaDraft";
-import { migrateOptionValues } from "../schema/optionMigration";
-import { removeValue, renameValue } from "../widgets/values";
+import { migrateOptionValues, optionValueEdit } from "../schema/optionMigration";
 import type { Membership } from "../schema/Membership";
 import { readBaseColumns, referencesName, type BaseColumns } from "../schema/baseDoc";
 import { getMetadataTypeManager } from "../internals/detect";
@@ -46,29 +45,39 @@ async function namesPresent(app: App, file: TFile, names: string[], match: KeyMa
 	}
 }
 
-/** Renames frontmatter keys (exact spelling) in one note; null when the note has none of them. */
-async function renameInNote(app: App, file: TFile, pairs: Pairs): Promise<{ renamed: boolean; conflict: boolean } | null> {
+/** Renames frontmatter keys (exact spelling) in one note; null when the note has none of them. `conflicts` holds the target names that already existed. */
+async function renameInNote(app: App, file: TFile, pairs: Pairs): Promise<{ renamed: boolean; conflicts: string[] } | null> {
 	const present = await namesPresent(app, file, pairs.map((p) => p.from), exactKey);
 	if (!present.length) return null;
-	const outcome = { renamed: false, conflict: false };
+	const outcome = { renamed: false, conflicts: [] as string[] };
 	await app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
 		for (const { from, to } of pairs) {
 			const result = renameKey(fm, from, to);
 			if (result === "renamed") outcome.renamed = true;
-			else if (result === "conflict") outcome.conflict = true;
+			else if (result === "conflict") outcome.conflicts.push(to);
 		}
 	});
 	return outcome;
 }
 
-/** Renames frontmatter keys in the notes that have one of them, one file at a time; counts are per note. Unreadable notes count as failed. */
-export async function migrateRenames(app: App, files: TFile[], pairs: Pairs): Promise<Counts> {
+/** Notes per lower-cased target name whose rename hit a conflict (both keys present). */
+export type RenameConflicts = Map<string, Set<TFile>>;
+
+/**
+ * Renames frontmatter keys in the notes that have one of them, one file at a time; counts are per note.
+ * Unreadable notes count as failed. Conflicting notes are added to `conflicts` when given.
+ */
+export async function migrateRenames(app: App, files: TFile[], pairs: Pairs, conflicts?: RenameConflicts): Promise<Counts> {
 	const counts: Counts = { renamed: 0, conflict: 0, failed: 0 };
 	for (const file of files) {
 		try {
 			const outcome = await renameInNote(app, file, pairs);
 			if (outcome?.renamed) counts.renamed++;
-			if (outcome?.conflict) counts.conflict++;
+			if (outcome?.conflicts.length) counts.conflict++;
+			for (const to of outcome?.conflicts ?? []) {
+				const key = to.toLowerCase();
+				conflicts?.set(key, (conflicts.get(key) ?? new Set()).add(file));
+			}
 		} catch (e) {
 			console.error(`Improved Bases: renaming properties in ${file.path} failed`, e);
 			counts.failed++;
@@ -138,22 +147,22 @@ export async function countNotesWithKey(app: App, files: TFile[], name: string):
 	return count;
 }
 
-type OptionCounts = { renamed: number; removed: number; failed: number };
+type OptionCounts = { changed: number; failed: number; conflict: number };
 
-/** Renames and removes option values in the notes, field by field; counts add up per migration step. */
-async function migrateOptions(app: App, files: TFile[], migrations: OptionMigration[]): Promise<OptionCounts> {
-	const counts: OptionCounts = { renamed: 0, removed: 0, failed: 0 };
+/**
+ * Renames and removes option values in the notes, one pass per field with all its changes at once.
+ * `fieldRenames` are this save's field renames: their notes are looked up under both names, and notes
+ * whose field rename hit a conflict are skipped, since their value under the new name is not the migrated one.
+ */
+async function migrateOptions(app: App, files: TFile[], migrations: OptionMigration[], fieldRenames: Pairs, conflicts: RenameConflicts): Promise<OptionCounts> {
+	const counts: OptionCounts = { changed: 0, failed: 0, conflict: 0 };
 	for (const { field, renames: pairs, removals: values } of migrations) {
-		for (const { from, to } of pairs) {
-			const r = await migrateOptionValues(app, files, field, (v) => renameValue(v, from, to));
-			counts.renamed += r.changed;
-			counts.failed += r.failed;
-		}
-		for (const value of values) {
-			const r = await migrateOptionValues(app, files, field, (v) => removeValue(v, value));
-			counts.removed += r.changed;
-			counts.failed += r.failed;
-		}
+		const skip = conflicts.get(field.toLowerCase()) ?? new Set<TFile>();
+		const previous = fieldRenames.find((p) => p.to.trim().toLowerCase() === field.toLowerCase())?.from;
+		const r = await migrateOptionValues(app, files.filter((f) => !skip.has(f)), field, optionValueEdit(pairs, values), previous);
+		counts.changed += r.changed;
+		counts.failed += r.failed;
+		counts.conflict += files.filter((f) => skip.has(f)).length;
 	}
 	return counts;
 }
@@ -163,8 +172,9 @@ const notes = (n: number): string => `${n} ${n === 1 ? "note" : "notes"}`;
 /** Notice line for option migrations; `counts` is null when the base members were unknown. */
 export function optionSummary(counts: OptionCounts | null): string {
 	if (counts === null) return "Option values not migrated: base members unknown";
-	const parts = [`Options: renamed in ${notes(counts.renamed)}, removed from ${notes(counts.removed)}`];
+	const parts = [`Option values updated in ${notes(counts.changed)}`];
 	if (counts.failed > 0) parts.push(`${counts.failed} failed`);
+	if (counts.conflict > 0) parts.push(`${counts.conflict} skipped (field rename conflict)`);
 	return parts.join(", ");
 }
 
@@ -269,10 +279,11 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 			return;
 		}
 		const current = env.membership.targetEntries(basePath);
-		let renameText = renameSummary(pairs, current && pairs.length ? await migrateRenames(app, current, pairs) : null);
+		const conflicts: RenameConflicts = new Map();
+		let renameText = renameSummary(pairs, current && pairs.length ? await migrateRenames(app, current, pairs, conflicts) : null);
 		const removed = current && removedNames.length ? await removeProperties(app, current, removedNames) : [];
 		if (!current && removedNames.length) renameText = [renameText, "Properties not removed: base members unknown"].filter(Boolean).join("\n");
-		const optionText = options.length ? optionSummary(current ? await migrateOptions(app, current, options) : null) : "";
+		const optionText = options.length ? optionSummary(current ? await migrateOptions(app, current, options, pairs, conflicts) : null) : "";
 		const referenced = [...pairs.map((p) => p.from), ...removedNames].filter((n) => referencesName(expressions, n));
 		new Notice(`Schema saved\n${saveSummary({ renames: renameText, removed, referenced, options: optionText })}`);
 	};

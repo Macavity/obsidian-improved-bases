@@ -144,6 +144,10 @@ describe("schemaDraft", () => {
 			])).toEqual([]);
 		});
 	});
+	it("does not suggest values of options removed from the notes", () => {
+		const options = [o("Gone", "red", { original: "Done", removal: "notes" }), o("Kept", "red", { original: "Kept", removal: "schema" })];
+		expect(optionSuggestions(["Done", "Kept", "New"], options)).toEqual([{ value: "Kept", count: 1 }, { value: "New", count: 1 }]);
+	});
 	it("writes neither removed options nor validates them", () => {
 		const draft = d({ originalName: "S", name: "S", type: "select", options: [o("A", "red", { original: "A", removal: "notes" }), o("A", "blue"), o("B", "red", { original: "B", removal: "schema" })] });
 		const f: RawFields = {};
