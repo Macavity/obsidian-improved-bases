@@ -191,7 +191,7 @@ describe("SelectWidget", () => {
 			expect(pills()).toEqual(["A"]);
 		});
 		it("writes the schema, migrates the notes, reports and redraws", async () => {
-			const { open, update, processFrontMatter, pills } = setup(["A"]);
+			const { open, update, processFrontMatter, pills } = setup(["A"], { used: "A" });
 			expect(await open().rename("A", "Z")).toBe(true);
 			expect(update).toHaveBeenCalledWith("M.base", expect.any(Function));
 			expect(processFrontMatter).toHaveBeenCalledTimes(2);
@@ -199,10 +199,10 @@ describe("SelectWidget", () => {
 			expect(pills()).toEqual(["Z"]);
 		});
 		it("uses the singular and reports failures", async () => {
-			const one = setup(["A"], { files: [new TFile()] });
+			const one = setup(["A"], { used: "A", files: [new TFile()] });
 			await one.open().rename("A", "Z");
 			expect(lastNotice()).toBe("Renamed in 1 note");
-			const bad = setup(["A"]);
+			const bad = setup(["A"], { used: "A" });
 			bad.processFrontMatter.mockRejectedValueOnce(new Error("x"));
 			await bad.open().rename("A", "Z");
 			expect(lastNotice()).toBe("Renamed in 1 note, 1 failed");
