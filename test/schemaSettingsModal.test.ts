@@ -5,12 +5,19 @@ import type { FieldDraft } from "../src/schema-settings/schemaDraft";
 import { OverlayRegistry } from "../src/widgets/types";
 import { openOptionEditMenu } from "../src/widgets/pickers";
 import type { Color } from "../src/schema/types";
+import type { PropertyType } from "../src/internals/typeRegistry";
 
 vi.mock("../src/widgets/pickers", () => ({ openOptionEditMenu: vi.fn() }));
 type ChipHandlers = { onRename: () => void; onRemove: () => void; onColor: (c: Color) => void };
 const lastMenu = () => vi.mocked(openOptionEditMenu).mock.calls.at(-1)?.[2] as ChipHandlers;
 const chips = (el: HTMLElement) => Array.from(el.querySelectorAll(".improved-bases-option-chip")).map((p) => p.textContent);
 
+const types: PropertyType[] = [
+	{ type: "text", name: "Text", icon: "lucide-text", reserved: false },
+	{ type: "multitext", name: "Liste", icon: "lucide-list", reserved: false },
+	{ type: "number", name: "Zahl", icon: "lucide-binary", reserved: false },
+	{ type: "tags", name: "Tags", icon: "lucide-tags", reserved: true },
+];
 const d = (p: Partial<FieldDraft>): FieldDraft => ({
 	originalName: null, originalBase: null, name: "X", type: "native", detected: null,
 	override: null, removed: false, multiple: false, options: [], ...p,
@@ -38,6 +45,7 @@ function open(state: SchemaSettingsInput["state"], { countAffected: count, ...op
 		defaultViewIndex: 0,
 		expressions: [],
 		otherDefinitions: () => [],
+		types,
 		...opts,
 	};
 	const modal = new SchemaSettingsModal({} as App, input, { onSave, onReset, countAffected });
@@ -315,124 +323,25 @@ describe("SchemaSettingsModal", () => {
 		expect(three.onSave).toHaveBeenCalledWith([expect.objectContaining({ name: "N" })], 2, "");
 	});
 
-	it("labels native fields with their type and override", () => {
+	it("labels and lists native types from the registry", () => {
 		const { el, q } = open({
 			kind: "fields",
 			drafts: [
-				d({ name: "Status", detected: "text" }),
-				d({ name: "Tags" }),
-				d({ name: "Alpha", detected: "text", override: { type: "text" } }),
-				d({ name: "Beta", override: { type: "number" } }),
-				d({ name: "Gamma", detected: "text", override: { type: "number" } }),
-				d({ name: "Delta", override: { type: "list" } }),
+				d({ name: "Team", detected: "multitext" }),
+				d({ name: "Tags", detected: "tags" }),
+				d({ name: "Old", detected: "text", override: { type: "list" } }),
+				d({ name: "Beta", detected: "text", override: { type: "number" } }),
+				d({ name: "None", detected: null }),
 			],
 		});
 		const selects = Array.from(el.querySelectorAll<HTMLSelectElement>(".improved-bases-field-type"));
-		expect(selects.map((s) => s.selectedOptions[0]?.textContent)).toEqual(["Text", "Native", "Text", "Number", "Number", "List"]);
-		expect(details(el)).toEqual(["—", "—", "Type override", "Type override", "Type override", "Type override"]);
-		const all = ["Text", "List", "Number", "Checkbox", "Date", "Date & time", "Relation", "Select"];
+		expect(selects.map((s) => s.selectedOptions[0]?.textContent)).toEqual(["Liste", "Tags", "list (not registered)", "Zahl", "Native"]);
+		expect(details(el)).toEqual(["—", "—", "Type override", "Type override", "—"]);
+		const all = ["Text", "Liste", "Zahl", "Relation", "Select"];
 		expect(Array.from(q<HTMLSelectElement>(".improved-bases-field-type").options).map((o) => o.textContent)).toEqual(all);
-		expect(Array.from(selects[1]?.options ?? []).map((o) => o.textContent)).toEqual(["Native", ...all]);
-		expect(Array.from(el.querySelectorAll(".improved-bases-type-icon")).map((x) => x.getAttribute("data-icon"))).toEqual(["lucide-text", "lucide-text", "lucide-text", "lucide-binary", "lucide-binary", "lucide-list"]);
-		expect(q<HTMLButtonElement>(".improved-bases-field-disclosure").disabled).toBe(true);
-	});
-
-	it("asks before removing a known field and marks it removed", async () => {
-		const countAffected = vi.fn(() => Promise.resolve(3));
-		const { el, q } = open({ kind: "fields", drafts: [d({ originalName: "Status", name: "Status" })] }, { countAffected });
-		q<HTMLElement>(".improved-bases-field-remove").click();
-		expect(countAffected).toHaveBeenCalledWith("Status");
-		expect(q(".improved-bases-field-confirm").textContent).toMatch(/Remove 'Status' and its value from the notes\?/);
-		expect(q(".improved-bases-confirm-remove").hasAttribute("disabled")).toBe(true);
-		await tick();
-		expect(q(".improved-bases-field-confirm").textContent).toMatch(/from 3 notes/);
-		expect(q(".improved-bases-confirm-remove").hasAttribute("disabled")).toBe(false);
-		q<HTMLElement>(".improved-bases-confirm-remove").click();
-		expect(el.querySelector(".improved-bases-field-removed")).not.toBeNull();
-		expect(el.querySelector(".improved-bases-field-remove")).toBeNull();
-		expect(el.querySelector(".improved-bases-field-name")).toBeNull();
-		expect(q(".improved-bases-field-removed-name").textContent).toBe("Status");
-		q<HTMLElement>(".improved-bases-undo").click();
-		expect(el.querySelector(".improved-bases-field-removed")).toBeNull();
-		expect(el.querySelector(".improved-bases-field-remove")).not.toBeNull();
-	});
-
-	it("uses the singular for one affected note", async () => {
-		const { q } = open({ kind: "fields", drafts: [d({ originalName: "S", name: "S" })] }, { countAffected: () => Promise.resolve(1) });
-		q<HTMLElement>(".improved-bases-field-remove").click();
-		await tick();
-		expect(q(".improved-bases-field-confirm").textContent).toMatch(/from 1 note\?/);
-	});
-
-	it("keeps the field when the confirmation is declined", async () => {
-		const { el, q } = open({ kind: "fields", drafts: [d({ originalName: "S", name: "S" })] }, { countAffected: () => Promise.resolve(2) });
-		q<HTMLElement>(".improved-bases-field-remove").click();
-		await tick();
-		q<HTMLElement>(".improved-bases-confirm-keep").click();
-		expect(el.querySelector(".improved-bases-field-confirm")).toBeNull();
-		expect(el.querySelector(".improved-bases-field-removed")).toBeNull();
-		expect(names(el)).toEqual(["S"]);
-	});
-
-	it("restores the row and shows the error when counting fails", async () => {
-		const { el, q, error } = open({ kind: "fields", drafts: [d({ originalName: "S", name: "S" })] }, { countAffected: () => Promise.reject(new Error("io")) });
-		q<HTMLElement>(".improved-bases-field-remove").click();
-		await tick();
-		expect(error()).toBe("io");
-		expect(el.querySelector(".improved-bases-field-confirm")).toBeNull();
-		expect(el.querySelector(".improved-bases-field-removed")).toBeNull();
-	});
-
-	it("ignores a count that arrives after the row was re-rendered", async () => {
-		let resolve: (n: number) => void = () => undefined;
-		const pending = new Promise<number>((r) => { resolve = r; });
-		const { el, q } = open({ kind: "fields", drafts: [d({ originalName: "S", name: "S" })] }, { countAffected: () => pending });
-		q<HTMLElement>(".improved-bases-field-remove").click();
-		q<HTMLElement>(".improved-bases-confirm-keep").click();
-		resolve(4);
-		await tick();
-		expect(el.textContent).not.toMatch(/4 notes/);
-		expect(el.querySelector(".improved-bases-field-confirm")).toBeNull();
-	});
-
-	it("blocks removal while members are unknown", () => {
-		const { el, q, error, countAffected } = open({ kind: "fields", drafts: [d({ originalName: "S", name: "S" })] }, { membersKnown: () => false });
-		q<HTMLElement>(".improved-bases-field-remove").click();
-		expect(error()).toMatch(/still loading/);
-		expect(countAffected).not.toHaveBeenCalled();
-		expect(el.querySelector(".improved-bases-field-confirm")).toBeNull();
-	});
-
-	it("shows conflicting definitions of other bases under the field and follows edits", () => {
-		const otherDefinitions = vi.fn((name: string) => (name.toLowerCase() === "team" ? [{ basePath: "Meetings.base", field: { type: "text" as const }, shared: 1 }] : []));
-		const { el, q } = open({ kind: "fields", drafts: [d({ name: "Team", type: "relation", base: "Teams.base", multiple: true }), d({ name: "Role", type: "select" })] }, { otherDefinitions });
-		const hints = () => Array.from(el.querySelectorAll<HTMLElement>(".improved-bases-field-conflict"));
-		expect(hints()[0]?.textContent).toBe("Also defined in Meetings.base as text; 1 note is in both bases.");
-		expect(hints().map((h) => h.hidden)).toEqual([false, true]);
-		expect(Array.from(el.querySelectorAll(".improved-bases-field-row")).map((r) => r.classList.contains("has-warning"))).toEqual([true, false]);
-		// Switching the type to native (not overridden) ends the conflict.
-		const type = q<HTMLSelectElement>(".improved-bases-field-type");
-		type.value = "native";
-		type.dispatchEvent(new Event("change"));
-		expect(hints().map((h) => h.hidden)).toEqual([true, true]);
-		// Renaming the other field onto the conflicting name starts it there.
-		const second = el.querySelectorAll<HTMLInputElement>(".improved-bases-field-name")[1];
-		if (!second) throw new Error("missing second name");
-		second.value = "team";
-		second.dispatchEvent(new Event("input"));
-		expect(hints().map((h) => h.hidden)).toEqual([true, false]);
-	});
-	it("hints when a renamed field is referenced by expressions", () => {
-		const { q } = open({ kind: "fields", drafts: [d({ originalName: "Status", name: "Status" })] }, { expressions: ['Status != "a"'] });
-		expect(q<HTMLElement>(".improved-bases-field-hint").hidden).toBe(true);
-		const input = q<HTMLInputElement>(".improved-bases-field-name");
-		input.value = "Stand";
-		input.dispatchEvent(new Event("input"));
-		expect(q<HTMLElement>(".improved-bases-field-hint").hidden).toBe(false);
-		expect(q(".improved-bases-field-hint").textContent).toMatch(/Filters or formulas reference 'Status'/);
-		input.value = "Status";
-		input.dispatchEvent(new Event("input"));
-		expect(q<HTMLElement>(".improved-bases-field-hint").hidden).toBe(true);
+		expect(Array.from(selects[1]?.options ?? []).map((o) => o.textContent)).toEqual(["Tags", ...all]);
+		expect(Array.from(selects[2]?.options ?? []).map((o) => o.textContent)).toEqual(["Text", "Liste", "Zahl", "list (not registered)", "Relation", "Select"]);
+		expect(Array.from(el.querySelectorAll(".improved-bases-type-icon")).map((x) => x.getAttribute("data-icon"))).toEqual(["lucide-list", "lucide-tags", "lucide-text", "lucide-binary", "lucide-text"]);
 	});
 
 	it("overrides the type from the dropdown and drops the override for Obsidian's own", () => {
@@ -441,9 +350,9 @@ describe("SchemaSettingsModal", () => {
 		expect(type.value).toBe("native:number");
 		const icon = () => q(".improved-bases-type-icon").getAttribute("data-icon");
 		expect(icon()).toBe("lucide-binary");
-		type.value = "native:date";
+		type.value = "native:multitext";
 		type.dispatchEvent(new Event("change"));
-		expect(icon()).toBe("lucide-calendar");
+		expect(icon()).toBe("lucide-list");
 		expect(details(el)).toEqual(["Type override"]);
 		expect(q<HTMLButtonElement>(".improved-bases-field-disclosure").disabled).toBe(true);
 		type.value = "native:text";

@@ -7,6 +7,7 @@ import { draftsToEdits, knownFieldDrafts, removals, renameKey, renames, type Fie
 import type { Membership } from "../schema/Membership";
 import { readBaseColumns, referencesName, type BaseColumns } from "../schema/baseDoc";
 import { getMetadataTypeManager } from "../internals/detect";
+import { listPropertyTypes } from "../internals/typeRegistry";
 import { findOwnKey } from "../schema/keys";
 
 type Pairs = { from: string; to: string }[];
@@ -146,7 +147,7 @@ export function saveSummary(parts: { renames: string; removed: Removal[]; refere
 
 const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
-function nativeLabelOf(app: App): (name: string) => string | null {
+function detectedTypeOf(app: App): (name: string) => string | null {
 	return (name) => {
 		const mtm = getMetadataTypeManager(app);
 		if (!mtm) return null;
@@ -199,7 +200,7 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 		expressions = columns.expressions;
 		const index = viewName === null ? -1 : views.indexOf(viewName);
 		defaultViewIndex = index < 0 ? 0 : index;
-		state = schemaState(registry, basePath, columns, memberKeys, nativeLabelOf(app), defaultViewIndex);
+		state = schemaState(registry, basePath, columns, memberKeys, detectedTypeOf(app), defaultViewIndex);
 	} catch (e) {
 		state = { kind: "error", message: message(e), resettable: false };
 	}
@@ -213,6 +214,7 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 		overlays: env.overlays,
 		membersKnown: () => env.membership.targetEntries(basePath) !== null,
 		otherDefinitions: (name) => otherDefinitions(registry, env.membership, basePath, name),
+		types: listPropertyTypes(getMetadataTypeManager(app)),
 		views,
 		defaultViewIndex,
 		expressions,

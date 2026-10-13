@@ -3,6 +3,7 @@ import { referencesName } from "../schema/baseDoc";
 import { openOptionEditMenu } from "../widgets/pickers";
 import { renderIcon } from "../widgets/icons";
 import type { OverlayRegistry } from "../widgets/types";
+import { propertyTypeOf, type PropertyType } from "../internals/typeRegistry";
 import { applyTypeChoice, conflictHint, removals, renames, typeChoice, typeChoices, validateDrafts, type FieldDraft, type OptionDraft, type OtherDefinition, type TypeChoice } from "./schemaDraft";
 
 export interface SchemaSettingsInput {
@@ -24,6 +25,8 @@ export interface SchemaSettingsInput {
 	expressions: string[];
 	/** Other schema bases' definitions of a field name (case-insensitive), for the conflict hint. */
 	otherDefinitions: (name: string) => OtherDefinition[];
+	/** Property types as Obsidian registers them, reserved ones included for labels; the dropdown offers the unreserved ones. */
+	types: PropertyType[];
 }
 
 export interface SchemaSettingsHandlers {
@@ -37,34 +40,8 @@ const MEMBERS_LOADING = "Base members are still loading, try again in a moment";
 const IDLE_STATUS = "Changes are written to the base on Save. Renames and removals also update the member notes.";
 const ICON_HELP = "Emoji shown for this base's entries in relations, unless a note has its own icon property. The system emoji picker opens with ctrl+cmd+space on macOS and with the Windows key + period on Windows.";
 
-/** Labels for Obsidian's property types. */
-const NATIVE_LABELS: Record<string, string> = {
-	text: "Text",
-	multitext: "List",
-	list: "List",
-	tags: "Tags",
-	aliases: "Aliases",
-	number: "Number",
-	checkbox: "Checkbox",
-	date: "Date",
-	datetime: "Date & time",
-};
-
 /** Generic icon for a base without a default entry icon. */
 const BASE_ICON = "lucide-layout-list";
-
-/** Lucide icons for Obsidian's property types. */
-const NATIVE_ICONS: Record<string, string> = {
-	text: "lucide-text",
-	multitext: "lucide-list",
-	list: "lucide-list",
-	tags: "lucide-tags",
-	aliases: "lucide-forward",
-	number: "lucide-binary",
-	checkbox: "lucide-check-square",
-	date: "lucide-calendar",
-	datetime: "lucide-clock",
-};
 
 function basename(path: string): string {
 	return (path.split("/").pop() ?? path).replace(/\.base$/, "");
@@ -74,16 +51,18 @@ function errorText(e: unknown): string {
 	return e instanceof Error ? e.message : String(e);
 }
 
-/** "Text", "Tags", … for a type name; "Native" when Obsidian's type is unknown. */
-function nativeLabel(type: string | null): string {
-	if (type === null) return "Native";
-	return NATIVE_LABELS[type] ?? type.charAt(0).toUpperCase() + type.slice(1);
+/** The registered type a draft shows: its override, else Obsidian's detected type; null when neither is known. */
+function nativeTypeOf(draft: FieldDraft, types: readonly PropertyType[]): PropertyType | null {
+	const id = typeof draft.override?.type === "string" ? draft.override.type : draft.detected;
+	return id === null ? null : propertyTypeOf(types, id);
 }
 
-function choiceText(draft: FieldDraft, choice: TypeChoice): string {
+/** Option label: registry names for native types ("Native" when Obsidian's type is unknown), fixed labels for plugin types. */
+function choiceText(draft: FieldDraft, choice: TypeChoice, types: readonly PropertyType[]): string {
 	if (choice === "relation") return "Relation";
 	if (choice === "select") return "Select";
-	return nativeLabel(choice === "native" ? draft.detected : choice.slice("native:".length));
+	if (choice === "native") return draft.detected === null ? "Native" : propertyTypeOf(types, draft.detected).name;
+	return propertyTypeOf(types, choice.slice("native:".length)).name;
 }
 
 /** Change detection for the footer: the drafts and the base icon as saved. */
@@ -91,11 +70,10 @@ function snapshot(drafts: FieldDraft[], icon: string): string {
 	return JSON.stringify({ drafts, icon });
 }
 
-function typeIcon(draft: FieldDraft): string {
+function typeIcon(draft: FieldDraft, types: readonly PropertyType[]): string {
 	if (draft.type === "relation") return "lucide-link";
 	if (draft.type === "select") return "lucide-circle-dot";
-	const label = draft.override ? String(draft.override.type) : draft.detected;
-	return (label && NATIVE_ICONS[label]) ?? "lucide-text";
+	return nativeTypeOf(draft, types)?.icon ?? "lucide-text";
 }
 
 /** Only plugin types have details to expand. */
@@ -416,8 +394,8 @@ export class SchemaSettingsModal extends Modal {
 		const typeWrap = main.createDiv({ cls: "improved-bases-type-select" });
 		const typeIconEl = typeWrap.createSpan({ cls: "improved-bases-type-icon" });
 		const type = typeWrap.createEl("select", { cls: "improved-bases-field-type", attr: { "aria-label": "Field type" } });
-		for (const choice of typeChoices(draft)) type.createEl("option", { text: choiceText(draft, choice), attr: { value: choice } });
-		type.value = typeChoice(draft);
+		for (const choice of typeChoices(draft, this.input.types)) type.createEl("option", { text: choiceText(draft, choice, this.input.types), attr: { value: choice } });
+		type.value = typeChoice(draft, this.input.types);
 		setIcon(typeWrap.createSpan({ cls: "improved-bases-type-chevron" }), "lucide-chevron-down");
 		const details = main.createDiv({ cls: "improved-bases-field-details" });
 		const trash = iconButton(main, "lucide-trash-2", "Remove field", "improved-bases-field-remove");
@@ -429,7 +407,7 @@ export class SchemaSettingsModal extends Modal {
 			const open = expandable(draft) && this.expanded.has(draft);
 			disclosure.disabled = !expandable(draft);
 			disclosure.toggleClass("is-open", open);
-			setIcon(typeIconEl, typeIcon(draft));
+			setIcon(typeIconEl, typeIcon(draft, this.input.types));
 			this.renderDetails(details, draft);
 			this.updateHint(hint, draft);
 			this.updateConflict(conflict, draft);
@@ -483,7 +461,7 @@ export class SchemaSettingsModal extends Modal {
 
 	/** Advises about other bases defining this field differently; saving stays possible. */
 	private updateConflict(hint: HTMLElement, draft: FieldDraft): void {
-		this.setHint(hint, conflictHint(draft, this.input.otherDefinitions(draft.name)));
+		this.setHint(hint, conflictHint(draft, this.input.otherDefinitions(draft.name), (type) => propertyTypeOf(this.input.types, type).name));
 	}
 
 	/** Warns that a renamed field is still referenced by filters or formulas. */

@@ -34,7 +34,7 @@ export interface FieldDraft {
 const NATIVE_PREFIX = "native:";
 
 /** Whether a type id can be chosen in the dropdown: registered and not bound to fixed keys. */
-function selectable(types: readonly PropertyType[], type: string | null): type is string {
+function selectable(types: readonly PropertyType[], type: string | null): boolean {
 	return type !== null && types.some((t) => t.type === type && !t.reserved);
 }
 
@@ -55,7 +55,8 @@ export function typeChoices(draft: FieldDraft, types: readonly PropertyType[]): 
 /** The choice a draft shows: its plugin type, else the overriding type, else Obsidian's own when selectable, else `native`. */
 export function typeChoice(draft: FieldDraft, types: readonly PropertyType[]): TypeChoice {
 	if (draft.type !== "native") return draft.type;
-	const type = overrideType(draft) ?? (selectable(types, draft.detected) ? draft.detected : null);
+	const detected = selectable(types, draft.detected) ? draft.detected : null;
+	const type = overrideType(draft) ?? detected;
 	return type === null ? "native" : `${NATIVE_PREFIX}${type}`;
 }
 
