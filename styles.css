@@ -584,6 +584,47 @@
 	color: var(--text-muted);
 	--icon-size: var(--icon-xs);
 }
+/* Values found in the member notes, offered as options */
+.improved-bases-schema .improved-bases-option-suggestions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--size-2-2);
+	margin-top: var(--size-2-2);
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+.improved-bases-schema .improved-bases-option-suggestion {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--size-2-1);
+	height: auto;
+	padding: var(--size-2-1) var(--size-2-3);
+	border: 1px dashed var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-normal);
+	cursor: pointer;
+	--icon-size: var(--icon-xs);
+}
+.improved-bases-schema .improved-bases-option-suggestion:hover {
+	border-style: solid;
+	border-color: var(--background-modifier-border-hover);
+	background-color: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+.improved-bases-schema .improved-bases-suggestions-all {
+	padding: 0 var(--size-2-2);
+	border: 0;
+	box-shadow: none;
+	background: transparent;
+	color: var(--text-accent);
+	font-size: var(--font-ui-smaller);
+	cursor: pointer;
+}
 
 /* Removed rows */
 .improved-bases-schema .improved-bases-field-removed .improved-bases-field-removed-name {

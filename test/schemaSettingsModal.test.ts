@@ -67,6 +67,32 @@ beforeEach(() => {
 });
 
 describe("SchemaSettingsModal", () => {
+	const suggestions = (el: HTMLElement) => Array.from(el.querySelectorAll(".improved-bases-option-suggestion")).map((p) => p.textContent);
+	it("suggests the values found in the notes as options, one by one or all at once", () => {
+		const memberValues = vi.fn((name: string) => (name === "Status" ? ["Todo", ["Open", "Done"], "Open", 3] : []));
+		const { el, q } = open({ kind: "fields", drafts: [d({ name: "Status", type: "select", options: [{ value: "Open", color: "blue" }] })] }, { memberValues });
+		q<HTMLButtonElement>(".improved-bases-field-disclosure").click();
+		expect(suggestions(el)).toEqual(["Done", "Todo"]);
+		q<HTMLButtonElement>('.improved-bases-option-suggestion[aria-label="Add option Todo"]').click();
+		expect(chips(el)).toEqual(["Open", "Todo"]);
+		expect(suggestions(el)).toEqual(["Done"]);
+		expect(el.querySelector(".improved-bases-suggestions-all")).toBeNull();
+		memberValues.mockReturnValue(["A", "B", "Done", "Open", "Todo"]);
+		q<HTMLButtonElement>(".improved-bases-field-disclosure").click();
+		q<HTMLButtonElement>(".improved-bases-field-disclosure").click();
+		expect(suggestions(el)).toEqual(["A", "B", "Done"]);
+		q<HTMLButtonElement>(".improved-bases-suggestions-all").click();
+		expect(chips(el)).toEqual(["Open", "Todo", "A", "B", "Done"]);
+		expect(el.querySelector(".improved-bases-option-suggestions")).toBeNull();
+	});
+	it("shows the suggestions when a field is switched to select", () => {
+		const { el, q } = open({ kind: "fields", drafts: [d({ name: "Status", detected: "text" })] }, { memberValues: () => ["x"] });
+		expect(el.querySelector(".improved-bases-option-suggestions")).toBeNull();
+		const type = q<HTMLSelectElement>(".improved-bases-field-type");
+		type.value = "select";
+		type.dispatchEvent(new Event("change"));
+		expect(suggestions(el)).toEqual(["x"]);
+	});
 	it("shows one table row per field with name, type icon and details", () => {
 		const { modal, el, q } = open({
 			kind: "fields",

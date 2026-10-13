@@ -1,6 +1,7 @@
 import { ButtonComponent, Modal, setIcon, ToggleComponent, type App } from "obsidian";
 import { referencesName } from "../schema/baseDoc";
 import { openOptionEditMenu } from "../widgets/pickers";
+import { toList } from "../widgets/values";
 import { renderIcon } from "../widgets/icons";
 import type { OverlayRegistry } from "../widgets/types";
 import { propertyTypeOf, type PropertyType } from "../internals/typeRegistry";
@@ -537,6 +538,36 @@ export class SchemaSettingsModal extends Modal {
 		const list = el.createDiv({ cls: "improved-bases-option-list" });
 		for (const option of draft.options) this.renderOption(list, draft, option, rerender);
 		this.renderAddOption(el, list, draft, rerender);
+		this.renderSuggestions(el, draft, rerender);
+	}
+
+	/** Values found in the member notes that are not options yet; a click adds one, "Add all" adds them all. */
+	private renderSuggestions(el: HTMLElement, draft: FieldDraft, rerender: () => void): void {
+		const known = new Set(draft.options.map((o) => o.value));
+		const found = new Set(this.input.memberValues(draft.originalName ?? draft.name).flatMap(toList));
+		const values = [...found].sort((a, b) => a.localeCompare(b)).filter((v) => !known.has(v));
+		if (!values.length) return;
+		const add = (value: string): void => {
+			if (!draft.options.some((o) => o.value === value)) draft.options.push({ value, color: "grey" });
+		};
+		const row = el.createDiv({ cls: "improved-bases-option-suggestions" });
+		row.createSpan({ cls: "improved-bases-suggestions-label", text: "In notes:" });
+		for (const value of values) {
+			const chip = row.createEl("button", { cls: "improved-bases-option-suggestion", attr: { type: "button", "aria-label": `Add option ${value}` } });
+			setIcon(chip.createSpan(), "lucide-plus");
+			chip.createSpan({ text: value });
+			chip.addEventListener("click", () => {
+				add(value);
+				rerender();
+			});
+		}
+		if (values.length > 1) {
+			const all = row.createEl("button", { cls: "improved-bases-suggestions-all", attr: { type: "button" }, text: "Add all" });
+			all.addEventListener("click", () => {
+				for (const value of values) add(value);
+				rerender();
+			});
+		}
 	}
 
 	/** "+ Option" turns into an input; Enter adds and keeps it open, an empty blur or Escape turns it back. */
