@@ -160,6 +160,39 @@ describe("typeInfoPatch", () => {
       vi.useRealTimers();
     }
   });
+  it("renders a native override value its widget rejects with the original widget and a marker", () => {
+    const { app, text, mtm } = fakeApp();
+    Object.assign(text, { name: "Text" });
+    const number = { ...widget("number"), name: () => "Zahl", validate: (v?: unknown) => typeof v === "number" };
+    mtm.registeredTypeWidgets.number = number;
+    const membership: FakeMembership = { knownFieldNames: () => new Set(["status"]), resolveWithBase: () => res({ type: "number" }), on: vi.fn() };
+    installTypeInfoPatch(app, env(membership), widgets({}));
+    const info = mtm.getTypeInfo("Status", "Aktiv");
+    const cell = div();
+    info.inferred.render(cell, "Aktiv", ctx("a.md", "Status"));
+    expect(number.render).not.toHaveBeenCalled();
+    expect(text.render).toHaveBeenCalledWith(cell, "Aktiv", expect.anything());
+    const marker = cell.querySelector<HTMLElement>(".improved-bases-mismatch");
+    expect(marker?.getAttribute("aria-label")).toBe('"Aktiv" is not a valid Zahl; shown as Text until edited');
+    const click = new MouseEvent("click", { bubbles: true, cancelable: true });
+    marker?.dispatchEvent(click);
+    expect(click.defaultPrevented).toBe(true);
+  });
+  it("renders the native override widget for valid and empty values without a marker", () => {
+    const { app, text, mtm } = fakeApp();
+    const number = { ...widget("number"), validate: (v?: unknown) => typeof v === "number" };
+    mtm.registeredTypeWidgets.number = number;
+    const membership: FakeMembership = { knownFieldNames: () => new Set(["status"]), resolveWithBase: () => res({ type: "number" }), on: vi.fn() };
+    installTypeInfoPatch(app, env(membership), widgets({}));
+    const info = mtm.getTypeInfo("Status", 3);
+    for (const value of [3, null, undefined, ""]) {
+      const cell = div();
+      info.inferred.render(cell, value, ctx("a.md", "Status"));
+      expect(cell.querySelector(".improved-bases-mismatch")).toBeNull();
+    }
+    expect(number.render).toHaveBeenCalledTimes(4);
+    expect(text.render).not.toHaveBeenCalled();
+  });
   it("falls back to original widget when plugin widget throws", () => {
     const { app, text, mtm } = fakeApp();
     const membership: FakeMembership = { knownFieldNames: () => new Set(["team"]), resolveWithBase: () => res({ type: "relation", base: "T.base", multiple: false }), on: vi.fn() };

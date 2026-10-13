@@ -112,7 +112,8 @@
 	flex: 1 1 auto;
 	min-width: 0;
 }
-.improved-bases-conflict {
+.improved-bases-conflict,
+.improved-bases-mismatch {
 	display: inline-flex;
 	flex: 0 0 auto;
 	margin-left: auto;

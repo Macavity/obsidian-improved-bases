@@ -11,7 +11,7 @@ export interface PropertyType {
 const DEFAULT_ICON = "lucide-text";
 
 /** The widget's display name; Obsidian stores a string or a getter. Falls back to the id. */
-function nameOf(widget: TypeWidget, fallback: string): string {
+export function nameOf(widget: TypeWidget, fallback: string): string {
 	try {
 		const name = typeof widget.name === "function" ? (widget.name as () => unknown)() : widget.name;
 		return typeof name === "string" && name ? name : fallback;
