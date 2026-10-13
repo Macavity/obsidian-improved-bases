@@ -186,6 +186,74 @@
 	display: none;
 }
 
+/* Option picker: popover at body, placed once at open (see placePopover). */
+.improved-bases-option-picker {
+	position: fixed;
+	z-index: var(--layer-menu);
+	top: var(--ib-picker-top);
+	bottom: var(--ib-picker-bottom);
+	left: var(--ib-picker-left);
+	width: var(--ib-picker-width);
+	max-height: var(--ib-picker-max-height);
+	display: flex;
+	flex-direction: column;
+	background-color: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	box-shadow: var(--shadow-s);
+	font-size: var(--font-ui-small);
+	overflow: hidden;
+}
+.improved-bases-picker-header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--size-2-2);
+	padding: var(--size-4-2);
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+.improved-bases-picker-values {
+	display: contents;
+}
+.improved-bases-picker-header input {
+	flex: 1 1 80px;
+	min-width: 80px;
+	border: none;
+	background: transparent;
+	box-shadow: none;
+}
+.improved-bases-picker-list {
+	flex: 1 1 auto;
+	overflow-y: auto;
+	padding: var(--size-2-2);
+}
+.improved-bases-picker-row,
+.improved-bases-picker-create {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	padding: var(--size-2-3) var(--size-4-2);
+	border-radius: var(--radius-s);
+	cursor: pointer;
+}
+.improved-bases-picker-row:hover,
+.improved-bases-picker-create:hover,
+.improved-bases-picker-row.is-selected,
+.improved-bases-picker-create.is-selected {
+	background-color: var(--background-modifier-hover);
+}
+.improved-bases-picker-check {
+	margin-left: auto;
+	color: var(--text-accent);
+}
+.improved-bases-picker-create {
+	color: var(--text-accent);
+}
+.improved-bases-picker-hint {
+	padding: var(--size-2-3) var(--size-4-2);
+	color: var(--text-muted);
+}
+
 .improved-bases-form-error {
 	color: var(--text-error);
 	font-size: var(--font-ui-smaller);
