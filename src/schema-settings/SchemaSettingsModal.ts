@@ -1,11 +1,11 @@
 import { ButtonComponent, Modal, setIcon, ToggleComponent, type App } from "obsidian";
 import { referencesName } from "../schema/baseDoc";
 import { openOptionEditMenu } from "../widgets/pickers";
-import { nextOptionColor, toList } from "../widgets/values";
+import { nextOptionColor } from "../widgets/values";
 import { renderIcon } from "../widgets/icons";
 import type { OverlayRegistry } from "../widgets/types";
 import { propertyTypeOf, type PropertyType } from "../internals/typeRegistry";
-import { applyTypeChoice, conflictHint, mismatchHint, overrideType, removals, renames, typeChoice, typeChoices, validateDrafts, type FieldDraft, type OptionDraft, type OtherDefinition, type TypeChoice } from "./schemaDraft";
+import { applyTypeChoice, conflictHint, mismatchHint, optionSuggestions, overrideType, removals, renames, typeChoice, typeChoices, validateDrafts, type FieldDraft, type OptionDraft, type OtherDefinition, type TypeChoice } from "./schemaDraft";
 
 export interface SchemaSettingsInput {
 	basePath: string;
@@ -39,6 +39,7 @@ export interface SchemaSettingsHandlers {
 	countAffected: (name: string) => Promise<number>;
 }
 
+const MAX_SUGGESTIONS = 12;
 const MEMBERS_LOADING = "Base members are still loading, try again in a moment";
 const IDLE_STATUS = "Changes are written to the base on Save. Renames and removals also update the member notes.";
 const ICON_HELP = "Emoji shown for this base's entries in relations, unless a note has its own icon property. The system emoji picker opens with ctrl+cmd+space on macOS and with the Windows key + period on Windows.";
@@ -541,30 +542,29 @@ export class SchemaSettingsModal extends Modal {
 		this.renderSuggestions(el, draft, rerender);
 	}
 
-	/** Values found in the member notes that are not options yet; a click adds one, "Add all" adds them all. */
+	/** Note values that are not options yet, most frequent first; a click adds one, "Add all" adds every one. */
 	private renderSuggestions(el: HTMLElement, draft: FieldDraft, rerender: () => void): void {
-		const known = new Set(draft.options.map((o) => o.value));
-		const found = new Set(this.input.memberValues(draft.originalName ?? draft.name).flatMap(toList));
-		const values = [...found].sort((a, b) => a.localeCompare(b)).filter((v) => !known.has(v));
-		if (!values.length) return;
+		const suggestions = optionSuggestions(this.input.memberValues(draft.originalName ?? draft.name), draft.options);
+		if (!suggestions.length) return;
 		const add = (value: string): void => {
 			if (!draft.options.some((o) => o.value === value)) draft.options.push({ value, color: nextOptionColor(draft.options.length) });
 		};
 		const row = el.createDiv({ cls: "improved-bases-option-suggestions" });
 		row.createSpan({ cls: "improved-bases-suggestions-label", text: "In notes:" });
-		for (const value of values) {
+		for (const { value, count } of suggestions.slice(0, MAX_SUGGESTIONS)) {
 			const chip = row.createEl("button", { cls: "improved-bases-option-suggestion", attr: { type: "button", "aria-label": `Add option ${value}` } });
 			setIcon(chip.createSpan(), "lucide-plus");
 			chip.createSpan({ text: value });
+			chip.createSpan({ cls: "improved-bases-suggestion-count", text: ` · ${count}` });
 			chip.addEventListener("click", () => {
 				add(value);
 				rerender();
 			});
 		}
-		if (values.length > 1) {
-			const all = row.createEl("button", { cls: "improved-bases-suggestions-all", attr: { type: "button" }, text: "Add all" });
+		if (suggestions.length > 1) {
+			const all = row.createEl("button", { cls: "improved-bases-suggestions-all", attr: { type: "button" }, text: `Add all (${suggestions.length})` });
 			all.addEventListener("click", () => {
-				for (const value of values) add(value);
+				for (const { value } of suggestions) add(value);
 				rerender();
 			});
 		}

@@ -616,6 +616,9 @@
 	background-color: var(--background-modifier-hover);
 	color: var(--text-normal);
 }
+.improved-bases-schema .improved-bases-suggestion-count {
+	opacity: 0.7;
+}
 .improved-bases-schema .improved-bases-suggestions-all {
 	padding: 0 var(--size-2-2);
 	border: 0;

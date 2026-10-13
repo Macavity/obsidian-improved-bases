@@ -4,6 +4,7 @@ import { SchemaSettingsModal, type SchemaSettingsInput } from "../src/schema-set
 import type { FieldDraft } from "../src/schema-settings/schemaDraft";
 import { OverlayRegistry } from "../src/widgets/types";
 import { openOptionEditMenu } from "../src/widgets/pickers";
+import { nextOptionColor } from "../src/widgets/values";
 import type { Color } from "../src/schema/types";
 import type { PropertyType } from "../src/internals/typeRegistry";
 
@@ -72,18 +73,52 @@ describe("SchemaSettingsModal", () => {
 		const memberValues = vi.fn((name: string) => (name === "Status" ? ["Todo", ["Open", "Done"], "Open", 3] : []));
 		const { el, q } = open({ kind: "fields", drafts: [d({ name: "Status", type: "select", options: [{ value: "Open", color: "blue" }] })] }, { memberValues });
 		q<HTMLButtonElement>(".improved-bases-field-disclosure").click();
-		expect(suggestions(el)).toEqual(["Done", "Todo"]);
+		expect(suggestions(el)).toEqual(["Done · 1", "Todo · 1"]);
 		q<HTMLButtonElement>('.improved-bases-option-suggestion[aria-label="Add option Todo"]').click();
 		expect(chips(el)).toEqual(["Open", "Todo"]);
-		expect(suggestions(el)).toEqual(["Done"]);
+		expect(suggestions(el)).toEqual(["Done · 1"]);
 		expect(el.querySelector(".improved-bases-suggestions-all")).toBeNull();
 		memberValues.mockReturnValue(["A", "B", "Done", "Open", "Todo"]);
 		q<HTMLButtonElement>(".improved-bases-field-disclosure").click();
 		q<HTMLButtonElement>(".improved-bases-field-disclosure").click();
-		expect(suggestions(el)).toEqual(["A", "B", "Done"]);
+		expect(suggestions(el)).toEqual(["A · 1", "B · 1", "Done · 1"]);
 		q<HTMLButtonElement>(".improved-bases-suggestions-all").click();
 		expect(chips(el)).toEqual(["Open", "Todo", "A", "B", "Done"]);
 		expect(el.querySelector(".improved-bases-option-suggestions")).toBeNull();
+	});
+	it("caps the suggestion chips at twelve while Add all adds every value", () => {
+		const values = Array.from({ length: 15 }, (_, i) => `V${String(i).padStart(2, "0")}`);
+		const { el, q } = open({ kind: "fields", drafts: [d({ name: "Status", type: "select" })] }, { memberValues: () => values });
+		q<HTMLButtonElement>(".improved-bases-field-disclosure").click();
+		expect(suggestions(el)).toHaveLength(12);
+		const all = q<HTMLButtonElement>(".improved-bases-suggestions-all");
+		expect(all.textContent).toBe("Add all (15)");
+		all.click();
+		expect(chips(el)).toEqual(values);
+	});
+	it("gives a clicked suggestion the next palette color and removes the chip", () => {
+		const options = [{ value: "Open", color: "blue" as Color }];
+		const { el, q, onSave } = open({ kind: "fields", drafts: [d({ name: "Status", type: "select", options })] }, { memberValues: () => ["Todo", "Todo", "Open"] });
+		q<HTMLButtonElement>(".improved-bases-field-disclosure").click();
+		expect(suggestions(el)).toEqual(["Todo · 2"]);
+		q<HTMLButtonElement>('.improved-bases-option-suggestion[aria-label="Add option Todo"]').click();
+		expect(suggestions(el)).toEqual([]);
+		q<HTMLButtonElement>(".improved-bases-save").click();
+		expect(onSave.mock.calls[0]?.[0][0]?.options[1]).toEqual({ value: "Todo", color: nextOptionColor(1) });
+	});
+	it("reads the suggestions of the original name for a renamed field", () => {
+		const memberValues = vi.fn((_name: string) => ["a"]);
+		const { el, q } = open({ kind: "fields", drafts: [d({ originalName: "Status", name: "State", type: "select" })] }, { memberValues });
+		q<HTMLButtonElement>(".improved-bases-field-disclosure").click();
+		expect(memberValues).toHaveBeenCalledWith("Status");
+		expect(memberValues).not.toHaveBeenCalledWith("State");
+		expect(suggestions(el)).toEqual(["a · 1"]);
+	});
+	it("offers no Add all for a single suggestion", () => {
+		const { el, q } = open({ kind: "fields", drafts: [d({ name: "Status", type: "select" })] }, { memberValues: () => ["a"] });
+		q<HTMLButtonElement>(".improved-bases-field-disclosure").click();
+		expect(suggestions(el)).toEqual(["a · 1"]);
+		expect(el.querySelector(".improved-bases-suggestions-all")).toBeNull();
 	});
 	it("shows the suggestions when a field is switched to select", () => {
 		const { el, q } = open({ kind: "fields", drafts: [d({ name: "Status", detected: "text" })] }, { memberValues: () => ["x"] });
@@ -91,7 +126,7 @@ describe("SchemaSettingsModal", () => {
 		const type = q<HTMLSelectElement>(".improved-bases-field-type");
 		type.value = "select";
 		type.dispatchEvent(new Event("change"));
-		expect(suggestions(el)).toEqual(["x"]);
+		expect(suggestions(el)).toEqual(["x · 1"]);
 	});
 	it("shows one table row per field with name, type icon and details", () => {
 		const { modal, el, q } = open({
