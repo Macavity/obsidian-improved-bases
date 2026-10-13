@@ -1,19 +1,31 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { App } from "obsidian";
+import { Notice, TFile, type App } from "obsidian";
 import { SelectWidget } from "../src/widgets/SelectWidget";
 import { openOptionPicker, type OptionPickerHost } from "../src/widgets/OptionPicker";
 import { addOptionMutation, nextOptionColor } from "../src/widgets/values";
 import type { SelectField } from "../src/schema/types";
+import { MEMBERS_LOADING } from "../src/schema/messages";
 import { OverlayRegistry, type PropertyRenderContext, type WidgetEnv } from "../src/widgets/types";
 
+vi.mock("obsidian", async (orig) => {
+	const actual = await orig<typeof import("obsidian")>();
+	return { ...actual, Notice: vi.fn() };
+});
 vi.mock("../src/widgets/OptionPicker", () => ({ openOptionPicker: vi.fn(() => ({ close: vi.fn() })) }));
 
-function setup(value: unknown, opts: { multiple?: boolean; resolved?: boolean; writeFails?: boolean; source?: { basePath: string; name: string } } = {}) {
+function setup(value: unknown, opts: { multiple?: boolean; resolved?: boolean; writeFails?: boolean; source?: { basePath: string; name: string }; files?: TFile[] | null } = {}) {
+	const processFrontMatter = vi.fn((_f: unknown, fn: (fm: Record<string, unknown>) => void) => {
+		fn({ status: ["A", "B"] });
+		return Promise.resolve();
+	});
 	const update = vi.fn((_path: string, _mutate: unknown) => (opts.writeFails ? Promise.reject(new Error("locked")) : Promise.resolve()));
 	const env = {
-		app: {} as App,
+		app: { fileManager: { processFrontMatter } } as unknown as App,
 		writer: { update },
-		membership: { resolveWithBase: () => (opts.resolved === false ? null : { basePath: "M.base", name: "Status" }) },
+		membership: {
+			resolveWithBase: () => (opts.resolved === false ? null : { basePath: "M.base", name: "Status" }),
+			targetEntries: () => (opts.files === null ? null : (opts.files ?? [new TFile(), new TFile()] as TFile[])),
+		},
 		overlays: new OverlayRegistry(),
 	} as unknown as WidgetEnv;
 	const onChange = vi.fn();
@@ -29,7 +41,7 @@ function setup(value: unknown, opts: { multiple?: boolean; resolved?: boolean; w
 		if (!call) throw new Error("picker not opened");
 		return call[1];
 	};
-	return { el, root, handle, onChange, update, pills, open, env };
+	return { el, root, handle, onChange, update, pills, open, env, processFrontMatter };
 }
 
 beforeEach(() => {
@@ -126,9 +138,53 @@ describe("SelectWidget", () => {
 		expect(await open().recolor("A", "blue")).toBe(false);
 		expect(el.querySelector(".improved-bases-pill")?.getAttribute("data-color")).toBe("red");
 	});
-	it("leaves rename and remove for later", async () => {
+	it("leaves remove for later", async () => {
 		const host = setup(["A"]).open();
-		expect(await host.rename("A", "B")).toBe(false);
 		expect(await host.remove("A")).toBe(false);
+	});
+	describe("rename", () => {
+		const lastNotice = () => vi.mocked(Notice).mock.calls.at(-1)?.[0];
+		it("refuses an existing option name without writing", async () => {
+			const { open, update, processFrontMatter } = setup(["A"]);
+			expect(await open().rename("A", "A")).toBe(false);
+			expect(lastNotice()).toBe("Option exists");
+			expect(update).not.toHaveBeenCalled();
+			expect(processFrontMatter).not.toHaveBeenCalled();
+		});
+		it("writes nothing while the members are unknown", async () => {
+			const { open, update, processFrontMatter } = setup(["A"], { files: null });
+			expect(await open().rename("A", "Z")).toBe(false);
+			expect(update).not.toHaveBeenCalled();
+			expect(processFrontMatter).not.toHaveBeenCalled();
+			expect(lastNotice()).toBe(MEMBERS_LOADING);
+		});
+		it("does nothing without a source", async () => {
+			const { open, update } = setup(["A"], { resolved: false });
+			expect(await open().rename("A", "Z")).toBe(false);
+			expect(update).not.toHaveBeenCalled();
+		});
+		it("stops when the schema write fails", async () => {
+			const { open, processFrontMatter, pills } = setup(["A"], { writeFails: true });
+			expect(await open().rename("A", "Z")).toBe(false);
+			expect(processFrontMatter).not.toHaveBeenCalled();
+			expect(pills()).toEqual(["A"]);
+		});
+		it("writes the schema, migrates the notes, reports and redraws", async () => {
+			const { open, update, processFrontMatter, pills } = setup(["A"]);
+			expect(await open().rename("A", "Z")).toBe(true);
+			expect(update).toHaveBeenCalledWith("M.base", expect.any(Function));
+			expect(processFrontMatter).toHaveBeenCalledTimes(2);
+			expect(lastNotice()).toBe("Renamed in 2 notes");
+			expect(pills()).toEqual(["Z"]);
+		});
+		it("uses the singular and reports failures", async () => {
+			const one = setup(["A"], { files: [new TFile()] });
+			await one.open().rename("A", "Z");
+			expect(lastNotice()).toBe("Renamed in 1 note");
+			const bad = setup(["A"]);
+			bad.processFrontMatter.mockRejectedValueOnce(new Error("x"));
+			await bad.open().rename("A", "Z");
+			expect(lastNotice()).toBe("Renamed in 1 note, 1 failed");
+		});
 	});
 });

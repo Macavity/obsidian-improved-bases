@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { openOptionPicker, placePopover, type OptionPickerHost } from "../src/widgets/OptionPicker";
+import { openOptionPicker, type OptionPickerHost } from "../src/widgets/OptionPicker";
+import { placePopover } from "../src/widgets/placePopover";
 import { OverlayRegistry } from "../src/widgets/types";
 import type { SelectOption } from "../src/schema/types";
 
@@ -12,6 +13,11 @@ const OPTIONS: SelectOption[] = [
 const setup = (p: Partial<OptionPickerHost> = {}) => {
 	const anchor = document.body.createDiv();
 	const commit = vi.fn();
+	const fns = {
+		recolor: vi.fn((_value: string, _color: string) => Promise.resolve(true)),
+		rename: vi.fn((_from: string, _to: string) => Promise.resolve(true)),
+		remove: vi.fn((_value: string) => Promise.resolve(true)),
+	};
 	const create = vi.fn((value: string) => Promise.resolve<SelectOption | null>({ value, color: "orange" }));
 	const host: OptionPickerHost = {
 		options: OPTIONS.map((o) => ({ ...o })),
@@ -19,9 +25,9 @@ const setup = (p: Partial<OptionPickerHost> = {}) => {
 		multiple: false,
 		commit,
 		create,
-		recolor: vi.fn(() => Promise.resolve(true)),
-		rename: vi.fn(() => Promise.resolve(true)),
-		remove: vi.fn(() => Promise.resolve(true)),
+		recolor: fns.recolor,
+		rename: fns.rename,
+		remove: fns.remove,
 		...p,
 	};
 	const overlays = new OverlayRegistry();
@@ -41,7 +47,7 @@ const setup = (p: Partial<OptionPickerHost> = {}) => {
 		input().dispatchEvent(e);
 		return e;
 	};
-	return { anchor, host, commit, create, overlays, picker, popover, input, rows, labels, createRow, headerPills, type, key };
+	return { anchor, host, fns, commit, create, overlays, picker, popover, input, rows, labels, createRow, headerPills, type, key };
 };
 
 afterEach(() => {
@@ -240,5 +246,78 @@ describe("openOptionPicker", () => {
 		type("x");
 		expect(popover()).toBeNull();
 		expect(error).toHaveBeenCalledWith("Improved Bases: option picker failed", expect.any(Error));
+	});
+
+	describe("option editor", () => {
+		const editorEl = () => document.body.querySelector<HTMLElement>(".improved-bases-option-editor");
+		const pencil = (r: HTMLElement | undefined) => r?.querySelector<HTMLElement>(".improved-bases-picker-edit") as HTMLElement;
+		const flush = () => new Promise((r) => setTimeout(r, 0));
+		const rename = async (to: string) => {
+			const input = editorEl()?.querySelector("input") as HTMLInputElement;
+			input.value = to;
+			input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+			await flush();
+		};
+		it("opens from the pencil with an aria-label", () => {
+			const { rows } = setup();
+			expect(pencil(rows()[0]).getAttribute("aria-label")).toBe("Edit option Alpha");
+			expect(pencil(rows()[0]).getAttribute("data-icon")).toBe("lucide-pencil");
+			pencil(rows()[0]).click();
+			expect(editorEl()).not.toBeNull();
+		});
+		it("renames in list and header after success, closing the editor", async () => {
+			const { rows, labels, headerPills, host, fns } = setup({ values: ["Beta"] });
+			pencil(rows()[1]).click();
+			await rename("Zeta");
+			expect(fns.rename).toHaveBeenCalledWith("Beta", "Zeta");
+			expect(labels()[1]).toContain("Zeta");
+			expect(headerPills()[0]?.textContent).toContain("Zeta");
+			expect(host.values).toEqual(["Zeta"]);
+			expect(editorEl()).toBeNull();
+		});
+		it("keeps everything when the rename fails", async () => {
+			const { rows, labels, headerPills } = setup({ values: ["Beta"], rename: vi.fn(() => Promise.resolve(false)) });
+			pencil(rows()[1]).click();
+			await rename("Zeta");
+			expect(labels()[1]).toContain("Beta");
+			expect(headerPills()[0]?.textContent).toContain("Beta");
+			expect(editorEl()).not.toBeNull();
+		});
+		it("recolors the option and keeps the editor open", async () => {
+			const { rows, host, fns, popover } = setup();
+			pencil(rows()[0]).click();
+			editorEl()?.querySelector<HTMLElement>("[data-color='cyan']")?.click();
+			await flush();
+			expect(fns.recolor).toHaveBeenCalledWith("Alpha", "cyan");
+			expect(host.options[0]?.color).toBe("cyan");
+			expect(popover()?.querySelector(".improved-bases-picker-row .improved-bases-pill")?.getAttribute("data-color")).toBe("cyan");
+			expect(editorEl()).not.toBeNull();
+		});
+		it("removes the option from the list and closes the editor", async () => {
+			const { rows, labels, fns } = setup();
+			pencil(rows()[0]).click();
+			editorEl()?.querySelector<HTMLElement>(".improved-bases-option-editor-delete")?.click();
+			await flush();
+			expect(fns.remove).toHaveBeenCalledWith("Alpha");
+			expect(labels()).toEqual(["Beta", "Gamma"]);
+			expect(editorEl()).toBeNull();
+		});
+		it("mousedown inside the editor does not close the picker; Escape closes only the editor", () => {
+			const { rows, popover } = setup();
+			pencil(rows()[0]).click();
+			editorEl()?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+			expect(popover()).not.toBeNull();
+			editorEl()?.querySelector("input")?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+			expect(editorEl()).toBeNull();
+			expect(popover()).not.toBeNull();
+		});
+		it("closes the editor with the picker, and replaces it when another pencil is used", () => {
+			const { rows, picker } = setup();
+			pencil(rows()[0]).click();
+			pencil(rows()[1]).click();
+			expect(document.body.querySelectorAll(".improved-bases-option-editor").length).toBe(1);
+			picker.close();
+			expect(editorEl()).toBeNull();
+		});
 	});
 });

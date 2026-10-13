@@ -6,6 +6,7 @@ import { renderIcon } from "../widgets/icons";
 import type { OverlayRegistry } from "../widgets/types";
 import { propertyTypeOf, type PropertyType } from "../internals/typeRegistry";
 import { applyTypeChoice, conflictHint, mismatchHint, optionSuggestions, overrideType, removals, renames, typeChoice, typeChoices, validateDrafts, type FieldDraft, type OptionDraft, type OtherDefinition, type TypeChoice } from "./schemaDraft";
+import { MEMBERS_LOADING } from "../schema/messages";
 
 export interface SchemaSettingsInput {
 	basePath: string;
@@ -40,7 +41,6 @@ export interface SchemaSettingsHandlers {
 }
 
 const MAX_SUGGESTIONS = 12;
-const MEMBERS_LOADING = "Base members are still loading, try again in a moment";
 const IDLE_STATUS = "Changes are written to the base on Save. Renames and removals also update the member notes.";
 const ICON_HELP = "Emoji shown for this base's entries in relations, unless a note has its own icon property. The system emoji picker opens with ctrl+cmd+space on macOS and with the Windows key + period on Windows.";
 

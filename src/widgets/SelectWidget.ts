@@ -1,8 +1,10 @@
 import { Notice } from "obsidian";
+import { migrateOptionValues } from "../schema/optionMigration";
+import { MEMBERS_LOADING } from "../schema/messages";
 import type { Color, SelectField, SelectOption } from "../schema/types";
 import { openOptionPicker, type OptionPickerHost } from "./OptionPicker";
 import type { PluginWidget, SchemaSource } from "./types";
-import { addOptionMutation, colorOf, nextOptionColor, selectOutput, setColorMutation, toList } from "./values";
+import { addOptionMutation, colorOf, nextOptionColor, renameOptionMutation, renameValue, selectOutput, setColorMutation, toList } from "./values";
 
 /** Colored pills; options come from the schema, unknown values are shown grey and never dropped. Clicking the field opens the option picker. */
 export const SelectWidget: PluginWidget<SelectField> = (el, value, ctx, field, env, source) => {
@@ -61,7 +63,23 @@ export const SelectWidget: PluginWidget<SelectField> = (el, value, ctx, field, e
 			draw();
 			return true;
 		},
-		rename: () => Promise.resolve(false),
+		async rename(from: string, to: string): Promise<boolean> {
+			const src = sourceOf();
+			if (options.some((o) => o.value === to)) {
+				new Notice("Option exists");
+				return false;
+			}
+			const files = src && membership.targetEntries(src.basePath);
+			if (src && !files) new Notice(MEMBERS_LOADING);
+			if (!src || !files || !(await writeSchema(renameOptionMutation(src.name, from, to)))) return false;
+			const { changed, failed } = await migrateOptionValues(env.app, files, src.name, (v) => renameValue(v, from, to));
+			const count = `${changed} ${changed === 1 ? "note" : "notes"}`;
+			new Notice(`Renamed in ${count}${failed > 0 ? `, ${failed} failed` : ""}`);
+			for (const o of options) if (o.value === from) o.value = to;
+			values = [...new Set(values.map((v) => (v === from ? to : v)))];
+			draw();
+			return true;
+		},
 		remove: () => Promise.resolve(false),
 	});
 

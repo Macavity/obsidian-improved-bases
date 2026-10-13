@@ -1,5 +1,8 @@
+import { setIcon } from "obsidian";
 import type { Color, SelectOption } from "../schema/types";
 import type { OverlayRegistry } from "./types";
+import { openOptionEditor, OPTION_EDITOR_CLASS } from "./OptionEditor";
+import { placePopover } from "./placePopover";
 import { colorOf } from "./values";
 
 /** What the picker needs from the widget; the picker keeps working on its own copies after the cell re-renders. */
@@ -19,19 +22,6 @@ export interface OptionPickerHost {
 
 const MIN_WIDTH = 260;
 const MAX_HEIGHT = 320;
-
-/** Pure placement: below unless the space above is larger and below is too small for `height`. */
-export function placePopover(
-	anchor: DOMRect,
-	viewport: { width: number; height: number },
-	size: { width: number; height: number },
-): { top: number; left: number; width: number; above: boolean } {
-	const width = Math.max(anchor.width, size.width);
-	const left = Math.max(0, Math.min(anchor.left, viewport.width - width));
-	const below = viewport.height - anchor.bottom;
-	const above = below < size.height && anchor.top > below;
-	return { top: above ? Math.max(0, anchor.top - size.height) : anchor.bottom, left, width, above };
-}
 
 type Row = { option: SelectOption; create?: never } | { create: string; option?: never };
 
@@ -84,9 +74,11 @@ export function openOptionPicker(anchor: HTMLElement, host: OptionPickerHost, ov
 	let rows: Row[] = [];
 	let selected = 0;
 	let closed = false;
+	let editor: { close(): void } | null = null;
 
 	const onOutside = (evt: MouseEvent): void => {
-		if (!popover.contains(evt.target as Node)) close();
+		const target = evt.target as Element;
+		if (!popover.contains(target) && !target.closest(`.${OPTION_EDITOR_CLASS}`)) close();
 	};
 	document.addEventListener("mousedown", onOutside, true);
 	const unregister = overlays.add(() => close());
@@ -94,6 +86,7 @@ export function openOptionPicker(anchor: HTMLElement, host: OptionPickerHost, ov
 	function close(): void {
 		if (closed) return;
 		closed = true;
+		editor?.close();
 		document.removeEventListener("mousedown", onOutside, true);
 		unregister();
 		popover.remove();
@@ -146,6 +139,12 @@ export function openOptionPicker(anchor: HTMLElement, host: OptionPickerHost, ov
 		el.toggleClass("is-selected", index === selected);
 		pill(el, row.option.value);
 		if (active) el.createSpan({ cls: "improved-bases-picker-check", text: "✓" });
+		const edit = el.createEl("button", {
+			cls: "improved-bases-picker-edit",
+			attr: { type: "button", "aria-label": `Edit option ${row.option.value}` },
+		});
+		setIcon(edit, "lucide-pencil");
+		onPress(edit, () => editOption(el, row.option));
 		onPress(el, () => activate(row));
 	};
 
@@ -165,6 +164,32 @@ export function openOptionPicker(anchor: HTMLElement, host: OptionPickerHost, ov
 			fail(e);
 		}
 	}
+
+	const editOption = (anchorEl: HTMLElement, option: SelectOption): void => {
+		editor?.close();
+		const value = option.value;
+		const done = async (ok: Promise<boolean>, apply: () => void, closeEditor: boolean): Promise<boolean> => {
+			if (!(await ok)) return false;
+			apply();
+			if (closeEditor) editor?.close();
+			if (!closed) render();
+			return true;
+		};
+		editor = openOptionEditor(
+			anchorEl,
+			option,
+			{
+				rename: (to) =>
+					done(host.rename(value, to), () => {
+						option.value = to;
+						host.values = [...new Set(host.values.map((v) => (v === value ? to : v)))];
+					}, true),
+				recolor: (color) => done(host.recolor(value, color), () => (option.color = color), false),
+				remove: () => done(host.remove(value), () => (host.options = host.options.filter((o) => o !== option)), true),
+			},
+			overlays,
+		);
+	};
 
 	const choose = (value: string, add: boolean): void => {
 		setValues(nextValues(host.values, value, host.multiple, add));

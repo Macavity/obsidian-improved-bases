@@ -765,3 +765,62 @@
 		grid-column: 4;
 	}
 }
+
+/* Option editor: popover at body next to the picker row. */
+.improved-bases-option-editor {
+	position: fixed;
+	z-index: calc(var(--layer-menu) + 1);
+	top: var(--ib-editor-top);
+	left: var(--ib-editor-left);
+	width: var(--ib-editor-width);
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-2);
+	padding: var(--size-4-2);
+	background-color: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	box-shadow: var(--shadow-s);
+	font-size: var(--font-ui-small);
+}
+.improved-bases-option-editor-delete {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	padding: var(--size-2-3) var(--size-4-2);
+	border-radius: var(--radius-s);
+	color: var(--text-error);
+	cursor: pointer;
+}
+.improved-bases-option-editor-delete:hover {
+	background-color: var(--background-modifier-hover);
+}
+.improved-bases-option-editor-colors {
+	display: grid;
+	grid-template-columns: repeat(7, 1fr);
+	gap: var(--size-2-3);
+}
+.improved-bases-option-editor-colors button {
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	border-radius: 50%;
+	box-shadow: none;
+	background-color: rgb(var(--ib-rgb));
+}
+.improved-bases-option-editor-colors button.is-active {
+	outline: 2px solid var(--text-accent);
+	outline-offset: 1px;
+}
+.improved-bases-picker-edit {
+	margin-left: auto;
+	padding: 0 var(--size-2-3);
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	visibility: hidden;
+}
+.improved-bases-picker-row:hover .improved-bases-picker-edit,
+.improved-bases-picker-row.is-selected .improved-bases-picker-edit {
+	visibility: visible;
+}
