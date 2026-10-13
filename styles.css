@@ -174,20 +174,32 @@
 	font-size: var(--font-ui-small);
 	overflow: hidden;
 }
+/* Pills and cursor read as one tag field; the input itself has no frame of its own. */
 .improved-bases-picker-header {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--size-2-2);
-	padding: var(--size-4-2);
-	border-bottom: 1px solid var(--background-modifier-border);
+	margin: var(--size-4-2);
+	padding: var(--size-2-2) var(--size-4-2);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--input-radius);
+	background-color: var(--background-modifier-form-field);
+}
+.improved-bases-picker-header:focus-within {
+	border-color: var(--background-modifier-border-focus);
+	box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
 }
 .improved-bases-picker-values {
 	display: contents;
 }
-.improved-bases-picker-header input {
+.improved-bases-picker-header input[type="text"],
+.improved-bases-picker-header input[type="text"]:hover,
+.improved-bases-picker-header input[type="text"]:focus {
 	flex: 1 1 80px;
 	min-width: 80px;
+	height: auto;
+	padding: 0;
 	border: none;
 	background: transparent;
 	box-shadow: none;
