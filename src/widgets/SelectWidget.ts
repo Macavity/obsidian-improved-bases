@@ -1,10 +1,12 @@
-import { Notice } from "obsidian";
+import { Notice, type TFile } from "obsidian";
 import { migrateOptionValues } from "../schema/optionMigration";
 import { MEMBERS_LOADING } from "../schema/messages";
 import type { Color, SelectField, SelectOption } from "../schema/types";
+import { findOwnKey } from "../schema/keys";
+import { confirmOptionDelete } from "./OptionDeleteModal";
 import { openOptionPicker, type OptionPickerHost } from "./OptionPicker";
 import type { PluginWidget, SchemaSource } from "./types";
-import { addOptionMutation, colorOf, nextOptionColor, renameOptionMutation, renameValue, selectOutput, setColorMutation, toList } from "./values";
+import { addOptionMutation, colorOf, countNotesWithValue, nextOptionColor, removeOptionMutation, removeValue, renameOptionMutation, renameValue, selectOutput, setColorMutation, toList } from "./values";
 
 /** Colored pills; options come from the schema, unknown values are shown grey and never dropped. Clicking the field opens the option picker. */
 export const SelectWidget: PluginWidget<SelectField> = (el, value, ctx, field, env, source) => {
@@ -37,51 +39,82 @@ export const SelectWidget: PluginWidget<SelectField> = (el, value, ctx, field, e
 		}
 	};
 
-	const host = (): OptionPickerHost => ({
-		options: options.map((o) => ({ ...o })),
-		values: [...values],
-		multiple: field.multiple,
-		commit(next) {
-			values = [...next];
-			draw();
-			ctx.onChange(selectOutput(next, field.multiple));
-		},
-		async create(created): Promise<SelectOption | null> {
-			const src = sourceOf();
-			if (!src) return null;
-			const color = nextOptionColor(options.length);
-			if (!(await writeSchema(addOptionMutation(src.name, created, color)))) return null;
-			if (!options.some((o) => o.value === created)) options.push({ value: created, color });
-			return { value: created, color };
-		},
-		async recolor(picked: string, color: Color): Promise<boolean> {
-			const src = sourceOf();
-			if (!src || !(await writeSchema(setColorMutation(src.name, picked, color)))) return false;
-			const existing = options.find((o) => o.value === picked);
-			if (existing) existing.color = color;
-			else options.push({ value: picked, color });
-			draw();
-			return true;
-		},
-		async rename(from: string, to: string): Promise<boolean> {
-			const src = sourceOf();
-			if (options.some((o) => o.value === to)) {
-				new Notice("Option exists");
-				return false;
-			}
-			const files = src && membership.targetEntries(src.basePath);
-			if (src && !files) new Notice(MEMBERS_LOADING);
-			if (!src || !files || !(await writeSchema(renameOptionMutation(src.name, from, to)))) return false;
-			const { changed, failed } = await migrateOptionValues(env.app, files, src.name, (v) => renameValue(v, from, to));
-			const count = `${changed} ${changed === 1 ? "note" : "notes"}`;
-			new Notice(`Renamed in ${count}${failed > 0 ? `, ${failed} failed` : ""}`);
-			for (const o of options) if (o.value === from) o.value = to;
-			values = [...new Set(values.map((v) => (v === from ? to : v)))];
-			draw();
-			return true;
-		},
-		remove: () => Promise.resolve(false),
-	});
+	/** The field's value in a member note's properties (case-insensitive key). */
+	const valueIn = (file: TFile, name: string): unknown => {
+		const fm = env.app.metadataCache.getFileCache(file)?.frontmatter;
+		const key = fm && findOwnKey(fm, name);
+		return fm && key !== undefined ? fm[key] : undefined;
+	};
+
+	/** Removes an option; asks first when member notes still use it. After a migration the value also leaves the picker's own `h.values`. */
+	const removeOption = async (h: OptionPickerHost, value: string): Promise<boolean> => {
+		const src = sourceOf();
+		const files = src && membership.targetEntries(src.basePath);
+		if (src && !files) new Notice(MEMBERS_LOADING);
+		if (!src || !files) return false;
+		const count = countNotesWithValue(files.map((f) => valueIn(f, src.name)), value);
+		const choice = count === 0 ? "schema" : await confirmOptionDelete(env.app, value, count, env.overlays);
+		if (!choice || !(await writeSchema(removeOptionMutation(src.name, value)))) return false;
+		if (choice === "notes") {
+			const { changed, failed } = await migrateOptionValues(env.app, files, src.name, (v) => removeValue(v, value));
+			new Notice(`Removed from ${changed} ${changed === 1 ? "note" : "notes"}${failed > 0 ? `, ${failed} failed` : ""}`);
+			values = values.filter((v) => v !== value);
+			h.values = h.values.filter((v) => v !== value);
+		}
+		const index = options.findIndex((o) => o.value === value);
+		if (index >= 0) options.splice(index, 1);
+		draw();
+		return true;
+	};
+
+	const host = (): OptionPickerHost => {
+		const h: OptionPickerHost = {
+			options: options.map((o) => ({ ...o })),
+			values: [...values],
+			multiple: field.multiple,
+			commit(next) {
+				values = [...next];
+				draw();
+				ctx.onChange(selectOutput(next, field.multiple));
+			},
+			async create(created): Promise<SelectOption | null> {
+				const src = sourceOf();
+				if (!src) return null;
+				const color = nextOptionColor(options.length);
+				if (!(await writeSchema(addOptionMutation(src.name, created, color)))) return null;
+				if (!options.some((o) => o.value === created)) options.push({ value: created, color });
+				return { value: created, color };
+			},
+			async recolor(picked: string, color: Color): Promise<boolean> {
+				const src = sourceOf();
+				if (!src || !(await writeSchema(setColorMutation(src.name, picked, color)))) return false;
+				const existing = options.find((o) => o.value === picked);
+				if (existing) existing.color = color;
+				else options.push({ value: picked, color });
+				draw();
+				return true;
+			},
+			async rename(from: string, to: string): Promise<boolean> {
+				const src = sourceOf();
+				if (options.some((o) => o.value === to)) {
+					new Notice("Option exists");
+					return false;
+				}
+				const files = src && membership.targetEntries(src.basePath);
+				if (src && !files) new Notice(MEMBERS_LOADING);
+				if (!src || !files || !(await writeSchema(renameOptionMutation(src.name, from, to)))) return false;
+				const { changed, failed } = await migrateOptionValues(env.app, files, src.name, (v) => renameValue(v, from, to));
+				const count = `${changed} ${changed === 1 ? "note" : "notes"}`;
+				new Notice(`Renamed in ${count}${failed > 0 ? `, ${failed} failed` : ""}`);
+				for (const o of options) if (o.value === from) o.value = to;
+				values = [...new Set(values.map((v) => (v === from ? to : v)))];
+				draw();
+				return true;
+			},
+			remove: (value) => removeOption(h, value),
+		};
+		return h;
+	};
 
 	const openPicker = (): void => {
 		picker?.close();

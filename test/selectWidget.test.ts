@@ -4,6 +4,7 @@ import { SelectWidget } from "../src/widgets/SelectWidget";
 import { openOptionPicker, type OptionPickerHost } from "../src/widgets/OptionPicker";
 import { addOptionMutation, nextOptionColor } from "../src/widgets/values";
 import type { SelectField } from "../src/schema/types";
+import { confirmOptionDelete } from "../src/widgets/OptionDeleteModal";
 import { MEMBERS_LOADING } from "../src/schema/messages";
 import { OverlayRegistry, type PropertyRenderContext, type WidgetEnv } from "../src/widgets/types";
 
@@ -11,16 +12,17 @@ vi.mock("obsidian", async (orig) => {
 	const actual = await orig<typeof import("obsidian")>();
 	return { ...actual, Notice: vi.fn() };
 });
+vi.mock("../src/widgets/OptionDeleteModal", () => ({ confirmOptionDelete: vi.fn() }));
 vi.mock("../src/widgets/OptionPicker", () => ({ openOptionPicker: vi.fn(() => ({ close: vi.fn() })) }));
 
-function setup(value: unknown, opts: { multiple?: boolean; resolved?: boolean; writeFails?: boolean; source?: { basePath: string; name: string }; files?: TFile[] | null } = {}) {
+function setup(value: unknown, opts: { multiple?: boolean; resolved?: boolean; writeFails?: boolean; source?: { basePath: string; name: string }; files?: TFile[] | null; used?: unknown } = {}) {
 	const processFrontMatter = vi.fn((_f: unknown, fn: (fm: Record<string, unknown>) => void) => {
 		fn({ status: ["A", "B"] });
 		return Promise.resolve();
 	});
 	const update = vi.fn((_path: string, _mutate: unknown) => (opts.writeFails ? Promise.reject(new Error("locked")) : Promise.resolve()));
 	const env = {
-		app: { fileManager: { processFrontMatter } } as unknown as App,
+		app: { fileManager: { processFrontMatter }, metadataCache: { getFileCache: () => ({ frontmatter: { status: opts.used } }) } } as unknown as App,
 		writer: { update },
 		membership: {
 			resolveWithBase: () => (opts.resolved === false ? null : { basePath: "M.base", name: "Status" }),
@@ -138,10 +140,6 @@ describe("SelectWidget", () => {
 		expect(await open().recolor("A", "blue")).toBe(false);
 		expect(el.querySelector(".improved-bases-pill")?.getAttribute("data-color")).toBe("red");
 	});
-	it("leaves remove for later", async () => {
-		const host = setup(["A"]).open();
-		expect(await host.remove("A")).toBe(false);
-	});
 	describe("rename", () => {
 		const lastNotice = () => vi.mocked(Notice).mock.calls.at(-1)?.[0];
 		it("refuses an existing option name without writing", async () => {
@@ -185,6 +183,68 @@ describe("SelectWidget", () => {
 			bad.processFrontMatter.mockRejectedValueOnce(new Error("x"));
 			await bad.open().rename("A", "Z");
 			expect(lastNotice()).toBe("Renamed in 1 note, 1 failed");
+		});
+	});
+	describe("remove", () => {
+		const lastNotice = () => vi.mocked(Notice).mock.calls.at(-1)?.[0];
+		beforeEach(() => vi.mocked(confirmOptionDelete).mockReset());
+		it("writes only the schema without asking when no note uses the option", async () => {
+			const { open, update, processFrontMatter } = setup(["A"], { used: ["B"] });
+			expect(await open().remove("A")).toBe(true);
+			expect(confirmOptionDelete).not.toHaveBeenCalled();
+			expect(update).toHaveBeenCalledTimes(1);
+			expect(processFrontMatter).not.toHaveBeenCalled();
+		});
+		it("fails without a source or when the schema write fails", async () => {
+			expect(await setup(["A"], { resolved: false }).open().remove("A")).toBe(false);
+			expect(await setup(["A"], { writeFails: true }).open().remove("A")).toBe(false);
+		});
+		it("writes nothing while the members are unknown", async () => {
+			const { open, update } = setup(["A"], { files: null });
+			expect(await open().remove("A")).toBe(false);
+			expect(update).not.toHaveBeenCalled();
+			expect(lastNotice()).toBe(MEMBERS_LOADING);
+		});
+		it("removes from the notes and the pills on 'notes'", async () => {
+			vi.mocked(confirmOptionDelete).mockResolvedValue("notes");
+			const { open, update, processFrontMatter, pills, env } = setup(["A", "B"], { used: ["A"] });
+			const h = open();
+			expect(await h.remove("A")).toBe(true);
+			expect(confirmOptionDelete).toHaveBeenCalledWith(env.app, "A", 2, env.overlays);
+			expect(update).toHaveBeenCalledTimes(1);
+			expect(processFrontMatter).toHaveBeenCalledTimes(2);
+			expect(lastNotice()).toBe("Removed from 2 notes");
+			expect(pills()).toEqual(["B"]);
+			expect(h.values).toEqual(["B"]);
+		});
+		it("uses the singular and reports failures", async () => {
+			vi.mocked(confirmOptionDelete).mockResolvedValue("notes");
+			const bad = setup(["A"], { used: "A", files: [new TFile()] });
+			bad.processFrontMatter.mockRejectedValueOnce(new Error("x"));
+			await bad.open().remove("A");
+			expect(lastNotice()).toBe("Removed from 0 notes, 1 failed");
+			const one = setup(["A"], { used: "A", files: [new TFile()] });
+			await one.open().remove("A");
+			expect(lastNotice()).toBe("Removed from 1 note");
+		});
+		it("keeps the value as a grey pill on 'schema'", async () => {
+			vi.mocked(confirmOptionDelete).mockResolvedValue("schema");
+			const { open, update, processFrontMatter, pills, el } = setup(["A"], { used: ["A"] });
+			const h = open();
+			expect(await h.remove("A")).toBe(true);
+			expect(update).toHaveBeenCalledTimes(1);
+			expect(processFrontMatter).not.toHaveBeenCalled();
+			expect(pills()).toEqual(["A"]);
+			expect(h.values).toEqual(["A"]);
+			expect(el.querySelector(".improved-bases-pill")?.getAttribute("title")).toBe("Not in options");
+		});
+		it("writes nothing on cancel", async () => {
+			vi.mocked(confirmOptionDelete).mockResolvedValue(null);
+			const { open, update, processFrontMatter, pills } = setup(["A"], { used: ["A"] });
+			expect(await open().remove("A")).toBe(false);
+			expect(update).not.toHaveBeenCalled();
+			expect(processFrontMatter).not.toHaveBeenCalled();
+			expect(pills()).toEqual(["A"]);
 		});
 	});
 });
