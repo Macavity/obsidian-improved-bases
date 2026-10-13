@@ -236,6 +236,8 @@ describe("SchemaSettingsModal", () => {
 		const input = q<HTMLInputElement>(".improved-bases-option-new");
 		input.value = " B ";
 		input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+		// The browser blurs the input when the rerender detaches it; that must not add the option twice.
+		input.dispatchEvent(new Event("blur"));
 		expect(chips(el)).toEqual(["A", "B"]);
 		// Enter keeps the input open for the next option; Escape turns it back into the button.
 		const next = q<HTMLInputElement>(".improved-bases-option-new");

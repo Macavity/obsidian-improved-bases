@@ -589,9 +589,12 @@ export class SchemaSettingsModal extends Modal {
 				cls: "improved-bases-option-new",
 				attr: { type: "text", placeholder: "New option", "aria-label": "New option" },
 			});
+			let done = false;
+			// The rerender detaches the focused input and the browser then fires blur; `done` keeps that from adding twice.
 			const submit = (): void => {
 				const value = input.value.trim();
-				if (!value) return;
+				if (!value || done) return;
+				done = true;
 				draft.options.push(newOption(value, nextOptionColor(liveOptions(draft.options).length)));
 				rerender();
 				container.querySelector<HTMLElement>(".improved-bases-option-add-button")?.click();
