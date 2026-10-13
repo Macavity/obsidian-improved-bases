@@ -61,6 +61,11 @@ describe("placePopover", () => {
 		expect(placePopover(new DOMRect(10, 100, 120, 30), vp, { width: 260, height: 300 })).toMatchObject({ top: 130, left: 10, width: 260, above: false });
 		expect(placePopover(new DOMRect(10, 700, 300, 30), vp, { width: 260, height: 300 })).toMatchObject({ above: true, width: 300 });
 	});
+	it("right-aligns to the anchor with align end, clamped into the viewport", () => {
+		const vp = { width: 400, height: 800 };
+		expect(placePopover(new DOMRect(300, 100, 20, 20), vp, { width: 220, height: 190 }, "end")).toMatchObject({ left: 100, top: 120 });
+		expect(placePopover(new DOMRect(10, 100, 20, 20), vp, { width: 220, height: 190 }, "end").left).toBe(0);
+	});
 	it("stays below when it fits, and keeps the popover inside the viewport", () => {
 		const vp = { width: 400, height: 800 };
 		expect(placePopover(new DOMRect(300, 400, 50, 30), vp, { width: 260, height: 300 })).toMatchObject({ top: 430, left: 140, above: false });
@@ -70,6 +75,19 @@ describe("placePopover", () => {
 });
 
 describe("openOptionPicker", () => {
+	it("moves the highlight to the hovered row, so Enter picks it", () => {
+		const { rows, key, commit } = setup();
+		rows()[2]?.dispatchEvent(new MouseEvent("mouseenter"));
+		expect(rows().map((r) => r.classList.contains("is-selected"))).toEqual([false, false, true]);
+		key("Enter");
+		expect(commit).toHaveBeenCalledWith(["Gamma"]);
+	});
+	it("orders pill, pencil, check slot and keeps the slot on inactive rows", () => {
+		const { rows } = setup({ values: ["Beta"] });
+		const classes = (r: HTMLElement | undefined) => Array.from(r?.children ?? []).map((c) => c.className.split(" ")[0]);
+		expect(classes(rows()[1])).toEqual(["improved-bases-pill", "improved-bases-picker-edit", "improved-bases-picker-check"]);
+		expect(classes(rows()[0])).toEqual(classes(rows()[1]));
+	});
 	it("opens at body with the focused input, the options and the active values", () => {
 		const { popover, input, labels, rows, headerPills } = setup({ values: ["Beta"] });
 		expect(popover()?.parentElement).toBe(document.body);
@@ -264,6 +282,15 @@ describe("openOptionPicker", () => {
 			expect(pencil(rows()[0]).getAttribute("data-icon")).toBe("lucide-pencil");
 			pencil(rows()[0]).click();
 			expect(editorEl()).not.toBeNull();
+		});
+		it("places the editor at the pencil, not at the row", () => {
+			const { rows } = setup();
+			const rect = new DOMRect(300, 50, 20, 20);
+			const btn = pencil(rows()[0]);
+			vi.spyOn(btn, "getBoundingClientRect").mockReturnValue(rect);
+			btn.click();
+			expect(editorEl()?.style.getPropertyValue("--ib-editor-top")).toBe("70px");
+			expect(editorEl()?.style.getPropertyValue("--ib-editor-left")).toBe("100px");
 		});
 		it("renames in list and header after success, closing the editor", async () => {
 			const { rows, labels, headerPills, host, fns } = setup({ values: ["Beta"] });

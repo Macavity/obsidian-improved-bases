@@ -213,7 +213,8 @@
 	background-color: var(--background-modifier-hover);
 }
 .improved-bases-picker-check {
-	margin-left: auto;
+	flex: 0 0 1.2em;
+	text-align: center;
 	color: var(--text-accent);
 }
 .improved-bases-picker-create {

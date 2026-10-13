@@ -3,6 +3,7 @@ import type { Color, SelectOption } from "../schema/types";
 import type { OverlayRegistry } from "./types";
 import { openOptionEditor, OPTION_EDITOR_CLASS } from "./OptionEditor";
 import { placePopover } from "./placePopover";
+import { dismissOnOutside } from "./popover";
 import { colorOf } from "./values";
 
 /** What the picker needs from the widget; the picker keeps working on its own copies after the cell re-renders. */
@@ -72,23 +73,18 @@ export function openOptionPicker(anchor: HTMLElement, host: OptionPickerHost, ov
 	const list = popover.createDiv({ cls: "improved-bases-picker-list" });
 
 	let rows: Row[] = [];
+	let rowEls: HTMLElement[] = [];
 	let selected = 0;
 	let closed = false;
 	let editor: { close(): void } | null = null;
 
-	const onOutside = (evt: MouseEvent): void => {
-		const target = evt.target as Element;
-		if (!popover.contains(target) && !target.closest(`.${OPTION_EDITOR_CLASS}`)) close();
-	};
-	document.addEventListener("mousedown", onOutside, true);
-	const unregister = overlays.add(() => close());
+	const dismiss = dismissOnOutside((target) => popover.contains(target) || !!target.closest(`.${OPTION_EDITOR_CLASS}`), () => close(), overlays);
 
 	function close(): void {
 		if (closed) return;
 		closed = true;
 		editor?.close();
-		document.removeEventListener("mousedown", onOutside, true);
-		unregister();
+		dismiss();
 		popover.remove();
 	}
 
@@ -126,10 +122,18 @@ export function openOptionPicker(anchor: HTMLElement, host: OptionPickerHost, ov
 		}
 	};
 
+	/** Moves the highlight without re-rendering, so a row under the mouse keeps its elements. */
+	const highlight = (index: number): void => {
+		selected = index;
+		rowEls.forEach((el, i) => el.toggleClass("is-selected", i === index));
+	};
+
 	const renderRow = (row: Row, index: number): void => {
 		if (row.create !== undefined) {
 			const el = list.createDiv({ cls: "improved-bases-picker-create", text: `Create "${row.create}"` });
 			el.toggleClass("is-selected", index === selected);
+			el.addEventListener("mouseenter", () => highlight(index));
+			rowEls.push(el);
 			onPress(el, () => activate(row));
 			return;
 		}
@@ -137,19 +141,23 @@ export function openOptionPicker(anchor: HTMLElement, host: OptionPickerHost, ov
 		const el = list.createDiv({ cls: "improved-bases-picker-row" });
 		el.toggleClass("is-active", active);
 		el.toggleClass("is-selected", index === selected);
+		el.addEventListener("mouseenter", () => highlight(index));
+		rowEls.push(el);
 		pill(el, row.option.value);
-		if (active) el.createSpan({ cls: "improved-bases-picker-check", text: "✓" });
 		const edit = el.createEl("button", {
 			cls: "improved-bases-picker-edit",
 			attr: { type: "button", "aria-label": `Edit option ${row.option.value}` },
 		});
 		setIcon(edit, "lucide-pencil");
-		onPress(edit, () => editOption(el, row.option));
+		// The slot keeps its width without a check, so the pencils line up.
+		el.createSpan({ cls: "improved-bases-picker-check", text: active ? "✓" : "" });
+		onPress(edit, () => editOption(edit, row.option));
 		onPress(el, () => activate(row));
 	};
 
 	const renderList = (): void => {
 		list.empty();
+		rowEls = [];
 		rows = rowsFor(host.options, input.value);
 		selected = Math.min(selected, Math.max(0, rows.length - 1));
 		if (!host.options.length && !input.value.trim()) list.createDiv({ cls: "improved-bases-picker-hint", text: "Type to create an option" });

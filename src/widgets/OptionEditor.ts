@@ -1,6 +1,7 @@
 import { setIcon } from "obsidian";
 import { COLORS, type Color, type SelectOption } from "../schema/types";
 import { placePopover } from "./placePopover";
+import { dismissOnOutside } from "./popover";
 import type { OverlayRegistry } from "./types";
 
 export const OPTION_EDITOR_CLASS = "improved-bases-option-editor";
@@ -14,14 +15,14 @@ export interface OptionEditorHandlers {
 const WIDTH = 220;
 const HEIGHT = 190;
 
-/** Small popover at `document.body` to rename, recolor or delete one option. Escape closes only the editor. */
+/** Small popover at `document.body`, right-aligned below (or above) `anchor`, to rename, recolor or delete one option. Escape closes only the editor. */
 export function openOptionEditor(
 	anchor: HTMLElement,
 	option: SelectOption,
 	handlers: OptionEditorHandlers,
 	overlays: OverlayRegistry,
 ): { close(): void } {
-	const pos = placePopover(anchor.getBoundingClientRect(), { width: window.innerWidth, height: window.innerHeight }, { width: WIDTH, height: HEIGHT });
+	const pos = placePopover(anchor.getBoundingClientRect(), { width: window.innerWidth, height: window.innerHeight }, { width: WIDTH, height: HEIGHT }, "end");
 	const popover = document.body.createDiv({ cls: OPTION_EDITOR_CLASS });
 	popover.setCssProps({
 		"--ib-editor-left": `${pos.left}px`,
@@ -44,17 +45,12 @@ export function openOptionEditor(
 	remove.addEventListener("click", () => void handlers.remove());
 
 	let closed = false;
-	const onOutside = (evt: MouseEvent): void => {
-		if (!popover.contains(evt.target as Node)) close();
-	};
-	document.addEventListener("mousedown", onOutside, true);
-	const unregister = overlays.add(() => close());
+	const dismiss = dismissOnOutside((target) => popover.contains(target), () => close(), overlays);
 
 	function close(): void {
 		if (closed) return;
 		closed = true;
-		document.removeEventListener("mousedown", onOutside, true);
-		unregister();
+		dismiss();
 		popover.remove();
 	}
 
