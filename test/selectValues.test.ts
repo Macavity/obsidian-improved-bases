@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { RawFields } from "../src/schema/SchemaWriter";
 import type { SelectField } from "../src/schema/types";
-import { selectOutput, colorOf, addOptionMutation, nextOptionColor, setColorMutation, renameValue, removeValue, countNotesWithValue, renameOptionMutation, removeOptionMutation } from "../src/widgets/values";
+import { selectOutput, colorOf, addOptionMutation, nextOptionColor, setColorMutation, renameValue, removeValue, countNotesWithValue, renameOptionMutation, removeOptionMutation, StaleOptionError } from "../src/widgets/values";
 
 const field: SelectField = { type: "select", multiple: false, options: [{ value: "Dev", color: "blue" }] };
 const fresh = (): RawFields => ({ Role: { type: "select", options: { Dev: "blue" } } });
@@ -63,6 +63,10 @@ describe("option value edits", () => {
     expect(renameValue(3, "A", "B")).toBeUndefined();
     expect(renameValue(["X"], "A", "B")).toBeUndefined();
   });
+  it("only dedupes the renamed value, leaving other duplicates", () => {
+    expect(renameValue(["X", "X", "A"], "A", "B")).toEqual(["X", "X", "B"]);
+    expect(renameValue(["X", "X", "A", "B"], "A", "B")).toEqual(["X", "X", "B"]);
+  });
   it("removes values", () => {
     expect(removeValue("A", "A")).toBeNull();
     expect(removeValue(["A", "C"], "A")).toEqual(["C"]);
@@ -79,10 +83,10 @@ describe("option value edits", () => {
     expect(Object.keys(o)).toEqual(["Z", "B"]);
     expect(o.Z).toBe("red");
   });
-  it("does not rename onto an existing option or a missing one", () => {
+  it("throws instead of renaming onto an existing option or a missing one", () => {
     const f: RawFields = { Role: { type: "select", options: { A: "red", B: "blue" } } };
-    renameOptionMutation("Role", "A", "B")(f);
-    renameOptionMutation("Role", "Q", "Z")(f);
+    expect(() => renameOptionMutation("Role", "A", "B")(f)).toThrow(StaleOptionError);
+    expect(() => renameOptionMutation("Role", "Q", "Z")(f)).toThrow(StaleOptionError);
     expect(f.Role?.options).toEqual({ A: "red", B: "blue" });
   });
   it("removes an option", () => {

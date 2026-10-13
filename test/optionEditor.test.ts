@@ -54,6 +54,26 @@ describe("openOptionEditor", () => {
 		input().dispatchEvent(new Event("blur"));
 		expect(handlers.rename).toHaveBeenCalledWith("Omega");
 	});
+	it("saves a typed name when dismissed by an outside mousedown", () => {
+		const { handlers, root, input } = setup();
+		input().value = "Omega";
+		document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+		expect(handlers.rename).toHaveBeenCalledWith("Omega");
+		expect(root()).toBeNull();
+	});
+	it("ignores further saves while a rename is pending", async () => {
+		const { handlers, input, key } = setup();
+		let done: (ok: boolean) => void = () => undefined;
+		handlers.rename.mockReturnValueOnce(new Promise<boolean>((r) => (done = r)));
+		input().value = "Omega";
+		key("Enter");
+		key("Enter");
+		input().dispatchEvent(new Event("blur"));
+		expect(handlers.rename).toHaveBeenCalledTimes(1);
+		expect(input().disabled).toBe(true);
+		done(false);
+		await vi.waitFor(() => expect(input().disabled).toBe(false));
+	});
 	it("Escape cancels, closes only the editor and stops propagation", () => {
 		const { handlers, root, input, key } = setup();
 		const outer = vi.fn();

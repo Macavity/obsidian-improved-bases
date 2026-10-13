@@ -4,7 +4,7 @@ import type { OverlayRegistry } from "./types";
 import { openOptionEditor, OPTION_EDITOR_CLASS } from "./OptionEditor";
 import { placePopover } from "./placePopover";
 import { dismissOnOutside } from "./popover";
-import { colorOf } from "./values";
+import { colorOf, renameValue } from "./values";
 
 /** What the picker needs from the widget; the picker keeps working on its own copies after the cell re-renders. */
 export interface OptionPickerHost {
@@ -190,7 +190,7 @@ export function openOptionPicker(anchor: HTMLElement, host: OptionPickerHost, ov
 				rename: (to) =>
 					done(host.rename(value, to), () => {
 						option.value = to;
-						host.values = [...new Set(host.values.map((v) => (v === value ? to : v)))];
+						host.values = (renameValue(host.values, value, to) as string[] | undefined) ?? host.values;
 					}, true),
 				recolor: (color) => done(host.recolor(value, color), () => (option.color = color), false),
 				remove: () => done(host.remove(value), () => (host.options = host.options.filter((o) => o !== option)), true),
@@ -208,7 +208,7 @@ export function openOptionPicker(anchor: HTMLElement, host: OptionPickerHost, ov
 
 	const create = async (value: string): Promise<void> => {
 		const option = await host.create(value);
-		if (!option) return;
+		if (!option || closed) return;
 		if (!host.options.some((o) => o.value === option.value)) host.options.push(option);
 		choose(option.value, true);
 	};

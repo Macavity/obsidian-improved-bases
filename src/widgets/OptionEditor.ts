@@ -45,7 +45,10 @@ export function openOptionEditor(
 	remove.addEventListener("click", () => void handlers.remove());
 
 	let closed = false;
-	const dismiss = dismissOnOutside((target) => popover.contains(target), () => close(), overlays);
+	const dismiss = dismissOnOutside((target) => popover.contains(target), () => {
+		save();
+		close();
+	}, overlays);
 
 	function close(): void {
 		if (closed) return;
@@ -54,10 +57,17 @@ export function openOptionEditor(
 		popover.remove();
 	}
 
-	const save = (): void => {
+	let busy = false;
+	function save(): void {
 		const to = input.value.trim();
-		if (to && to !== option.value) void handlers.rename(to);
-	};
+		if (busy || !to || to === option.value) return;
+		busy = true;
+		input.disabled = true;
+		void handlers.rename(to).finally(() => {
+			busy = false;
+			input.disabled = false;
+		});
+	}
 	input.addEventListener("keydown", (evt) => {
 		if (evt.key === "Enter") save();
 		else if (evt.key === "Escape") close();

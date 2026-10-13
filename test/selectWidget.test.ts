@@ -113,6 +113,12 @@ describe("SelectWidget", () => {
 		expect(String(mutate)).toBe(String(addOptionMutation("Status", "N", nextOptionColor(1))));
 		expect(option).toEqual({ value: "N", color: nextOptionColor(1) });
 	});
+	it("refuses to create a reserved name", async () => {
+		const { open, update } = setup(["A"]);
+		expect(await open().create("constructor")).toBeNull();
+		expect(vi.mocked(Notice).mock.calls.at(-1)?.[0]).toBe("Reserved name");
+		expect(update).not.toHaveBeenCalled();
+	});
 	it("writes options into the base the patch resolved", async () => {
 		const { open, update } = setup(["A"], { source: { basePath: "Viewed.base", name: "Status" } });
 		await open().create("B");
@@ -148,6 +154,23 @@ describe("SelectWidget", () => {
 			expect(lastNotice()).toBe("Option exists");
 			expect(update).not.toHaveBeenCalled();
 			expect(processFrontMatter).not.toHaveBeenCalled();
+		});
+		it("refuses reserved names without writing", async () => {
+			const { open, update } = setup(["A"]);
+			expect(await open().rename("A", "__proto__")).toBe(false);
+			expect(lastNotice()).toBe("Reserved name");
+			expect(update).not.toHaveBeenCalled();
+		});
+		it("skips the migration and tells when the schema rename did not apply", async () => {
+			const { open, update, processFrontMatter, pills } = setup(["A"]);
+			update.mockImplementationOnce((_p: string, mutate: unknown) => {
+				(mutate as (f: Record<string, unknown>) => void)({ Status: { type: "select", options: { B: "red" } } });
+				return Promise.resolve();
+			});
+			expect(await open().rename("A", "Z")).toBe(false);
+			expect(lastNotice()).toBe("Option changed elsewhere, reopen the picker");
+			expect(processFrontMatter).not.toHaveBeenCalled();
+			expect(pills()).toEqual(["A"]);
 		});
 		it("writes nothing while the members are unknown", async () => {
 			const { open, update, processFrontMatter } = setup(["A"], { files: null });

@@ -133,6 +133,18 @@ describe("openOptionPicker", () => {
 		expect(labels()).toContain("Neu✓");
 	});
 
+	it("does not commit a created option when the picker closed meanwhile", async () => {
+		let resolve: (o: SelectOption) => void = () => undefined;
+		const create = vi.fn(() => new Promise<SelectOption | null>((r) => (resolve = r)));
+		const { type, key, picker, commit } = setup({ create });
+		type("Neu");
+		key("Enter");
+		picker.close();
+		resolve({ value: "Neu", color: "orange" });
+		await Promise.resolve();
+		await Promise.resolve();
+		expect(commit).not.toHaveBeenCalled();
+	});
 	it("does nothing when the host refuses to create", async () => {
 		const create = vi.fn(() => Promise.resolve(null));
 		const { type, key, popover, commit } = setup({ create });

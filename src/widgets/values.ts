@@ -69,11 +69,18 @@ export function setColorMutation(fieldName: string, value: string, color: Color)
 	};
 }
 
-/** Value with `from` replaced by `to` (lists are deduplicated); undefined when nothing matches. */
+/** Value with `from` replaced by `to` (a list drops the renamed entry when it already holds `to`); undefined when nothing matches. */
 export function renameValue(value: unknown, from: string, to: string): unknown {
 	if (typeof value === "string") return value === from ? to : undefined;
 	if (!Array.isArray(value) || !value.includes(from)) return undefined;
-	return [...new Set((value as unknown[]).map((v) => (v === from ? to : v)))];
+	// Only the renamed value is deduplicated: when `to` was already listed, the renamed occurrence is dropped.
+	const hadTo = value.includes(to);
+	const out: unknown[] = [];
+	for (const v of value) {
+		if (v !== from) out.push(v);
+		else if (!hadTo && !out.includes(to)) out.push(to);
+	}
+	return out;
 }
 
 /** Value without `target`: a matching string becomes null, lists drop the element; undefined when nothing matches. */
@@ -88,12 +95,15 @@ export function countNotesWithValue(values: readonly unknown[], target: string):
 	return values.filter((v) => toList(v).includes(target)).length;
 }
 
-/** Renames an option, keeping its color and its position; no-op when `from` is missing or `to` exists. */
+/** Thrown by a mutation whose target option no longer matches the expectation (the schema changed elsewhere). */
+export class StaleOptionError extends Error {}
+
+/** Renames an option, keeping its color and its position; throws `StaleOptionError` when `from` is missing or `to` exists. */
 export function renameOptionMutation(fieldName: string, from: string, to: string): (f: RawFields) => void {
 	return (fields) => {
 		const options = optionsOf(fields, fieldName);
 		const f = options && fields[fieldName];
-		if (!options || !f || !Object.hasOwn(options, from) || Object.hasOwn(options, to)) return;
+		if (!options || !f || !Object.hasOwn(options, from) || Object.hasOwn(options, to)) throw new StaleOptionError(`Cannot rename "${from}" to "${to}"`);
 		const rebuilt: Record<string, unknown> = {};
 		for (const [key, color] of Object.entries(options)) setOption(rebuilt, key === from ? to : key, color as string);
 		f.options = rebuilt;
