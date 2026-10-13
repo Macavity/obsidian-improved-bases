@@ -15,3 +15,6 @@ export interface BaseSchema {
 	fields: Map<string, { name: string; field: FieldSchema }>;
 }
 export const SCHEMA_KEY = "improved-bases";
+/** Narrowing helpers: a native type id is any other string, so `field.type === "relation"` alone does not narrow. */
+export const isRelation = (f: FieldSchema): f is RelationField => f.type === "relation";
+export const isSelect = (f: FieldSchema): f is SelectField => f.type === "select";

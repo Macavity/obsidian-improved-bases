@@ -1,11 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { parse } from "yaml";
-import { applyTypeChoice, conflictHint, detectedType, draftsToEdits, knownFieldDrafts, removals, renameKey, renames, typeChoice, typeChoices, TYPES, validateDrafts, type FieldDraft, type OtherDefinition } from "../src/schema-settings/schemaDraft";
+import { applyTypeChoice, conflictHint, draftsToEdits, knownFieldDrafts, removals, renameKey, renames, typeChoice, typeChoices, TYPES, validateDrafts, type FieldDraft, type OtherDefinition } from "../src/schema-settings/schemaDraft";
 import { updateSchemaSource } from "../src/schema/SchemaWriter";
 import type { BaseColumns, RawFields } from "../src/schema/baseDoc";
+import type { PropertyType } from "../src/internals/typeRegistry";
 import { parseSchema } from "../src/schema/parse";
 
-const d = (p: Partial<FieldDraft>): FieldDraft => ({ originalName: null, originalBase: null, name: "X", type: "native", nativeLabel: null, override: null, removed: false, multiple: false, options: [], ...p });
+const d = (p: Partial<FieldDraft>): FieldDraft => ({ originalName: null, originalBase: null, name: "X", type: "native", detected: null, override: null, removed: false, multiple: false, options: [], ...p });
 const mutation = (drafts: FieldDraft[], originals: string[]) => draftsToEdits(drafts, originals, 0).mutate;
 const leadOf = (src: string): unknown => (parse(src) as { "improved-bases": { fields: Record<string, unknown> } })["improved-bases"].fields.Lead;
 const none: BaseColumns = { views: [], orderByView: [], configured: [], expressions: [] };
@@ -13,9 +14,9 @@ const none: BaseColumns = { views: [], orderByView: [], configured: [], expressi
 describe("schemaDraft", () => {
 	it("maps schema fields to drafts", () => {
 		const fields = new Map([["role", { name: "Role", field: { type: "select" as const, multiple: true, options: [{ value: "A", color: "red" as const }] } }]]);
-		expect(knownFieldDrafts({ columns: none, schemaFields: fields, memberKeys: [], nativeLabel: () => null, currentView: 0 })).toEqual([d({ originalName: "Role", name: "Role", type: "select", multiple: true, options: [{ value: "A", color: "red" }] })]);
+		expect(knownFieldDrafts({ columns: none, schemaFields: fields, memberKeys: [], detected: () => null, currentView: 0 })).toEqual([d({ originalName: "Role", name: "Role", type: "select", multiple: true, options: [{ value: "A", color: "red" }] })]);
 		const rel = new Map([["lead", { name: "Lead", field: { type: "relation" as const, base: "M.base", multiple: false } }]]);
-		expect(knownFieldDrafts({ columns: none, schemaFields: rel, memberKeys: [], nativeLabel: () => null, currentView: 0 })).toEqual([d({ originalName: "Lead", originalBase: "M.base", name: "Lead", type: "relation", base: "M.base" })]);
+		expect(knownFieldDrafts({ columns: none, schemaFields: rel, memberKeys: [], detected: () => null, currentView: 0 })).toEqual([d({ originalName: "Lead", originalBase: "M.base", name: "Lead", type: "relation", base: "M.base" })]);
 	});
 	it("writes a relation without an icon", () => {
 		const out = updateSchemaSource("improved-bases:\n  fields: {}\n", mutation([d({ name: "Lead", type: "relation", base: "M.base" })], []));
@@ -95,14 +96,14 @@ describe("schemaDraft", () => {
 		["alpha", { name: "Alpha", field: { type: "text" as const } }],
 	]);
 	it("builds the union ordered by the current view", () => {
-		const drafts = knownFieldDrafts({ columns: cols, schemaFields: schema, memberKeys: ["created", "team", "position"], nativeLabel: (n) => (n === "Team" ? "multitext" : null), currentView: 1 });
+		const drafts = knownFieldDrafts({ columns: cols, schemaFields: schema, memberKeys: ["created", "team", "position"], detected: (n) => (n === "Team" ? "multitext" : null), currentView: 1 });
 		expect(drafts.map((x) => x.name)).toEqual(["Zeta", "Status", "Alpha", "created", "Team"]);
 		expect(drafts[1]).toMatchObject({ type: "select", originalName: "Status" });
 		expect(drafts[2]).toMatchObject({ type: "native", override: { type: "text" }, originalName: "Alpha" });
-		expect(drafts[4]).toMatchObject({ type: "native", nativeLabel: "multitext", originalName: "Team", override: null });
+		expect(drafts[4]).toMatchObject({ type: "native", detected: "multitext", originalName: "Team", override: null });
 	});
 	it("treats an out-of-range view as no current view", () => {
-		const drafts = knownFieldDrafts({ columns: cols, schemaFields: null, memberKeys: [], nativeLabel: () => null, currentView: 5 });
+		const drafts = knownFieldDrafts({ columns: cols, schemaFields: null, memberKeys: [], detected: () => null, currentView: 5 });
 		expect(drafts.map((x) => x.name)).toEqual(["Alpha", "Status", "Team", "Zeta"]);
 	});
 	it("turns drafts into column edits and a schema mutation", () => {
@@ -172,39 +173,44 @@ describe("schemaDraft", () => {
 	});
 
 	describe("type choices", () => {
-		const NATIVE = ["native:text", "native:list", "native:number", "native:checkbox", "native:date", "native:datetime"];
-		it("maps Obsidian's type to a schema type", () => {
-			expect(detectedType(d({ nativeLabel: "text" }))).toBe("text");
-			expect(detectedType(d({ nativeLabel: "multitext" }))).toBe("list");
-			expect(detectedType(d({ nativeLabel: "tags" }))).toBeNull();
-			expect(detectedType(d({ nativeLabel: null }))).toBeNull();
-		});
-		it("lists every native type, plus Obsidian's own when it is not one", () => {
-			expect(typeChoices(d({ nativeLabel: "text" }))).toEqual([...NATIVE, "relation", "select"]);
-			expect(typeChoices(d({ nativeLabel: "tags" }))).toEqual(["native", ...NATIVE, "relation", "select"]);
-			expect(typeChoices(d({ nativeLabel: null }))).toEqual(["native", ...NATIVE, "relation", "select"]);
+		const types: PropertyType[] = [
+			{ type: "text", name: "Text", icon: "lucide-text", reserved: false },
+			{ type: "multitext", name: "Liste", icon: "lucide-list", reserved: false },
+			{ type: "tags", name: "Tags", icon: "lucide-tags", reserved: true },
+		];
+		it("lists unreserved registry types, Obsidian's own first when it is not one of them", () => {
+			expect(typeChoices(d({ detected: "multitext" }), types)).toEqual(["native:text", "native:multitext", "relation", "select"]);
+			expect(typeChoices(d({ detected: "tags" }), types)).toEqual(["native", "native:text", "native:multitext", "relation", "select"]);
+			expect(typeChoices(d({ detected: null }), types)).toEqual(["native", "native:text", "native:multitext", "relation", "select"]);
+			expect(typeChoices(d({ detected: "text", override: { type: "list" } }), types)).toEqual(["native:text", "native:multitext", "native:list", "relation", "select"]);
+			expect(typeChoices(d({ detected: "text" }), [])).toEqual(["native", "relation", "select"]);
 		});
 		it("shows the overriding type, else Obsidian's", () => {
-			expect(typeChoice(d({ nativeLabel: "text" }))).toBe("native:text");
-			expect(typeChoice(d({ nativeLabel: "multitext" }))).toBe("native:list");
-			expect(typeChoice(d({ nativeLabel: "text", override: { type: "number" } }))).toBe("native:number");
-			expect(typeChoice(d({ nativeLabel: "tags" }))).toBe("native");
-			expect(typeChoice(d({ type: "select" }))).toBe("select");
+			expect(typeChoice(d({ detected: "multitext" }), types)).toBe("native:multitext");
+			expect(typeChoice(d({ detected: "text", override: { type: "number" } }), types)).toBe("native:number");
+			expect(typeChoice(d({ detected: "text", override: { type: "list" } }), types)).toBe("native:list");
+			expect(typeChoice(d({ detected: "tags" }), types)).toBe("native");
+			expect(typeChoice(d({ detected: null }), types)).toBe("native");
+			expect(typeChoice(d({ type: "select" }), types)).toBe("select");
 		});
-		it("overrides with another native type and drops the override for Obsidian's own", () => {
-			const draft = d({ nativeLabel: "text" });
+		it("drops the override for Obsidian's own type and writes another id", () => {
+			const draft = d({ detected: "multitext", override: { type: "text" } });
+			applyTypeChoice(draft, "native:multitext");
+			expect(draft).toMatchObject({ type: "native", override: null });
 			applyTypeChoice(draft, "native:number");
 			expect(draft).toMatchObject({ type: "native", override: { type: "number" } });
 			applyTypeChoice(draft, "select");
 			expect(draft.type).toBe("select");
-			applyTypeChoice(draft, "native:text");
+			applyTypeChoice(draft, "native");
 			expect(draft).toMatchObject({ type: "native", override: null });
-			const tags = d({ nativeLabel: "tags", override: { type: "list" } });
-			applyTypeChoice(tags, "native");
-			expect(tags).toMatchObject({ type: "native", override: null });
+		});
+		it("labels the conflicting type through the registry", () => {
+			const others: OtherDefinition[] = [{ basePath: "Meetings.base", field: { type: "multitext" }, shared: 1 }];
+			expect(conflictHint(d({ name: "Team", override: { type: "text" } }), others, (t) => (t === "multitext" ? "Liste" : t)))
+				.toBe("Also defined in Meetings.base as Liste; 1 note is in both bases.");
 		});
 		it("writes a type override chosen in the dialog", () => {
-			const draft = d({ originalName: "Due", name: "Due", nativeLabel: "text" });
+			const draft = d({ originalName: "Due", name: "Due", detected: "text" });
 			applyTypeChoice(draft, "native:date");
 			const f: RawFields = {};
 			mutation([draft], ["Due"])(f);

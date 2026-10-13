@@ -83,7 +83,7 @@ function nativeLabel(type: string | null): string {
 function choiceText(draft: FieldDraft, choice: TypeChoice): string {
 	if (choice === "relation") return "Relation";
 	if (choice === "select") return "Select";
-	return nativeLabel(choice === "native" ? draft.nativeLabel : choice.slice("native:".length));
+	return nativeLabel(choice === "native" ? draft.detected : choice.slice("native:".length));
 }
 
 /** Change detection for the footer: the drafts and the base icon as saved. */
@@ -94,7 +94,7 @@ function snapshot(drafts: FieldDraft[], icon: string): string {
 function typeIcon(draft: FieldDraft): string {
 	if (draft.type === "relation") return "lucide-link";
 	if (draft.type === "select") return "lucide-circle-dot";
-	const label = draft.override ? String(draft.override.type) : draft.nativeLabel;
+	const label = draft.override ? String(draft.override.type) : draft.detected;
 	return (label && NATIVE_ICONS[label]) ?? "lucide-text";
 }
 
@@ -245,7 +245,7 @@ export class SchemaSettingsModal extends Modal {
 		add.createSpan({ text: "Add field" });
 		add.addEventListener("click", () => {
 			const draft: FieldDraft = {
-				originalName: null, originalBase: null, name: "", type: "native", nativeLabel: null,
+				originalName: null, originalBase: null, name: "", type: "native", detected: null,
 				override: null, removed: false, multiple: false, options: [],
 			};
 			this.drafts.push(draft);

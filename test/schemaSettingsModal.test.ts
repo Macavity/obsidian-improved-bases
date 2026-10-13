@@ -12,7 +12,7 @@ const lastMenu = () => vi.mocked(openOptionEditMenu).mock.calls.at(-1)?.[2] as C
 const chips = (el: HTMLElement) => Array.from(el.querySelectorAll(".improved-bases-option-chip")).map((p) => p.textContent);
 
 const d = (p: Partial<FieldDraft>): FieldDraft => ({
-	originalName: null, originalBase: null, name: "X", type: "native", nativeLabel: null,
+	originalName: null, originalBase: null, name: "X", type: "native", detected: null,
 	override: null, removed: false, multiple: false, options: [], ...p,
 });
 const tick = () => new Promise<void>((r) => setTimeout(r, 0));
@@ -64,7 +64,7 @@ describe("SchemaSettingsModal", () => {
 			drafts: [
 				d({ name: "Lead", type: "relation", base: "Teams.base", multiple: true }),
 				d({ name: "Status", type: "select", multiple: true, options: [{ value: "A", color: "red" }, { value: "B", color: "blue" }] }),
-				d({ name: " ", nativeLabel: "text" }),
+				d({ name: " ", detected: "text" }),
 			],
 		});
 		expect(modal.titleEl.textContent).toBe("Schema settings – Mitarbeiter");
@@ -319,11 +319,11 @@ describe("SchemaSettingsModal", () => {
 		const { el, q } = open({
 			kind: "fields",
 			drafts: [
-				d({ name: "Status", nativeLabel: "text" }),
+				d({ name: "Status", detected: "text" }),
 				d({ name: "Tags" }),
-				d({ name: "Alpha", nativeLabel: "text", override: { type: "text" } }),
+				d({ name: "Alpha", detected: "text", override: { type: "text" } }),
 				d({ name: "Beta", override: { type: "number" } }),
-				d({ name: "Gamma", nativeLabel: "text", override: { type: "number" } }),
+				d({ name: "Gamma", detected: "text", override: { type: "number" } }),
 				d({ name: "Delta", override: { type: "list" } }),
 			],
 		});
@@ -436,7 +436,7 @@ describe("SchemaSettingsModal", () => {
 	});
 
 	it("overrides the type from the dropdown and drops the override for Obsidian's own", () => {
-		const { el, q } = open({ kind: "fields", drafts: [d({ name: "G", nativeLabel: "text", override: { type: "number" } })] });
+		const { el, q } = open({ kind: "fields", drafts: [d({ name: "G", detected: "text", override: { type: "number" } })] });
 		const type = q<HTMLSelectElement>(".improved-bases-field-type");
 		expect(type.value).toBe("native:number");
 		const icon = () => q(".improved-bases-type-icon").getAttribute("data-icon");

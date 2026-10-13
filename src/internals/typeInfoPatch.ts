@@ -1,7 +1,7 @@
 import type { App, EventRef } from "obsidian";
 import { around } from "monkey-around";
 import type { Resolution } from "../schema/Membership";
-import type { NativeType, RelationField, SelectField } from "../schema/types";
+import { isRelation, isSelect, type RelationField, type SelectField } from "../schema/types";
 import { renderConflictMarker } from "../widgets/conflictMarker";
 import { baseContextOf } from "./baseContext";
 import type { PluginWidget, PropertyRenderContext, WidgetEnv, WidgetHandle } from "../widgets/types";
@@ -17,16 +17,6 @@ export interface PluginWidgets {
 	relation: PluginWidget<RelationField>;
 	select: PluginWidget<SelectField>;
 }
-
-/** Obsidian widget used for each native schema type. */
-const NATIVE_WIDGET: Record<NativeType, string> = {
-	text: "text",
-	list: "multitext",
-	number: "number",
-	checkbox: "checkbox",
-	date: "date",
-	datetime: "datetime",
-};
 
 interface CacheEntry {
 	generation: number;
@@ -59,9 +49,9 @@ export function installTypeInfoPatch(app: App, env: WidgetEnv, widgets: PluginWi
 	const renderField = (el: HTMLElement, value: unknown, ctx: PropertyRenderContext, res: Resolution, mtm: MetadataTypeManager): unknown => {
 		const { field } = res;
 		const source = { basePath: res.basePath, name: res.name };
-		if (field.type === "relation") return widgets.relation(el, value, ctx, field, env, source);
-		if (field.type === "select") return widgets.select(el, value, ctx, field, env, source);
-		const native = mtm.registeredTypeWidgets[NATIVE_WIDGET[field.type]];
+		if (isRelation(field)) return widgets.relation(el, value, ctx, field, env, source);
+		if (isSelect(field)) return widgets.select(el, value, ctx, field, env, source);
+		const native = mtm.registeredTypeWidgets[field.type]; // an unregistered id falls back to Obsidian's original widget
 		return native ? native.render(el, value, ctx) : undefined;
 	};
 

@@ -15,11 +15,11 @@ type Counts = { renamed: number; conflict: number; failed: number };
 type State = SchemaSettingsInput["state"];
 
 /** Modal state for a base: its known fields, or the schema errors. */
-export function schemaState(registry: SchemaRegistry, basePath: string, columns: BaseColumns, memberKeys: string[], nativeLabel: (name: string) => string | null, currentView: number): State {
+export function schemaState(registry: SchemaRegistry, basePath: string, columns: BaseColumns, memberKeys: string[], detected: (name: string) => string | null, currentView: number): State {
 	const errors = registry.errors().get(basePath);
 	if (errors) return { kind: "error", message: errors.join("; "), resettable: true };
 	const schemaFields = registry.schemas().find((s) => s.basePath === basePath)?.fields ?? null;
-	return { kind: "fields", drafts: knownFieldDrafts({ columns, schemaFields, memberKeys, nativeLabel, currentView }) };
+	return { kind: "fields", drafts: knownFieldDrafts({ columns, schemaFields, memberKeys, detected, currentView }) };
 }
 
 type KeyMatch = (fm: object, name: string) => boolean;

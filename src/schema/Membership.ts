@@ -2,7 +2,7 @@ import { Events } from "obsidian";
 import type { EventRef, MetadataCache, TFile } from "obsidian";
 import type { BaseQuery } from "../query/BaseQuery";
 import type { SchemaRegistry } from "./SchemaRegistry";
-import type { BaseSchema, FieldSchema } from "./types";
+import { isRelation, isSelect, type BaseSchema, type FieldSchema } from "./types";
 
 const sig = (s: BaseSchema): string => JSON.stringify([s.icon ?? null, [...s.fields]]);
 
@@ -11,7 +11,7 @@ const QUIET_MS = 300;
 /** Field names (lowercase) of relations whose target is `basePath`; their widgets show its default icon. */
 function relationsTargeting(schemas: BaseSchema[], basePath: string): string[] {
 	const out: string[] = [];
-	for (const s of schemas) for (const [k, f] of s.fields) if (f.field.type === "relation" && f.field.base === basePath) out.push(k);
+	for (const s of schemas) for (const [k, f] of s.fields) if (isRelation(f.field) && f.field.base === basePath) out.push(k);
 	return out;
 }
 
@@ -20,7 +20,7 @@ function wantedPaths(schemas: BaseSchema[]): Set<string> {
 	const wanted = new Set<string>();
 	for (const s of schemas) {
 		wanted.add(s.basePath);
-		for (const { field } of s.fields.values()) if (field.type === "relation") wanted.add(field.base);
+		for (const { field } of s.fields.values()) if (isRelation(field)) wanted.add(field.base);
 	}
 	return wanted;
 }
@@ -153,7 +153,7 @@ export class Membership extends Events {
 		for (const s of this.registry.schemas()) {
 			const f = s.fields.get(name)?.field;
 			if (!f) continue;
-			if (f.type === "relation" || f.type === "select") out.add(f.multiple ? "list" : "scalar");
+			if (isRelation(f) || isSelect(f)) out.add(f.multiple ? "list" : "scalar");
 			else out.add("native");
 		}
 		return out;
@@ -224,7 +224,7 @@ export class Membership extends Events {
 
 	private isRelationTarget(path: string): boolean {
 		for (const s of this.registry.schemas()) {
-			for (const { field } of s.fields.values()) if (field.type === "relation" && field.base === path) return true;
+			for (const { field } of s.fields.values()) if (isRelation(field) && field.base === path) return true;
 		}
 		return false;
 	}

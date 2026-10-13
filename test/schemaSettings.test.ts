@@ -16,7 +16,7 @@ const fmText = (f: TFile) => {
   const fm = (f as unknown as { frontmatter?: Record<string, unknown> }).frontmatter;
   return fm ? `---\n${Object.entries(fm).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join("\n")}\n---\n` : "";
 };
-const d = (o: Partial<FieldDraft>): FieldDraft => ({ originalName: null, originalBase: null, name: "", type: "native", nativeLabel: null, override: null, removed: false, multiple: false, options: [], ...o });
+const d = (o: Partial<FieldDraft>): FieldDraft => ({ originalName: null, originalBase: null, name: "", type: "native", detected: null, override: null, removed: false, multiple: false, options: [], ...o });
 
 const registry = (schemas: { basePath: string; fields: Map<string, { name: string; field: { type: "text" } }> }[], errors: Record<string, string[]>) =>
   ({ schemas: () => schemas, errors: () => new Map(Object.entries(errors)) }) as unknown as SchemaRegistry;
@@ -81,7 +81,7 @@ describe("schemaState", () => {
   const columns = { views: ["A"], orderByView: [["Team"]], configured: [], expressions: [] };
   it("builds drafts or reports registry errors", () => {
     const state = schemaState(registry([], {}), "A.base", columns, ["Status"], () => "text", 0);
-    expect(state.kind === "fields" && state.drafts.map((x) => [x.name, x.nativeLabel])).toEqual([["Team", "text"], ["Status", "text"]]);
+    expect(state.kind === "fields" && state.drafts.map((x) => [x.name, x.detected])).toEqual([["Team", "text"], ["Status", "text"]]);
     expect(schemaState(registry([], { "A.base": ["bad", "worse"] }), "A.base", columns, [], () => null, 0)).toEqual({ kind: "error", message: "bad; worse", resettable: true });
   });
 });
