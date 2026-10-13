@@ -1,6 +1,6 @@
-import { isColor, NATIVE_TYPES, SCHEMA_KEY } from "./types";
+import { isColor, SCHEMA_KEY } from "./types";
 import { isUnsafeKey } from "./keys";
-import type { BaseSchema, FieldSchema, NativeType, SelectOption } from "./types";
+import type { BaseSchema, FieldSchema, SelectOption } from "./types";
 
 export function isRecord(v: unknown): v is Record<string, unknown> {
 	return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -55,7 +55,7 @@ function parseField(name: string, raw: unknown, errors: string[]): FieldSchema |
 	const multiple = raw.multiple === true;
 	if (type === "relation") return parseRelation(name, raw, multiple, errors);
 	if (type === "select") return parseSelect(name, raw, multiple, errors);
-	if (typeof type === "string" && (NATIVE_TYPES as readonly string[]).includes(type)) return { type: type as NativeType };
+	if (typeof type === "string" && type.length > 0) return { type };
 	errors.push(`field "${name}": unknown type`);
 	return null;
 }
