@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { TFile, type App, type Plugin } from "obsidian";
-import { buildSchemaSettings, countNotesWithKey, migrateRenames, removeProperties, renameSummary, saveSummary, schemaState } from "../src/schema-settings/schemaSettings";
+import { buildSchemaSettings, countNotesWithKey, migrateRenames, registerSchemaSettings, removeProperties, renameSummary, saveSummary, schemaState } from "../src/schema-settings/schemaSettings";
 import type { FieldDraft } from "../src/schema-settings/schemaDraft";
 import type { SchemaRegistry } from "../src/schema/SchemaRegistry";
 import type { WidgetEnv } from "../src/widgets/types";
@@ -320,5 +320,35 @@ describe("buildSchemaSettings", () => {
     const { handlers, writer } = await build({ error: true });
     await handlers.onReset();
     expect(writer.reset).toHaveBeenCalledWith("M.base");
+  });
+});
+
+describe("registerSchemaSettings", () => {
+  it("closes an open dialog when the plugin unloads, and keeps one dialog per instance", async () => {
+    const base = Object.assign(new TFile(), { path: "M.base", extension: "base" });
+    let command: { checkCallback: (checking: boolean) => boolean } | null = null;
+    const cleanups: (() => unknown)[] = [];
+    const app = {
+      workspace: { getActiveFile: () => base, on: vi.fn(), offref: vi.fn(), iterateAllLeaves: vi.fn() },
+      vault: { getFiles: () => [base], getAbstractFileByPath: () => base, cachedRead: () => Promise.resolve("views:\n  - type: table\n    name: A\n") },
+      metadataCache: { getFileCache: () => null },
+    };
+    const plugin = {
+      app,
+      register: (cb: () => unknown) => cleanups.push(cb),
+      registerEvent: vi.fn(),
+      addCommand: (cmd: unknown) => { command = cmd as typeof command; return cmd; },
+    } as unknown as Plugin;
+    const env = { app, writer: {}, membership: { targetEntries: () => [], baseIcon: () => null }, overlays: {} } as unknown as WidgetEnv;
+    registerSchemaSettings(plugin, env, registry([], {}));
+    const dialogs = () => document.querySelectorAll(".improved-bases-schema-modal").length;
+    expect(command!.checkCallback(false)).toBe(true);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(dialogs()).toBe(1);
+    command!.checkCallback(false);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(dialogs()).toBe(1);
+    for (const cb of cleanups) cb();
+    expect(dialogs()).toBe(0);
   });
 });

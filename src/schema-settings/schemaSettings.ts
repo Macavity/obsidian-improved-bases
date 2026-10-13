@@ -244,10 +244,15 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 }
 
 export function registerSchemaSettings(plugin: Plugin, env: WidgetEnv, registry: SchemaRegistry): void {
+	let modal: SchemaSettingsModal | null = null;
+	// An open dialog belongs to this plugin instance; a reload must not leave it behind with stale handlers.
+	plugin.register(() => modal?.close());
 	const open = async (basePath: string, viewName: string | null): Promise<void> => {
 		try {
 			const { input, handlers } = await buildSchemaSettings(plugin, env, registry, basePath, viewName);
-			new SchemaSettingsModal(plugin.app, input, handlers).open();
+			modal?.close();
+			modal = new SchemaSettingsModal(plugin.app, input, handlers);
+			modal.open();
 		} catch (e) {
 			new Notice(`Could not open schema settings: ${message(e)}`);
 		}
