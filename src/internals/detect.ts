@@ -26,6 +26,8 @@ export interface TypeWidget {
 	type: string;
 	icon?: string;
 	name?: unknown;
+	/** Present on types bound to fixed property keys (tags, aliases, file, …). */
+	reservedKeys?: unknown;
 	validate(value: unknown): boolean;
 	render(el: HTMLElement, value: unknown, ctx: unknown): unknown;
 }

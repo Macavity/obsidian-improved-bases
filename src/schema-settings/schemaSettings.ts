@@ -7,6 +7,7 @@ import { draftsToEdits, knownFieldDrafts, removals, renameKey, renames, type Fie
 import type { Membership } from "../schema/Membership";
 import { readBaseColumns, referencesName, type BaseColumns } from "../schema/baseDoc";
 import { getMetadataTypeManager } from "../internals/detect";
+import { listPropertyTypes } from "../internals/typeRegistry";
 import { findOwnKey } from "../schema/keys";
 
 type Pairs = { from: string; to: string }[];
@@ -15,11 +16,11 @@ type Counts = { renamed: number; conflict: number; failed: number };
 type State = SchemaSettingsInput["state"];
 
 /** Modal state for a base: its known fields, or the schema errors. */
-export function schemaState(registry: SchemaRegistry, basePath: string, columns: BaseColumns, memberKeys: string[], nativeLabel: (name: string) => string | null, currentView: number): State {
+export function schemaState(registry: SchemaRegistry, basePath: string, columns: BaseColumns, memberKeys: string[], detected: (name: string) => string | null, currentView: number): State {
 	const errors = registry.errors().get(basePath);
 	if (errors) return { kind: "error", message: errors.join("; "), resettable: true };
 	const schemaFields = registry.schemas().find((s) => s.basePath === basePath)?.fields ?? null;
-	return { kind: "fields", drafts: knownFieldDrafts({ columns, schemaFields, memberKeys, nativeLabel, currentView }) };
+	return { kind: "fields", drafts: knownFieldDrafts({ columns, schemaFields, memberKeys, detected, currentView }) };
 }
 
 type KeyMatch = (fm: object, name: string) => boolean;
@@ -146,7 +147,7 @@ export function saveSummary(parts: { renames: string; removed: Removal[]; refere
 
 const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
-function nativeLabelOf(app: App): (name: string) => string | null {
+function detectedTypeOf(app: App): (name: string) => string | null {
 	return (name) => {
 		const mtm = getMetadataTypeManager(app);
 		if (!mtm) return null;
@@ -182,9 +183,14 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 	const source = await app.vault.cachedRead(file);
 	const members = env.membership.targetEntries(basePath);
 	const names = new Set<string>();
+	// Lower-cased key to the member values, so the mismatch hint needs no rescan per keystroke.
+	const values = new Map<string, unknown[]>();
 	for (const f of members ?? []) {
-		for (const k of Object.keys(app.metadataCache.getFileCache(f)?.frontmatter ?? {})) {
-			if (k !== "position") names.add(k);
+		for (const [k, v] of Object.entries(app.metadataCache.getFileCache(f)?.frontmatter ?? {})) {
+			if (k === "position") continue;
+			names.add(k);
+			const key = k.toLowerCase();
+			values.set(key, [...(values.get(key) ?? []), v]);
 		}
 	}
 	const memberKeys = [...names].sort();
@@ -199,7 +205,7 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 		expressions = columns.expressions;
 		const index = viewName === null ? -1 : views.indexOf(viewName);
 		defaultViewIndex = index < 0 ? 0 : index;
-		state = schemaState(registry, basePath, columns, memberKeys, nativeLabelOf(app), defaultViewIndex);
+		state = schemaState(registry, basePath, columns, memberKeys, detectedTypeOf(app), defaultViewIndex);
 	} catch (e) {
 		state = { kind: "error", message: message(e), resettable: false };
 	}
@@ -213,6 +219,8 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 		overlays: env.overlays,
 		membersKnown: () => env.membership.targetEntries(basePath) !== null,
 		otherDefinitions: (name) => otherDefinitions(registry, env.membership, basePath, name),
+		memberValues: (name) => values.get(name.toLowerCase()) ?? [],
+		types: listPropertyTypes(getMetadataTypeManager(app)),
 		views,
 		defaultViewIndex,
 		expressions,
@@ -242,10 +250,15 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 }
 
 export function registerSchemaSettings(plugin: Plugin, env: WidgetEnv, registry: SchemaRegistry): void {
+	let modal: SchemaSettingsModal | null = null;
+	// An open dialog belongs to this plugin instance; a reload must not leave it behind with stale handlers.
+	plugin.register(() => modal?.close());
 	const open = async (basePath: string, viewName: string | null): Promise<void> => {
 		try {
 			const { input, handlers } = await buildSchemaSettings(plugin, env, registry, basePath, viewName);
-			new SchemaSettingsModal(plugin.app, input, handlers).open();
+			modal?.close();
+			modal = new SchemaSettingsModal(plugin.app, input, handlers);
+			modal.open();
 		} catch (e) {
 			new Notice(`Could not open schema settings: ${message(e)}`);
 		}

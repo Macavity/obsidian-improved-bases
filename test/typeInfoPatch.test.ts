@@ -46,7 +46,7 @@ describe("typeInfoPatch", () => {
     const membership: FakeMembership = {
       knownFieldNames: () => new Set(["team"]),
       resolveWithBase: (p) => res(p === "a.md" ? { type: "relation", base: "T.base", multiple: false }
-        : p === "m.md" ? { type: "list" } : null),
+        : p === "m.md" ? { type: "multitext" } : p === "u.md" ? { type: "list" } : p === "c.md" ? { type: "constructor" } : null),
       on: vi.fn(),
     };
     const relation = vi.fn(() => ({ type: "relation", focus() {} }));
@@ -56,9 +56,11 @@ describe("typeInfoPatch", () => {
     info.inferred.render(div(), "[[X]]", ctx("a.md"));
     info.inferred.render(div(), ["x"], ctx("m.md"));
     info.inferred.render(div(), "y", ctx("other.md"));
+    info.inferred.render(div(), "z", ctx("u.md")); // unregistered id: Obsidian's original widget
+    info.inferred.render(div(), "z", ctx("c.md")); // prototype member is not a widget either
     expect(relation).toHaveBeenCalledTimes(1);
     expect(multitext.render).toHaveBeenCalledTimes(1);
-    expect(text.render).toHaveBeenCalledTimes(1);
+    expect(text.render).toHaveBeenCalledTimes(3);
     expect(mtm.getTypeInfo("Other", "v").inferred).toBe(text);
     expect(mtm.getTypeInfo("Team", "[[X]]").inferred).toBe(info.inferred); // cached identity
     patch.uninstall();
@@ -97,7 +99,7 @@ describe("typeInfoPatch", () => {
     info.inferred.render(panel, null, ctx("cora.md"));
     expect(resolveWithBase).toHaveBeenLastCalledWith("cora.md", "Team", null);
     expect(panel.querySelector(".improved-bases-conflict")).not.toBeNull();
-    // No conflict, no marker; a native pin with a conflict gets one too.
+    // No conflict, no marker; a native override with a conflict gets one too.
     const plain = vi.fn(() => res({ type: "relation", base: "T.base", multiple: true }));
     membership.resolveWithBase = plain;
     const quiet = document.body.createDiv();
@@ -157,6 +159,39 @@ describe("typeInfoPatch", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+  it("renders a native override value its widget rejects with the original widget and a marker", () => {
+    const { app, text, mtm } = fakeApp();
+    Object.assign(text, { name: "Text" });
+    const number = { ...widget("number"), name: () => "Zahl", validate: (v?: unknown) => typeof v === "number" };
+    mtm.registeredTypeWidgets.number = number;
+    const membership: FakeMembership = { knownFieldNames: () => new Set(["status"]), resolveWithBase: () => res({ type: "number" }), on: vi.fn() };
+    installTypeInfoPatch(app, env(membership), widgets({}));
+    const info = mtm.getTypeInfo("Status", "Aktiv");
+    const cell = div();
+    info.inferred.render(cell, "Aktiv", ctx("a.md", "Status"));
+    expect(number.render).not.toHaveBeenCalled();
+    expect(text.render).toHaveBeenCalledWith(cell, "Aktiv", expect.anything());
+    const marker = cell.querySelector<HTMLElement>(".improved-bases-mismatch");
+    expect(marker?.getAttribute("aria-label")).toBe('"Aktiv" is not a valid Zahl; shown as Text until edited');
+    const click = new MouseEvent("click", { bubbles: true, cancelable: true });
+    marker?.dispatchEvent(click);
+    expect(click.defaultPrevented).toBe(true);
+  });
+  it("renders the native override widget for valid and empty values without a marker", () => {
+    const { app, text, mtm } = fakeApp();
+    const number = { ...widget("number"), validate: (v?: unknown) => typeof v === "number" };
+    mtm.registeredTypeWidgets.number = number;
+    const membership: FakeMembership = { knownFieldNames: () => new Set(["status"]), resolveWithBase: () => res({ type: "number" }), on: vi.fn() };
+    installTypeInfoPatch(app, env(membership), widgets({}));
+    const info = mtm.getTypeInfo("Status", 3);
+    for (const value of [3, null, undefined, ""]) {
+      const cell = div();
+      info.inferred.render(cell, value, ctx("a.md", "Status"));
+      expect(cell.querySelector(".improved-bases-mismatch")).toBeNull();
+    }
+    expect(number.render).toHaveBeenCalledTimes(4);
+    expect(text.render).not.toHaveBeenCalled();
   });
   it("falls back to original widget when plugin widget throws", () => {
     const { app, text, mtm } = fakeApp();

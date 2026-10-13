@@ -3,7 +3,8 @@ import { referencesName } from "../schema/baseDoc";
 import { openOptionEditMenu } from "../widgets/pickers";
 import { renderIcon } from "../widgets/icons";
 import type { OverlayRegistry } from "../widgets/types";
-import { conflictHint, removals, renames, TYPES, validateDrafts, type DraftType, type FieldDraft, type OptionDraft, type OtherDefinition } from "./schemaDraft";
+import { propertyTypeOf, type PropertyType } from "../internals/typeRegistry";
+import { applyTypeChoice, conflictHint, mismatchHint, overrideType, removals, renames, typeChoice, typeChoices, validateDrafts, type FieldDraft, type OptionDraft, type OtherDefinition, type TypeChoice } from "./schemaDraft";
 
 export interface SchemaSettingsInput {
 	basePath: string;
@@ -24,6 +25,10 @@ export interface SchemaSettingsInput {
 	expressions: string[];
 	/** Other schema bases' definitions of a field name (case-insensitive), for the conflict hint. */
 	otherDefinitions: (name: string) => OtherDefinition[];
+	/** Values of a property across the member notes (case-insensitive key), for the mismatch hint; empty while members are unknown. */
+	memberValues: (name: string) => unknown[];
+	/** Property types as Obsidian registers them, reserved ones included for labels; the dropdown offers the unreserved ones. */
+	types: PropertyType[];
 }
 
 export interface SchemaSettingsHandlers {
@@ -37,34 +42,8 @@ const MEMBERS_LOADING = "Base members are still loading, try again in a moment";
 const IDLE_STATUS = "Changes are written to the base on Save. Renames and removals also update the member notes.";
 const ICON_HELP = "Emoji shown for this base's entries in relations, unless a note has its own icon property. The system emoji picker opens with ctrl+cmd+space on macOS and with the Windows key + period on Windows.";
 
-/** Labels for Obsidian's property types. */
-const NATIVE_LABELS: Record<string, string> = {
-	text: "Text",
-	multitext: "List",
-	list: "List",
-	tags: "Tags",
-	aliases: "Aliases",
-	number: "Number",
-	checkbox: "Checkbox",
-	date: "Date",
-	datetime: "Date & time",
-};
-
 /** Generic icon for a base without a default entry icon. */
 const BASE_ICON = "lucide-layout-list";
-
-/** Lucide icons for Obsidian's property types. */
-const NATIVE_ICONS: Record<string, string> = {
-	text: "lucide-text",
-	multitext: "lucide-list",
-	list: "lucide-list",
-	tags: "lucide-tags",
-	aliases: "lucide-forward",
-	number: "lucide-binary",
-	checkbox: "lucide-check-square",
-	date: "lucide-calendar",
-	datetime: "lucide-clock",
-};
 
 function basename(path: string): string {
 	return (path.split("/").pop() ?? path).replace(/\.base$/, "");
@@ -74,18 +53,18 @@ function errorText(e: unknown): string {
 	return e instanceof Error ? e.message : String(e);
 }
 
-/** "Text", "Native" (type unknown) or "Number (pinned)"; the pin decides the widget in this base, so its type wins. */
-function nativeText(draft: FieldDraft): string {
-	const type = draft.pinned ? String(draft.pinned.type) : draft.nativeLabel;
-	if (type === null) return "Native";
-	const label = NATIVE_LABELS[type] ?? type.charAt(0).toUpperCase() + type.slice(1);
-	return draft.pinned ? `${label} (pinned)` : label;
+/** The registered type a draft shows: its override, else Obsidian's detected type; null when neither is known. */
+function nativeTypeOf(draft: FieldDraft, types: readonly PropertyType[]): PropertyType | null {
+	const id = overrideType(draft) ?? draft.detected;
+	return id === null ? null : propertyTypeOf(types, id);
 }
 
-function typeText(draft: FieldDraft, type: DraftType): string {
-	if (type === "relation") return "Relation";
-	if (type === "select") return "Select";
-	return nativeText(draft);
+/** Option label: registry names for native types ("Native" when Obsidian's type is unknown), fixed labels for plugin types. */
+function choiceText(draft: FieldDraft, choice: TypeChoice, types: readonly PropertyType[]): string {
+	if (choice === "relation") return "Relation";
+	if (choice === "select") return "Select";
+	if (choice === "native") return draft.detected === null ? "Native" : propertyTypeOf(types, draft.detected).name;
+	return propertyTypeOf(types, choice.slice("native:".length)).name;
 }
 
 /** Change detection for the footer: the drafts and the base icon as saved. */
@@ -93,11 +72,10 @@ function snapshot(drafts: FieldDraft[], icon: string): string {
 	return JSON.stringify({ drafts, icon });
 }
 
-function typeIcon(draft: FieldDraft): string {
+function typeIcon(draft: FieldDraft, types: readonly PropertyType[]): string {
 	if (draft.type === "relation") return "lucide-link";
 	if (draft.type === "select") return "lucide-circle-dot";
-	const label = draft.pinned ? String(draft.pinned.type) : draft.nativeLabel;
-	return (label && NATIVE_ICONS[label]) ?? "lucide-text";
+	return nativeTypeOf(draft, types)?.icon ?? "lucide-text";
 }
 
 /** Only plugin types have details to expand. */
@@ -247,8 +225,8 @@ export class SchemaSettingsModal extends Modal {
 		add.createSpan({ text: "Add field" });
 		add.addEventListener("click", () => {
 			const draft: FieldDraft = {
-				originalName: null, originalBase: null, name: "", type: "native", nativeLabel: null,
-				pinned: null, removed: false, multiple: false, options: [],
+				originalName: null, originalBase: null, name: "", type: "native", detected: null,
+				override: null, removed: false, multiple: false, options: [],
 			};
 			this.drafts.push(draft);
 			this.focusNext = draft;
@@ -418,24 +396,26 @@ export class SchemaSettingsModal extends Modal {
 		const typeWrap = main.createDiv({ cls: "improved-bases-type-select" });
 		const typeIconEl = typeWrap.createSpan({ cls: "improved-bases-type-icon" });
 		const type = typeWrap.createEl("select", { cls: "improved-bases-field-type", attr: { "aria-label": "Field type" } });
-		for (const t of TYPES) type.createEl("option", { text: typeText(draft, t), attr: { value: t } });
-		type.value = draft.type;
+		for (const choice of typeChoices(draft, this.input.types)) type.createEl("option", { text: choiceText(draft, choice, this.input.types), attr: { value: choice } });
+		type.value = typeChoice(draft, this.input.types);
 		setIcon(typeWrap.createSpan({ cls: "improved-bases-type-chevron" }), "lucide-chevron-down");
 		const details = main.createDiv({ cls: "improved-bases-field-details" });
 		const trash = iconButton(main, "lucide-trash-2", "Remove field", "improved-bases-field-remove");
 		const hint = row.createDiv({ cls: "improved-bases-field-hint" });
 		const conflict = row.createDiv({ cls: "improved-bases-field-hint improved-bases-field-conflict" });
+		const mismatch = row.createDiv({ cls: "improved-bases-field-hint improved-bases-field-mismatch" });
 		const editor = row.createDiv({ cls: "improved-bases-field-editor" });
 
 		const refresh = (): void => {
 			const open = expandable(draft) && this.expanded.has(draft);
 			disclosure.disabled = !expandable(draft);
 			disclosure.toggleClass("is-open", open);
-			setIcon(typeIconEl, typeIcon(draft));
+			setIcon(typeIconEl, typeIcon(draft, this.input.types));
 			this.renderDetails(details, draft);
 			this.updateHint(hint, draft);
 			this.updateConflict(conflict, draft);
-			row.toggleClass("has-warning", !hint.hidden || !conflict.hidden);
+			this.setHint(mismatch, mismatchHint(draft, this.input.types, this.input.memberValues(draft.originalName ?? draft.name)));
+			row.toggleClass("has-warning", !hint.hidden || !conflict.hidden || !mismatch.hidden);
 			row.toggleClass("is-expanded", open);
 			editor.hidden = !open;
 			if (!open) editor.empty();
@@ -453,7 +433,7 @@ export class SchemaSettingsModal extends Modal {
 			refresh();
 		});
 		type.addEventListener("change", () => {
-			draft.type = type.value as DraftType;
+			applyTypeChoice(draft, type.value as TypeChoice);
 			if (expandable(draft)) this.expanded.add(draft);
 			editor.empty();
 			refresh();
@@ -466,7 +446,7 @@ export class SchemaSettingsModal extends Modal {
 		refresh();
 	}
 
-	/** Details column: option colors and count, relation target and cardinality, or a dash for native fields. */
+	/** Details column: option colors and count, relation target and cardinality, "Type override" or a dash for native fields. */
 	private renderDetails(el: HTMLElement, draft: FieldDraft): void {
 		el.empty();
 		if (draft.type === "select") {
@@ -476,7 +456,8 @@ export class SchemaSettingsModal extends Modal {
 			if (draft.base) this.renderBaseIcon(el.createSpan({ cls: "improved-bases-details-icon" }), draft.base);
 			el.createSpan({ cls: "improved-bases-details-target", text: draft.base ?? "No base chosen" });
 		} else {
-			el.createSpan({ cls: "improved-bases-details-muted", text: "—" });
+			if (draft.override) el.createEl("em", { cls: "improved-bases-details-tag", text: "Type override" });
+			else el.createSpan({ cls: "improved-bases-details-muted", text: "—" });
 			return;
 		}
 		if (draft.multiple) el.createEl("em", { cls: "improved-bases-details-tag", text: "Multiple" });
@@ -484,7 +465,7 @@ export class SchemaSettingsModal extends Modal {
 
 	/** Advises about other bases defining this field differently; saving stays possible. */
 	private updateConflict(hint: HTMLElement, draft: FieldDraft): void {
-		this.setHint(hint, conflictHint(draft, this.input.otherDefinitions(draft.name)));
+		this.setHint(hint, conflictHint(draft, this.input.otherDefinitions(draft.name), (type) => propertyTypeOf(this.input.types, type).name));
 	}
 
 	/** Warns that a renamed field is still referenced by filters or formulas. */

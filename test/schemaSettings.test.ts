@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { TFile, type App, type Plugin } from "obsidian";
-import { buildSchemaSettings, countNotesWithKey, migrateRenames, removeProperties, renameSummary, saveSummary, schemaState } from "../src/schema-settings/schemaSettings";
+import { buildSchemaSettings, countNotesWithKey, migrateRenames, registerSchemaSettings, removeProperties, renameSummary, saveSummary, schemaState } from "../src/schema-settings/schemaSettings";
 import type { FieldDraft } from "../src/schema-settings/schemaDraft";
 import type { SchemaRegistry } from "../src/schema/SchemaRegistry";
 import type { WidgetEnv } from "../src/widgets/types";
@@ -16,7 +16,7 @@ const fmText = (f: TFile) => {
   const fm = (f as unknown as { frontmatter?: Record<string, unknown> }).frontmatter;
   return fm ? `---\n${Object.entries(fm).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join("\n")}\n---\n` : "";
 };
-const d = (o: Partial<FieldDraft>): FieldDraft => ({ originalName: null, originalBase: null, name: "", type: "native", nativeLabel: null, pinned: null, removed: false, multiple: false, options: [], ...o });
+const d = (o: Partial<FieldDraft>): FieldDraft => ({ originalName: null, originalBase: null, name: "", type: "native", detected: null, override: null, removed: false, multiple: false, options: [], ...o });
 
 const registry = (schemas: { basePath: string; fields: Map<string, { name: string; field: { type: "text" } }> }[], errors: Record<string, string[]>) =>
   ({ schemas: () => schemas, errors: () => new Map(Object.entries(errors)) }) as unknown as SchemaRegistry;
@@ -81,7 +81,7 @@ describe("schemaState", () => {
   const columns = { views: ["A"], orderByView: [["Team"]], configured: [], expressions: [] };
   it("builds drafts or reports registry errors", () => {
     const state = schemaState(registry([], {}), "A.base", columns, ["Status"], () => "text", 0);
-    expect(state.kind === "fields" && state.drafts.map((x) => [x.name, x.nativeLabel])).toEqual([["Team", "text"], ["Status", "text"]]);
+    expect(state.kind === "fields" && state.drafts.map((x) => [x.name, x.detected])).toEqual([["Team", "text"], ["Status", "text"]]);
     expect(schemaState(registry([], { "A.base": ["bad", "worse"] }), "A.base", columns, [], () => null, 0)).toEqual({ kind: "error", message: "bad; worse", resettable: true });
   });
 });
@@ -221,6 +221,13 @@ describe("buildSchemaSettings", () => {
     expect(input.baseIcon("Z.base")).toBe("🏢");
     expect(input.baseIcon("A.base")).toBeNull();
   });
+  it("collects member values of a property in any key case", async () => {
+    const { input } = await build({ members: [mdFile("a.md", { Status: "Aktiv" }), mdFile("b.md", { status: 3 }), mdFile("c.md", { Other: "z" })] });
+    expect(input.memberValues("STATUS")).toEqual(["Aktiv", 3]);
+    expect(input.memberValues("Missing")).toEqual([]);
+    const unknown = await build({ members: null });
+    expect(unknown.input.memberValues("Status")).toEqual([]);
+  });
   it("collects the other bases", async () => {
     const { input } = await build();
     expect(input.basePaths).toEqual(["A.base", "M.base", "Z.base"]);
@@ -320,5 +327,35 @@ describe("buildSchemaSettings", () => {
     const { handlers, writer } = await build({ error: true });
     await handlers.onReset();
     expect(writer.reset).toHaveBeenCalledWith("M.base");
+  });
+});
+
+describe("registerSchemaSettings", () => {
+  it("closes an open dialog when the plugin unloads, and keeps one dialog per instance", async () => {
+    const base = Object.assign(new TFile(), { path: "M.base", extension: "base" });
+    let command: { checkCallback: (checking: boolean) => boolean } | null = null;
+    const cleanups: (() => unknown)[] = [];
+    const app = {
+      workspace: { getActiveFile: () => base, on: vi.fn(), offref: vi.fn(), iterateAllLeaves: vi.fn() },
+      vault: { getFiles: () => [base], getAbstractFileByPath: () => base, cachedRead: () => Promise.resolve("views:\n  - type: table\n    name: A\n") },
+      metadataCache: { getFileCache: () => null },
+    };
+    const plugin = {
+      app,
+      register: (cb: () => unknown) => cleanups.push(cb),
+      registerEvent: vi.fn(),
+      addCommand: (cmd: unknown) => { command = cmd as typeof command; return cmd; },
+    } as unknown as Plugin;
+    const env = { app, writer: {}, membership: { targetEntries: () => [], baseIcon: () => null }, overlays: {} } as unknown as WidgetEnv;
+    registerSchemaSettings(plugin, env, registry([], {}));
+    const dialogs = () => document.querySelectorAll(".improved-bases-schema-modal").length;
+    expect(command!.checkCallback(false)).toBe(true);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(dialogs()).toBe(1);
+    command!.checkCallback(false);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(dialogs()).toBe(1);
+    for (const cb of cleanups) cb();
+    expect(dialogs()).toBe(0);
   });
 });

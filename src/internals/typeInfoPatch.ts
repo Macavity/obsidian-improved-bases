@@ -1,10 +1,11 @@
 import type { App, EventRef } from "obsidian";
 import { around } from "monkey-around";
 import type { Resolution } from "../schema/Membership";
-import type { NativeType, RelationField, SelectField } from "../schema/types";
-import { renderConflictMarker } from "../widgets/conflictMarker";
+import { isRelation, isSelect, type RelationField, type SelectField } from "../schema/types";
+import { mismatchText, renderConflictMarker, renderInfoMarker } from "../widgets/conflictMarker";
 import { baseContextOf } from "./baseContext";
 import type { PluginWidget, PropertyRenderContext, WidgetEnv, WidgetHandle } from "../widgets/types";
+import { nameOf } from "./typeRegistry";
 import { getMetadataTypeManager, type MetadataTypeManager, type TypeInfo, type TypeWidget } from "./detect";
 
 export interface TypeInfoPatch {
@@ -17,16 +18,6 @@ export interface PluginWidgets {
 	relation: PluginWidget<RelationField>;
 	select: PluginWidget<SelectField>;
 }
-
-/** Obsidian widget used for each native schema type. */
-const NATIVE_WIDGET: Record<NativeType, string> = {
-	text: "text",
-	list: "multitext",
-	number: "number",
-	checkbox: "checkbox",
-	date: "date",
-	datetime: "datetime",
-};
 
 interface CacheEntry {
 	generation: number;
@@ -56,13 +47,33 @@ export function installTypeInfoPatch(app: App, env: WidgetEnv, widgets: PluginWi
 		}
 	};
 
-	const renderField = (el: HTMLElement, value: unknown, ctx: PropertyRenderContext, res: Resolution, mtm: MetadataTypeManager): unknown => {
+	const isEmpty = (value: unknown): boolean => value === null || value === undefined || value === "";
+
+	const accepts = (widget: TypeWidget, value: unknown): boolean => {
+		try {
+			return isEmpty(value) || widget.validate(value);
+		} catch {
+			return true;
+		}
+	};
+
+	/** A value the override widget rejects would render empty; Obsidian's own widget shows it, with a marker. */
+	const renderNative = (el: HTMLElement, value: unknown, ctx: PropertyRenderContext, native: TypeWidget, info: TypeInfo): unknown => {
+		if (accepts(native, value)) return native.render(el, value, ctx);
+		const shown = original(info, value);
+		const handle = shown.render(el, value, ctx);
+		renderInfoMarker(el, mismatchText(value, nameOf(native, native.type), nameOf(shown, shown.type)), "improved-bases-mismatch");
+		return handle;
+	};
+
+	const renderField = (el: HTMLElement, value: unknown, ctx: PropertyRenderContext, res: Resolution, mtm: MetadataTypeManager, info: TypeInfo): unknown => {
 		const { field } = res;
 		const source = { basePath: res.basePath, name: res.name };
-		if (field.type === "relation") return widgets.relation(el, value, ctx, field, env, source);
-		if (field.type === "select") return widgets.select(el, value, ctx, field, env, source);
-		const native = mtm.registeredTypeWidgets[NATIVE_WIDGET[field.type]];
-		return native ? native.render(el, value, ctx) : undefined;
+		if (isRelation(field)) return widgets.relation(el, value, ctx, field, env, source);
+		if (isSelect(field)) return widgets.select(el, value, ctx, field, env, source);
+		// An unregistered id (or a prototype member such as "constructor") falls back to Obsidian's original widget.
+		const native = Object.hasOwn(mtm.registeredTypeWidgets, field.type) ? mtm.registeredTypeWidgets[field.type] : undefined;
+		return native ? renderNative(el, value, ctx, native, info) : undefined;
 	};
 
 	const isHandle = (h: unknown): h is WidgetHandle => typeof h === "object" && h !== null && typeof (h as WidgetHandle).focus === "function";
@@ -72,11 +83,11 @@ export function installTypeInfoPatch(app: App, env: WidgetEnv, widgets: PluginWi
 	 * Bases builds table cells detached and attaches them later, so the context is checked again once `el` is in the
 	 * DOM: a different winner re-renders the cell, a same winner only refreshes the marker text.
 	 */
-	const renderPlugin = (el: HTMLElement, value: unknown, ctx: PropertyRenderContext, mtm: MetadataTypeManager): unknown => {
+	const renderPlugin = (el: HTMLElement, value: unknown, ctx: PropertyRenderContext, mtm: MetadataTypeManager, info: TypeInfo): unknown => {
 		const context = baseContextOf(app, el);
 		const res = membership.resolveWithBase(ctx.sourcePath, ctx.key, context);
 		if (!res) return undefined;
-		let handle = renderField(el, value, ctx, res, mtm);
+		let handle = renderField(el, value, ctx, res, mtm, info);
 		if (handle === undefined) return undefined;
 		if (res.others.length) renderConflictMarker(el, res, res.name, context);
 		if (!el.isConnected && res.others.length) {
@@ -89,7 +100,7 @@ export function installTypeInfoPatch(app: App, env: WidgetEnv, widgets: PluginWi
 				if (next.basePath !== res.basePath) {
 					el.empty();
 					el.removeClass("improved-bases-has-conflict");
-					const rerendered = renderField(el, value, ctx, next, mtm);
+					const rerendered = renderField(el, value, ctx, next, mtm, info);
 					if (rerendered !== undefined) handle = rerendered;
 				} else {
 					el.querySelector(".improved-bases-conflict")?.remove();
@@ -129,7 +140,7 @@ export function installTypeInfoPatch(app: App, env: WidgetEnv, widgets: PluginWi
 		render(el: HTMLElement, value: unknown, ctx: unknown): unknown {
 			if (active) {
 				try {
-					const handle = renderPlugin(el, value, ctx as PropertyRenderContext, mtm);
+					const handle = renderPlugin(el, value, ctx as PropertyRenderContext, mtm, info);
 					if (handle !== undefined) return handle;
 				} catch (e) {
 					console.error("Improved Bases: widget failed, falling back to native widget", e);

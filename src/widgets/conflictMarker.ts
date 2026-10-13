@@ -16,9 +16,18 @@ export function conflictText(propName: string, res: Resolution, context: string 
 
 /** Appends an info icon with the explanation to `el`; clicks stay inside the icon (no picker, no cell edit). */
 export function renderConflictMarker(el: HTMLElement, res: Resolution, propName: string, context: string | null): void {
-	const text = conflictText(propName, res, context);
+	renderInfoMarker(el, conflictText(propName, res, context), "improved-bases-conflict");
+}
+
+/** Explains why a native override shows a value with another widget. */
+export function mismatchText(value: unknown, overrideName: string, shownName: string): string {
+	return `${JSON.stringify(value)} is not a valid ${overrideName}; shown as ${shownName} until edited`;
+}
+
+/** Appends an info icon with `text` as tooltip; `cls` keeps markers apart so each can be replaced on its own. */
+export function renderInfoMarker(el: HTMLElement, text: string, cls: string): void {
 	el.addClass("improved-bases-has-conflict");
-	const marker = el.createSpan({ cls: "improved-bases-conflict", attr: { "aria-label": text, tabindex: "-1" } });
+	const marker = el.createSpan({ cls, attr: { "aria-label": text, tabindex: "-1" } });
 	setIcon(marker, "info");
 	if (typeof setTooltip === "function") setTooltip(marker, text, { placement: "top" });
 	else marker.setAttribute("title", text);

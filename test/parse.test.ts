@@ -23,6 +23,13 @@ describe("parseSchema", () => {
       options: [{ value: "Developer", color: "blue" }, { value: "Product Owner", color: "orange" }] });
     expect(schema!.fields.get("notes")!.field).toEqual({ type: "text" });
   });
+  it("passes any type id through as a native field", () => {
+    for (const type of ["multitext", "text", "my-plugin-type"]) {
+      const { schema, errors } = parseSchema("A.base", { "improved-bases": { fields: { F: { type } } } });
+      expect(errors).toEqual([]);
+      expect(schema?.fields.get("f")?.field).toEqual({ type });
+    }
+  });
   it("parses the optional base icon", () => {
     const withIcon = parseSchema("A.base", { "improved-bases": { icon: " 👥 ", fields: { Team: { type: "relation", base: "T.base" } } } });
     expect(withIcon.schema?.icon).toBe("👥");
@@ -51,7 +58,11 @@ describe("parseSchema", () => {
     [{ Team: { type: "relation", base: 5 } }, /base/i],
     [{ Team: { type: "relation", base: "Teams.md" } }, /base/i],
     [{ Team: { type: "relation" } }, /base/i],
-    [{ X: { type: "rollup" } }, /type/i],
+    [{ X: { type: "" } }, /type/i],
+    [{ X: { type: "constructor" } }, /type/i],
+    [{ X: { type: "__proto__" } }, /type/i],
+    [{ X: { type: 3 } }, /type/i],
+    [{ X: {} }, /type/i],
     [{ X: "text" }, /field/i],
     [{ team: { type: "text" }, Team: { type: "text" } }, /duplicate/i],
   ])("rejects %j", (fields, msg) => {

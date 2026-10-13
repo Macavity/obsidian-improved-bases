@@ -57,7 +57,7 @@ sequenceDiagram
 ## Failure modes
 
 - Base file missing: `SchemaWriter` throws `Base not found`; the dialog shows the error and stays open, the select widget shows "Could not update the schema base" and does not commit the value.
-- Mutation produces an invalid schema (for example an unknown color written by hand): the registry rejects the whole base, keeps the previous schema out, shows the first error as a `Notice`, and membership drops the base's fields, so its widgets revert to native.
+- Mutation produces an invalid schema (for example an unknown color in a base edited outside Obsidian): the registry rejects the whole base, keeps the previous schema out, shows the first error as a `Notice`, and membership drops the base's fields, so its widgets revert to native.
 
 ## Related
 

@@ -1,12 +1,16 @@
-import { isColor, type BaseSchema, type Color, type FieldSchema } from "../schema/types";
+import { isColor, isRelation, isSelect, type BaseSchema, type Color, type FieldSchema } from "../schema/types";
 import { findOwnKey, isUnsafeKey, setOption } from "../schema/keys";
 import type { BaseColumns, ColumnEdits, RawFields } from "../schema/baseDoc";
+import { propertyTypeOf, type PropertyType } from "../internals/typeRegistry";
 
 /** Field kinds in the dialog: native (Obsidian's own type), or a plugin customization. */
 export type DraftType = "native" | "relation" | "select";
 
 /** All selectable field types. */
 export const TYPES: readonly DraftType[] = ["native", "relation", "select"];
+
+/** A dropdown choice: Obsidian's own type (`native`, offered only when it is not selectable itself), a registered type id, or a plugin type. */
+export type TypeChoice = DraftType | `native:${string}`;
 
 /** One select option while editing. */
 export interface OptionDraft { value: string; color: Color }
@@ -17,14 +21,55 @@ export interface FieldDraft {
 	originalBase: string | null;
 	name: string;
 	type: DraftType;
-	/** Obsidian's type for this property ("text", "multitext", "tags", ...) or null. */
-	nativeLabel: string | null;
-	/** Hand-written native entry, written back unchanged. */
-	pinned: Record<string, unknown> | null;
+	/** Obsidian's type id for this property ("text", "multitext", "tags", ...) or null. */
+	detected: string | null;
+	/** Native schema entry overriding Obsidian's type for this base, written back unchanged while its type is not changed. */
+	override: Record<string, unknown> | null;
 	removed: boolean;
 	multiple: boolean;
 	base?: string;
 	options: OptionDraft[];
+}
+
+const NATIVE_PREFIX = "native:";
+
+/** Whether a type id can be chosen in the dropdown: registered and not bound to fixed keys. */
+function selectable(types: readonly PropertyType[], type: string | null): boolean {
+	return type !== null && types.some((t) => t.type === type && !t.reserved);
+}
+
+/** The override's type id, null without one. */
+export function overrideType(draft: FieldDraft): string | null {
+	const type = draft.override?.type;
+	return typeof type === "string" && type ? type : null;
+}
+
+/** Obsidian's own type first unless it is selectable, every selectable registered type, the override when it is not registered, then the plugin types. */
+export function typeChoices(draft: FieldDraft, types: readonly PropertyType[]): TypeChoice[] {
+	const own: TypeChoice[] = selectable(types, draft.detected) ? [] : ["native"];
+	const registered = types.filter((t) => !t.reserved).map((t): TypeChoice => `${NATIVE_PREFIX}${t.type}`);
+	const override = overrideType(draft);
+	const extra: TypeChoice[] = override !== null && !selectable(types, override) ? [`${NATIVE_PREFIX}${override}`] : [];
+	return [...own, ...registered, ...extra, "relation", "select"];
+}
+
+/** The choice a draft shows: its plugin type, else the overriding type, else Obsidian's own when selectable, else `native`. */
+export function typeChoice(draft: FieldDraft, types: readonly PropertyType[]): TypeChoice {
+	if (draft.type !== "native") return draft.type;
+	const detected = selectable(types, draft.detected) ? draft.detected : null;
+	const type = overrideType(draft) ?? detected;
+	return type === null ? "native" : `${NATIVE_PREFIX}${type}`;
+}
+
+/** Applies a choice: Obsidian's own type drops the override, another id becomes one; plugin types keep their details. */
+export function applyTypeChoice(draft: FieldDraft, choice: TypeChoice): void {
+	if (choice === "relation" || choice === "select") {
+		draft.type = choice;
+		return;
+	}
+	draft.type = "native";
+	const type = choice === "native" ? null : choice.slice(NATIVE_PREFIX.length);
+	draft.override = type === null || type === draft.detected ? null : { type };
 }
 
 /** Another schema base's definition of the same field name, with the number of this base's members that are also in it. */
@@ -34,28 +79,28 @@ export interface OtherDefinition { basePath: string; field: FieldSchema; shared:
 function draftShape(draft: FieldDraft): { type: string; multiple: boolean; base: string | null } | null {
 	if (draft.type === "relation") return { type: "relation", multiple: draft.multiple, base: draft.base ?? null };
 	if (draft.type === "select") return { type: "select", multiple: draft.multiple, base: null };
-	const pinned = draft.pinned?.type;
-	return typeof pinned === "string" ? { type: pinned, multiple: false, base: null } : null;
+	const override = overrideType(draft);
+	return override !== null ? { type: override, multiple: false, base: null } : null;
 }
 
 function fieldShape(field: FieldSchema): { type: string; multiple: boolean; base: string | null } {
-	if (field.type === "relation") return { type: "relation", multiple: field.multiple, base: field.base };
-	if (field.type === "select") return { type: "select", multiple: field.multiple, base: null };
+	if (isRelation(field)) return { type: "relation", multiple: field.multiple, base: field.base };
+	if (isSelect(field)) return { type: "select", multiple: field.multiple, base: null };
 	return { type: field.type, multiple: false, base: null };
 }
 
-function describe(field: FieldSchema): string {
+function describe(field: FieldSchema, label: (type: string) => string): string {
 	const shape = fieldShape(field);
-	const parts = [shape.type === "relation" ? `relation to ${shape.base}` : shape.type];
+	const parts = [shape.type === "relation" ? `relation to ${shape.base}` : shape.type === "select" ? "select" : label(shape.type)];
 	if (shape.multiple) parts.push("(multiple)");
 	return parts.join(" ");
 }
 
 /**
  * Advises (never blocks) when another base defines the same field with a different type, `multiple` or target.
- * Select options and colors do not count. Null without a conflict.
+ * Select options and colors do not count. Null without a conflict. `label` names a native type id for the hint.
  */
-export function conflictHint(draft: FieldDraft, others: OtherDefinition[]): string | null {
+export function conflictHint(draft: FieldDraft, others: OtherDefinition[], label: (type: string) => string = (t) => t): string | null {
 	const mine = draftShape(draft);
 	if (!mine) return null;
 	const conflicts = others.filter((o) => {
@@ -64,14 +109,41 @@ export function conflictHint(draft: FieldDraft, others: OtherDefinition[]): stri
 	});
 	if (!conflicts.length) return null;
 	const overlap = (n: number): string => (n === 0 ? "no note is in both bases yet" : n === 1 ? "1 note is in both bases" : `${n} notes are in both bases`);
-	return conflicts.map((o) => `Also defined in ${o.basePath} as ${describe(o.field)}; ${overlap(o.shared)}.`).join(" ");
+	return conflicts.map((o) => `Also defined in ${o.basePath} as ${describe(o.field, label)}; ${overlap(o.shared)}.`).join(" ");
+}
+
+const isEmpty = (value: unknown): boolean => value === null || value === undefined || value === "";
+
+/** Whether `value` fails the type's check; a throwing check counts as passing so a broken widget never warns. */
+function rejects(type: PropertyType, value: unknown): boolean {
+	try {
+		return !isEmpty(value) && type.validate?.(value) === false;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Advises (never blocks) when member values do not fit the overriding native type; they stay in the notes and
+ * render with Obsidian's own widget. Null without an override, without a registered check or without a mismatch.
+ */
+export function mismatchHint(draft: FieldDraft, types: readonly PropertyType[], values: readonly unknown[]): string | null {
+	const override = draft.type === "native" ? overrideType(draft) : null;
+	const type = override === null ? undefined : types.find((t) => t.type === override);
+	if (!type?.validate) return null;
+	const count = values.filter((v) => rejects(type, v)).length;
+	if (count === 0) return null;
+	const shown = draft.detected === null ? "is" : propertyTypeOf(types, draft.detected).name;
+	return count === 1
+		? `1 note has a ${draft.name} that is not a valid ${type.name}; it keeps its value and shows as ${shown}`
+		: `${count} notes have a ${draft.name} that is not a valid ${type.name}; they keep their value and show as ${shown}`;
 }
 
 export interface KnownFieldsInput {
 	columns: BaseColumns;
 	schemaFields: BaseSchema["fields"] | null;
 	memberKeys: string[];
-	nativeLabel: (name: string) => string | null;
+	detected: (name: string) => string | null;
 	currentView: number;
 }
 
@@ -96,16 +168,16 @@ function collectNames(input: KnownFieldsInput, current: string[]): string[] {
 
 function toDraft(name: string, field: FieldSchema | undefined, label: string | null): FieldDraft {
 	const draft: FieldDraft = {
-		originalName: name, originalBase: null, name, type: "native", nativeLabel: label,
-		pinned: null, removed: false, multiple: false, options: [],
+		originalName: name, originalBase: null, name, type: "native", detected: label,
+		override: null, removed: false, multiple: false, options: [],
 	};
 	if (!field) return draft;
-	if (field.type === "relation") {
+	if (isRelation(field)) {
 		Object.assign(draft, { type: "relation", base: field.base, originalBase: field.base, multiple: field.multiple });
-	} else if (field.type === "select") {
+	} else if (isSelect(field)) {
 		Object.assign(draft, { type: "select", multiple: field.multiple, options: field.options.map((o) => ({ value: o.value, color: o.color })) });
 	} else {
-		draft.pinned = { type: field.type };
+		draft.override = { type: field.type };
 	}
 	return draft;
 }
@@ -117,7 +189,7 @@ export function knownFieldDrafts(input: KnownFieldsInput): FieldDraft[] {
 	const lead = new Set(current.map((n) => n.toLowerCase()));
 	const first = names.filter((n) => lead.has(n.toLowerCase()));
 	const rest = names.filter((n) => !lead.has(n.toLowerCase())).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
-	return [...first, ...rest].map((n) => toDraft(n, input.schemaFields?.get(n.toLowerCase())?.field, input.nativeLabel(n)));
+	return [...first, ...rest].map((n) => toDraft(n, input.schemaFields?.get(n.toLowerCase())?.field, input.detected(n)));
 }
 
 const isRenamed = (x: FieldDraft): boolean => !x.removed && x.originalName !== null && x.originalName.toLowerCase() !== x.name.toLowerCase();
@@ -217,7 +289,7 @@ function applyDrafts(f: RawFields, live: FieldDraft[], originalNames: string[]):
 
 /** Raw schema value for one draft. */
 function draftToField(draft: FieldDraft): Record<string, unknown> | null {
-	if (draft.type === "native") return draft.pinned;
+	if (draft.type === "native") return draft.override;
 	if (draft.type === "relation") return { type: "relation", base: draft.base, multiple: draft.multiple };
 	const options = Object.create(null) as Record<string, unknown>;
 	for (const o of draft.options) setOption(options, o.value, o.color);
