@@ -11,24 +11,22 @@ export interface PropertyType {
 const DEFAULT_ICON = "lucide-text";
 
 /** The widget's display name; Obsidian stores a string or a getter. Falls back to the id. */
-function nameOf(widget: TypeWidget): string {
+function nameOf(widget: TypeWidget, fallback: string): string {
 	try {
 		const name = typeof widget.name === "function" ? (widget.name as () => unknown)() : widget.name;
-		return typeof name === "string" && name ? name : widget.type;
+		return typeof name === "string" && name ? name : fallback;
 	} catch {
-		return widget.type;
+		return fallback;
 	}
 }
 
-/** Every registered property type in registry order; empty when the internals are missing. */
+/** Every registered property type in registry order, keyed by its registry key (that is what the schema stores and the patch looks up); empty when the internals are missing. */
 export function listPropertyTypes(mtm: MetadataTypeManager | null): PropertyType[] {
 	if (!mtm) return [];
 	const types: PropertyType[] = [];
-	for (const [key, widget] of Object.entries(mtm.registeredTypeWidgets)) {
+	for (const [type, widget] of Object.entries(mtm.registeredTypeWidgets)) {
 		if (!widget) continue;
-		const type = typeof widget.type === "string" && widget.type ? widget.type : key;
-		if (types.some((t) => t.type === type)) continue; // two entries for one id would double the dropdown option
-		types.push({ type, name: nameOf(widget), icon: widget.icon || DEFAULT_ICON, reserved: widget.reservedKeys !== undefined });
+		types.push({ type, name: nameOf(widget, type), icon: widget.icon || DEFAULT_ICON, reserved: widget.reservedKeys !== undefined });
 	}
 	return types;
 }

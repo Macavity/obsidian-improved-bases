@@ -18,13 +18,15 @@ const mtm = {
 } as unknown as MetadataTypeManager;
 
 describe("typeRegistry", () => {
-	it("lists registered widgets with resolved names and icons", () => {
+	// The id is the registry key: the patch looks widgets up by key, so a widget whose `type` differs from its key must still resolve.
+	it("lists registered widgets by key with resolved names and icons", () => {
 		expect(listPropertyTypes(mtm)).toEqual([
 			{ type: "text", name: "Text", icon: "lucide-text", reserved: false },
 			{ type: "multitext", name: "Liste", icon: "lucide-list", reserved: false },
 			{ type: "tags", name: "Tags", icon: "lucide-tags", reserved: true },
 			{ type: "odd", name: "odd", icon: "lucide-text", reserved: false },
-			{ type: "throwing", name: "throwing", icon: "lucide-text", reserved: false },
+				{ type: "throwing", name: "throwing", icon: "lucide-text", reserved: false },
+			{ type: "alias", name: "Text again", icon: "lucide-text", reserved: false },
 		]);
 		expect(listPropertyTypes(null)).toEqual([]);
 	});
