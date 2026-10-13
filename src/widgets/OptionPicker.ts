@@ -232,6 +232,7 @@ export function openOptionPicker(anchor: HTMLElement, host: OptionPickerHost, ov
 			case "ArrowUp":
 				selected = Math.max(0, Math.min(rows.length - 1, selected + (key === "ArrowDown" ? 1 : -1)));
 				render();
+				rowEls[selected]?.scrollIntoView({ block: "nearest" });
 				return true;
 			case "Enter":
 				activate(rows[selected]);

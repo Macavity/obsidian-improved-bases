@@ -208,6 +208,16 @@ describe("openOptionPicker", () => {
 		expect(key("a").defaultPrevented).toBe(false);
 	});
 
+	it("scrolls the highlighted row into view on arrow keys", () => {
+		const scroll = vi.fn();
+		Element.prototype.scrollIntoView = scroll;
+		const { key, rows } = setup();
+		key("ArrowDown");
+		key("ArrowDown");
+		expect(scroll).toHaveBeenLastCalledWith({ block: "nearest" });
+		expect(scroll.mock.contexts.at(-1)).toBe(rows()[2]);
+	});
+
 	it("shows a hint for an empty option list", () => {
 		const { popover, key, create } = setup({ options: [] });
 		expect(popover()?.querySelector(".improved-bases-picker-hint")?.textContent).toBe("Type to create an option");
