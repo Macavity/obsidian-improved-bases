@@ -59,6 +59,8 @@ describe("parseSchema", () => {
     [{ Team: { type: "relation", base: "Teams.md" } }, /base/i],
     [{ Team: { type: "relation" } }, /base/i],
     [{ X: { type: "" } }, /type/i],
+    [{ X: { type: "constructor" } }, /type/i],
+    [{ X: { type: "__proto__" } }, /type/i],
     [{ X: { type: 3 } }, /type/i],
     [{ X: {} }, /type/i],
     [{ X: "text" }, /field/i],

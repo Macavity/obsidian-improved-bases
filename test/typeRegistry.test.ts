@@ -11,6 +11,7 @@ const mtm = {
 		odd: widget("odd"),
 		throwing: widget("throwing", { name: () => { throw new Error("no name"); } }),
 		gone: undefined,
+		alias: widget("text", { name: "Text again" }),
 	},
 	getTypeInfo: () => { throw new Error("unused"); },
 	trigger: () => undefined,

@@ -51,7 +51,8 @@ export function installTypeInfoPatch(app: App, env: WidgetEnv, widgets: PluginWi
 		const source = { basePath: res.basePath, name: res.name };
 		if (isRelation(field)) return widgets.relation(el, value, ctx, field, env, source);
 		if (isSelect(field)) return widgets.select(el, value, ctx, field, env, source);
-		const native = mtm.registeredTypeWidgets[field.type]; // an unregistered id falls back to Obsidian's original widget
+		// An unregistered id (or a prototype member such as "constructor") falls back to Obsidian's original widget.
+		const native = Object.hasOwn(mtm.registeredTypeWidgets, field.type) ? mtm.registeredTypeWidgets[field.type] : undefined;
 		return native ? native.render(el, value, ctx) : undefined;
 	};
 

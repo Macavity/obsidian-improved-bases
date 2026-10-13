@@ -27,6 +27,7 @@ export function listPropertyTypes(mtm: MetadataTypeManager | null): PropertyType
 	for (const [key, widget] of Object.entries(mtm.registeredTypeWidgets)) {
 		if (!widget) continue;
 		const type = typeof widget.type === "string" && widget.type ? widget.type : key;
+		if (types.some((t) => t.type === type)) continue; // two entries for one id would double the dropdown option
 		types.push({ type, name: nameOf(widget), icon: widget.icon || DEFAULT_ICON, reserved: widget.reservedKeys !== undefined });
 	}
 	return types;

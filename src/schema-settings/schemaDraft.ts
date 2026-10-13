@@ -38,7 +38,8 @@ function selectable(types: readonly PropertyType[], type: string | null): boolea
 	return type !== null && types.some((t) => t.type === type && !t.reserved);
 }
 
-function overrideType(draft: FieldDraft): string | null {
+/** The override's type id, null without one. */
+export function overrideType(draft: FieldDraft): string | null {
 	const type = draft.override?.type;
 	return typeof type === "string" && type ? type : null;
 }

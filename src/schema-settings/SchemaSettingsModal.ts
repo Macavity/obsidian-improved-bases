@@ -4,7 +4,7 @@ import { openOptionEditMenu } from "../widgets/pickers";
 import { renderIcon } from "../widgets/icons";
 import type { OverlayRegistry } from "../widgets/types";
 import { propertyTypeOf, type PropertyType } from "../internals/typeRegistry";
-import { applyTypeChoice, conflictHint, removals, renames, typeChoice, typeChoices, validateDrafts, type FieldDraft, type OptionDraft, type OtherDefinition, type TypeChoice } from "./schemaDraft";
+import { applyTypeChoice, conflictHint, overrideType, removals, renames, typeChoice, typeChoices, validateDrafts, type FieldDraft, type OptionDraft, type OtherDefinition, type TypeChoice } from "./schemaDraft";
 
 export interface SchemaSettingsInput {
 	basePath: string;
@@ -53,7 +53,7 @@ function errorText(e: unknown): string {
 
 /** The registered type a draft shows: its override, else Obsidian's detected type; null when neither is known. */
 function nativeTypeOf(draft: FieldDraft, types: readonly PropertyType[]): PropertyType | null {
-	const id = typeof draft.override?.type === "string" ? draft.override.type : draft.detected;
+	const id = overrideType(draft) ?? draft.detected;
 	return id === null ? null : propertyTypeOf(types, id);
 }
 

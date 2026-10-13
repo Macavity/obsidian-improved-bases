@@ -55,7 +55,7 @@ function parseField(name: string, raw: unknown, errors: string[]): FieldSchema |
 	const multiple = raw.multiple === true;
 	if (type === "relation") return parseRelation(name, raw, multiple, errors);
 	if (type === "select") return parseSelect(name, raw, multiple, errors);
-	if (typeof type === "string" && type.length > 0) return { type };
+	if (typeof type === "string" && type.length > 0 && !isUnsafeKey(type)) return { type };
 	errors.push(`field "${name}": unknown type`);
 	return null;
 }

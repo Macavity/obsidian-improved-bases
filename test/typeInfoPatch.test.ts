@@ -46,7 +46,7 @@ describe("typeInfoPatch", () => {
     const membership: FakeMembership = {
       knownFieldNames: () => new Set(["team"]),
       resolveWithBase: (p) => res(p === "a.md" ? { type: "relation", base: "T.base", multiple: false }
-        : p === "m.md" ? { type: "multitext" } : p === "u.md" ? { type: "list" } : null),
+        : p === "m.md" ? { type: "multitext" } : p === "u.md" ? { type: "list" } : p === "c.md" ? { type: "constructor" } : null),
       on: vi.fn(),
     };
     const relation = vi.fn(() => ({ type: "relation", focus() {} }));
@@ -57,9 +57,10 @@ describe("typeInfoPatch", () => {
     info.inferred.render(div(), ["x"], ctx("m.md"));
     info.inferred.render(div(), "y", ctx("other.md"));
     info.inferred.render(div(), "z", ctx("u.md")); // unregistered id: Obsidian's original widget
+    info.inferred.render(div(), "z", ctx("c.md")); // prototype member is not a widget either
     expect(relation).toHaveBeenCalledTimes(1);
     expect(multitext.render).toHaveBeenCalledTimes(1);
-    expect(text.render).toHaveBeenCalledTimes(2);
+    expect(text.render).toHaveBeenCalledTimes(3);
     expect(mtm.getTypeInfo("Other", "v").inferred).toBe(text);
     expect(mtm.getTypeInfo("Team", "[[X]]").inferred).toBe(info.inferred); // cached identity
     patch.uninstall();
