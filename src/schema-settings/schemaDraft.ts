@@ -1,7 +1,7 @@
 import { isColor, isRelation, isSelect, type BaseSchema, type Color, type FieldSchema } from "../schema/types";
 import { findOwnKey, isUnsafeKey, setOption } from "../schema/keys";
 import type { BaseColumns, ColumnEdits, RawFields } from "../schema/baseDoc";
-import type { PropertyType } from "../internals/typeRegistry";
+import { propertyTypeOf, type PropertyType } from "../internals/typeRegistry";
 
 /** Field kinds in the dialog: native (Obsidian's own type), or a plugin customization. */
 export type DraftType = "native" | "relation" | "select";
@@ -110,6 +110,33 @@ export function conflictHint(draft: FieldDraft, others: OtherDefinition[], label
 	if (!conflicts.length) return null;
 	const overlap = (n: number): string => (n === 0 ? "no note is in both bases yet" : n === 1 ? "1 note is in both bases" : `${n} notes are in both bases`);
 	return conflicts.map((o) => `Also defined in ${o.basePath} as ${describe(o.field, label)}; ${overlap(o.shared)}.`).join(" ");
+}
+
+const isEmpty = (value: unknown): boolean => value === null || value === undefined || value === "";
+
+/** Whether `value` fails the type's check; a throwing check counts as passing so a broken widget never warns. */
+function rejects(type: PropertyType, value: unknown): boolean {
+	try {
+		return !isEmpty(value) && type.validate?.(value) === false;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Advises (never blocks) when member values do not fit the overriding native type; they stay in the notes and
+ * render with Obsidian's own widget. Null without an override, without a registered check or without a mismatch.
+ */
+export function mismatchHint(draft: FieldDraft, types: readonly PropertyType[], values: readonly unknown[]): string | null {
+	const override = draft.type === "native" ? overrideType(draft) : null;
+	const type = override === null ? undefined : types.find((t) => t.type === override);
+	if (!type?.validate) return null;
+	const count = values.filter((v) => rejects(type, v)).length;
+	if (count === 0) return null;
+	const shown = draft.detected === null ? "is" : propertyTypeOf(types, draft.detected).name;
+	return count === 1
+		? `1 note has a ${draft.name} that is not a valid ${type.name}; it keeps its value and shows as ${shown}`
+		: `${count} notes have a ${draft.name} that is not a valid ${type.name}; they keep their value and show as ${shown}`;
 }
 
 export interface KnownFieldsInput {

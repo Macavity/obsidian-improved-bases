@@ -20,7 +20,7 @@ const mtm = {
 describe("typeRegistry", () => {
 	// The id is the registry key: the patch looks widgets up by key, so a widget whose `type` differs from its key must still resolve.
 	it("lists registered widgets by key with resolved names and icons", () => {
-		expect(listPropertyTypes(mtm)).toEqual([
+		expect(listPropertyTypes(mtm).map(({ validate: _v, ...t }) => t)).toEqual([
 			{ type: "text", name: "Text", icon: "lucide-text", reserved: false },
 			{ type: "multitext", name: "Liste", icon: "lucide-list", reserved: false },
 			{ type: "tags", name: "Tags", icon: "lucide-tags", reserved: true },
@@ -29,6 +29,15 @@ describe("typeRegistry", () => {
 			{ type: "alias", name: "Text again", icon: "lucide-text", reserved: false },
 		]);
 		expect(listPropertyTypes(null)).toEqual([]);
+	});
+	it("passes each widget's validate on, treating a throw as valid", () => {
+		const types = listPropertyTypes({ registeredTypeWidgets: {
+			number: widget("number", { validate: (v: unknown) => typeof v === "number" }),
+			broken: widget("broken", { validate: () => { throw new Error("x"); } }),
+		} } as never);
+		expect(types[0]?.validate?.(3)).toBe(true);
+		expect(types[0]?.validate?.("a")).toBe(false);
+		expect(types[1]?.validate?.("a")).toBe(true);
 	});
 	it("labels an unregistered id", () => {
 		const types = listPropertyTypes(mtm);

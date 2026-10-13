@@ -6,6 +6,8 @@ export interface PropertyType {
 	name: string;
 	icon: string;
 	reserved: boolean;
+	/** The widget's value check; a throwing check counts as valid. */
+	validate?: (value: unknown) => boolean;
 }
 
 const DEFAULT_ICON = "lucide-text";
@@ -20,13 +22,24 @@ export function nameOf(widget: TypeWidget, fallback: string): string {
 	}
 }
 
+/** A third-party check that throws must not turn a value into a mismatch. */
+function safeValidate(widget: TypeWidget): (value: unknown) => boolean {
+	return (value) => {
+		try {
+			return widget.validate(value);
+		} catch {
+			return true;
+		}
+	};
+}
+
 /** Every registered property type in registry order, keyed by its registry key (that is what the schema stores and the patch looks up); empty when the internals are missing. */
 export function listPropertyTypes(mtm: MetadataTypeManager | null): PropertyType[] {
 	if (!mtm) return [];
 	const types: PropertyType[] = [];
 	for (const [type, widget] of Object.entries(mtm.registeredTypeWidgets)) {
 		if (!widget) continue;
-		types.push({ type, name: nameOf(widget, type), icon: widget.icon || DEFAULT_ICON, reserved: widget.reservedKeys !== undefined });
+		types.push({ type, name: nameOf(widget, type), icon: widget.icon || DEFAULT_ICON, reserved: widget.reservedKeys !== undefined, validate: safeValidate(widget) });
 	}
 	return types;
 }

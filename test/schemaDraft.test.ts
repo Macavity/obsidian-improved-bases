@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parse } from "yaml";
-import { applyTypeChoice, conflictHint, draftsToEdits, knownFieldDrafts, removals, renameKey, renames, typeChoice, typeChoices, TYPES, validateDrafts, type FieldDraft, type OtherDefinition } from "../src/schema-settings/schemaDraft";
+import { applyTypeChoice, conflictHint, draftsToEdits, knownFieldDrafts, mismatchHint, removals, renameKey, renames, typeChoice, typeChoices, TYPES, validateDrafts, type FieldDraft, type OtherDefinition } from "../src/schema-settings/schemaDraft";
 import { updateSchemaSource } from "../src/schema/SchemaWriter";
 import type { BaseColumns, RawFields } from "../src/schema/baseDoc";
 import type { PropertyType } from "../src/internals/typeRegistry";
@@ -152,6 +152,23 @@ describe("schemaDraft", () => {
 	});
 	it("skips removed drafts in validation", () => {
 		expect(validateDrafts([d({ name: "", removed: true, originalName: "X" })], [])).toEqual([]);
+	});
+	it("hints at member values the overriding type rejects", () => {
+		const types: PropertyType[] = [
+			{ type: "text", name: "Text", icon: "lucide-text", reserved: false },
+			{ type: "number", name: "Zahl", icon: "lucide-binary", reserved: false, validate: (v) => typeof v === "number" },
+			{ type: "broken", name: "Broken", icon: "lucide-text", reserved: false, validate: () => { throw new Error("x"); } },
+		];
+		const status = d({ name: "Status", detected: "text", override: { type: "number" } });
+		expect(mismatchHint(status, types, ["Aktiv", "Urlaub", 3, null, undefined, ""])).toBe("2 notes have a Status that is not a valid Zahl; they keep their value and show as Text");
+		expect(mismatchHint(status, types, ["Aktiv"])).toBe("1 note has a Status that is not a valid Zahl; it keeps its value and shows as Text");
+		expect(mismatchHint({ ...status, detected: null }, types, ["Aktiv"])).toBe("1 note has a Status that is not a valid Zahl; it keeps its value and shows as is");
+		expect(mismatchHint(status, types, [1, 2, null, ""])).toBeNull();
+		expect(mismatchHint(d({ name: "Status", detected: "text" }), types, ["Aktiv"])).toBeNull();
+		expect(mismatchHint({ ...status, type: "select" }, types, ["Aktiv"])).toBeNull();
+		expect(mismatchHint(d({ name: "Status", override: { type: "text" } }), types, ["Aktiv"])).toBeNull();
+		expect(mismatchHint(d({ name: "Status", override: { type: "broken" } }), types, ["Aktiv"])).toBeNull();
+		expect(mismatchHint(d({ name: "Status", override: { type: "gone" } }), types, ["Aktiv"])).toBeNull();
 	});
 	it("hints at conflicting definitions in other bases, with the overlap count", () => {
 		const relation = d({ name: "Team", type: "relation", base: "Teams.base", multiple: true });

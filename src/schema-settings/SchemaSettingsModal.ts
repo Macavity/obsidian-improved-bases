@@ -4,7 +4,7 @@ import { openOptionEditMenu } from "../widgets/pickers";
 import { renderIcon } from "../widgets/icons";
 import type { OverlayRegistry } from "../widgets/types";
 import { propertyTypeOf, type PropertyType } from "../internals/typeRegistry";
-import { applyTypeChoice, conflictHint, overrideType, removals, renames, typeChoice, typeChoices, validateDrafts, type FieldDraft, type OptionDraft, type OtherDefinition, type TypeChoice } from "./schemaDraft";
+import { applyTypeChoice, conflictHint, mismatchHint, overrideType, removals, renames, typeChoice, typeChoices, validateDrafts, type FieldDraft, type OptionDraft, type OtherDefinition, type TypeChoice } from "./schemaDraft";
 
 export interface SchemaSettingsInput {
 	basePath: string;
@@ -25,6 +25,8 @@ export interface SchemaSettingsInput {
 	expressions: string[];
 	/** Other schema bases' definitions of a field name (case-insensitive), for the conflict hint. */
 	otherDefinitions: (name: string) => OtherDefinition[];
+	/** Values of a property across the member notes (case-insensitive key), for the mismatch hint; empty while members are unknown. */
+	memberValues: (name: string) => unknown[];
 	/** Property types as Obsidian registers them, reserved ones included for labels; the dropdown offers the unreserved ones. */
 	types: PropertyType[];
 }
@@ -401,6 +403,7 @@ export class SchemaSettingsModal extends Modal {
 		const trash = iconButton(main, "lucide-trash-2", "Remove field", "improved-bases-field-remove");
 		const hint = row.createDiv({ cls: "improved-bases-field-hint" });
 		const conflict = row.createDiv({ cls: "improved-bases-field-hint improved-bases-field-conflict" });
+		const mismatch = row.createDiv({ cls: "improved-bases-field-hint improved-bases-field-mismatch" });
 		const editor = row.createDiv({ cls: "improved-bases-field-editor" });
 
 		const refresh = (): void => {
@@ -411,7 +414,8 @@ export class SchemaSettingsModal extends Modal {
 			this.renderDetails(details, draft);
 			this.updateHint(hint, draft);
 			this.updateConflict(conflict, draft);
-			row.toggleClass("has-warning", !hint.hidden || !conflict.hidden);
+			this.setHint(mismatch, mismatchHint(draft, this.input.types, this.input.memberValues(draft.originalName ?? draft.name)));
+			row.toggleClass("has-warning", !hint.hidden || !conflict.hidden || !mismatch.hidden);
 			row.toggleClass("is-expanded", open);
 			editor.hidden = !open;
 			if (!open) editor.empty();

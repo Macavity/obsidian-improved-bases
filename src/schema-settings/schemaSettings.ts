@@ -183,9 +183,14 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 	const source = await app.vault.cachedRead(file);
 	const members = env.membership.targetEntries(basePath);
 	const names = new Set<string>();
+	// Lower-cased key to the member values, so the mismatch hint needs no rescan per keystroke.
+	const values = new Map<string, unknown[]>();
 	for (const f of members ?? []) {
-		for (const k of Object.keys(app.metadataCache.getFileCache(f)?.frontmatter ?? {})) {
-			if (k !== "position") names.add(k);
+		for (const [k, v] of Object.entries(app.metadataCache.getFileCache(f)?.frontmatter ?? {})) {
+			if (k === "position") continue;
+			names.add(k);
+			const key = k.toLowerCase();
+			values.set(key, [...(values.get(key) ?? []), v]);
 		}
 	}
 	const memberKeys = [...names].sort();
@@ -214,6 +219,7 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 		overlays: env.overlays,
 		membersKnown: () => env.membership.targetEntries(basePath) !== null,
 		otherDefinitions: (name) => otherDefinitions(registry, env.membership, basePath, name),
+		memberValues: (name) => values.get(name.toLowerCase()) ?? [],
 		types: listPropertyTypes(getMetadataTypeManager(app)),
 		views,
 		defaultViewIndex,

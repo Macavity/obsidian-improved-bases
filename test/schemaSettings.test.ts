@@ -221,6 +221,13 @@ describe("buildSchemaSettings", () => {
     expect(input.baseIcon("Z.base")).toBe("🏢");
     expect(input.baseIcon("A.base")).toBeNull();
   });
+  it("collects member values of a property in any key case", async () => {
+    const { input } = await build({ members: [mdFile("a.md", { Status: "Aktiv" }), mdFile("b.md", { status: 3 }), mdFile("c.md", { Other: "z" })] });
+    expect(input.memberValues("STATUS")).toEqual(["Aktiv", 3]);
+    expect(input.memberValues("Missing")).toEqual([]);
+    const unknown = await build({ members: null });
+    expect(unknown.input.memberValues("Status")).toEqual([]);
+  });
   it("collects the other bases", async () => {
     const { input } = await build();
     expect(input.basePaths).toEqual(["A.base", "M.base", "Z.base"]);

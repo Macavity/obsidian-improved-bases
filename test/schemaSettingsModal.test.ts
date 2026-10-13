@@ -15,7 +15,7 @@ const chips = (el: HTMLElement) => Array.from(el.querySelectorAll(".improved-bas
 const types: PropertyType[] = [
 	{ type: "text", name: "Text", icon: "lucide-text", reserved: false },
 	{ type: "multitext", name: "Liste", icon: "lucide-list", reserved: false },
-	{ type: "number", name: "Zahl", icon: "lucide-binary", reserved: false },
+	{ type: "number", name: "Zahl", icon: "lucide-binary", reserved: false, validate: (v) => typeof v === "number" },
 	{ type: "tags", name: "Tags", icon: "lucide-tags", reserved: true },
 ];
 const d = (p: Partial<FieldDraft>): FieldDraft => ({
@@ -45,6 +45,7 @@ function open(state: SchemaSettingsInput["state"], { countAffected: count, ...op
 		defaultViewIndex: 0,
 		expressions: [],
 		otherDefinitions: () => [],
+		memberValues: () => [],
 		types,
 		...opts,
 	};
@@ -359,6 +360,31 @@ describe("SchemaSettingsModal", () => {
 		type.dispatchEvent(new Event("change"));
 		expect(icon()).toBe("lucide-text");
 		expect(details(el)).toEqual(["—"]);
+	});
+
+	it("warns when member values do not fit the chosen type, without blocking save", () => {
+		const values = ["Aktiv", "Urlaub", "Aktiv", "Urlaub", "Aktiv"];
+		const memberValues = vi.fn((name: string) => (name === "Status" ? values : []));
+		const { el, q } = open({ kind: "fields", drafts: [d({ originalName: "Status", name: "Status", detected: "text" })] }, { memberValues });
+		const type = q<HTMLSelectElement>(".improved-bases-field-type");
+		const warning = () => q<HTMLElement>(".improved-bases-field-mismatch");
+		const row = () => q(".improved-bases-field-row");
+		expect(warning().hidden).toBe(true);
+		expect(row().classList.contains("has-warning")).toBe(false);
+		type.value = "native:number";
+		type.dispatchEvent(new Event("change"));
+		expect(warning().hidden).toBe(false);
+		expect(warning().textContent).toBe("5 notes have a Status that is not a valid Zahl; they keep their value and show as Text");
+		expect(row().classList.contains("has-warning")).toBe(true);
+		expect(q<HTMLButtonElement>(".improved-bases-save").disabled).toBe(false);
+		for (const back of ["native:text", "select"]) {
+			type.value = "native:number";
+			type.dispatchEvent(new Event("change"));
+			type.value = back;
+			type.dispatchEvent(new Event("change"));
+			expect(warning().hidden).toBe(true);
+		}
+		expect(el.querySelectorAll(".improved-bases-field-mismatch")).toHaveLength(1);
 	});
 
 	it("warns in the remove confirmation when expressions reference the field", async () => {
