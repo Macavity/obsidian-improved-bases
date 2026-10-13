@@ -90,6 +90,17 @@ describe("openOptionEditor", () => {
 		expect(key("a").defaultPrevented).toBe(false);
 		expect(input().isConnected).toBe(true);
 	});
+	it("moves the active ring to the new color once the recolor succeeds, keeps it on failure", async () => {
+		const { handlers, root } = setup();
+		const active = () => root()?.querySelector(".is-active")?.getAttribute("data-color");
+		root()?.querySelector<HTMLElement>("[data-color='blue']")?.click();
+		await Promise.resolve();
+		expect(active()).toBe("blue");
+		handlers.recolor.mockResolvedValueOnce(false);
+		root()?.querySelector<HTMLElement>("[data-color='green']")?.click();
+		await Promise.resolve();
+		expect(active()).toBe("blue");
+	});
 	it("recolors on swatch click and removes on Delete", () => {
 		const { handlers, root } = setup();
 		root()?.querySelector<HTMLElement>("[data-color='blue']")?.click();

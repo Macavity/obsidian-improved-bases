@@ -38,7 +38,12 @@ export function openOptionEditor(
 	for (const color of COLORS) {
 		const swatch = grid.createEl("button", { attr: { type: "button", "data-color": color, "aria-label": color } });
 		swatch.toggleClass("is-active", color === option.color);
-		swatch.addEventListener("click", () => void handlers.recolor(color));
+		swatch.addEventListener("click", () => {
+			void handlers.recolor(color).then((ok) => {
+				if (!ok) return;
+				for (const other of Array.from(grid.children)) other.toggleClass("is-active", other === swatch);
+			});
+		});
 	}
 	// Buttons never take the focus from the input, so a click does not blur-save first.
 	for (const el of [remove, ...Array.from(grid.children)]) el.addEventListener("mousedown", (evt) => evt.preventDefault());
