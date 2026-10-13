@@ -2,7 +2,7 @@ import { Notice } from "obsidian";
 import type { Color, SelectField } from "../schema/types";
 import { openColorMenu, openOptionMenu } from "./pickers";
 import type { PluginWidget, SchemaSource } from "./types";
-import { addOptionMutation, colorOf, selectOutput, setColorMutation, toList } from "./values";
+import { addOptionMutation, colorOf, nextOptionColor, selectOutput, setColorMutation, toList } from "./values";
 
 /** Colored pills; options come from the schema, unknown values are shown grey and never dropped. */
 export const SelectWidget: PluginWidget<SelectField> = (el, value, ctx, field, env, source) => {
@@ -48,9 +48,10 @@ export const SelectWidget: PluginWidget<SelectField> = (el, value, ctx, field, e
 	const create = (created: string): void => {
 		const src = sourceOf();
 		if (!src) return;
-		void writeSchema(addOptionMutation(src.name, created)).then((ok) => {
+		const color = nextOptionColor(options.length);
+		void writeSchema(addOptionMutation(src.name, created, color)).then((ok) => {
 			if (!ok) return;
-			if (!options.some((o) => o.value === created)) options.push({ value: created, color: "grey" });
+			if (!options.some((o) => o.value === created)) options.push({ value: created, color });
 			if (field.multiple) {
 				if (!values.includes(created)) commit([...values, created]);
 			} else {

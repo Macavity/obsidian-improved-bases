@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { RawFields } from "../src/schema/SchemaWriter";
 import type { SelectField } from "../src/schema/types";
-import { selectOutput, colorOf, addOptionMutation, setColorMutation } from "../src/widgets/values";
+import { selectOutput, colorOf, addOptionMutation, nextOptionColor, setColorMutation } from "../src/widgets/values";
 
 const field: SelectField = { type: "select", multiple: false, options: [{ value: "Dev", color: "blue" }] };
 const fresh = (): RawFields => ({ Role: { type: "select", options: { Dev: "blue" } } });
@@ -18,20 +18,34 @@ describe("select values", () => {
   });
   it("adds options without duplicates and recolors", () => {
     const f = fresh();
-    addOptionMutation("Role", "PO")(f); addOptionMutation("Role", "PO")(f);
+    addOptionMutation("Role", "PO", "grey")(f); addOptionMutation("Role", "PO", "grey")(f);
     expect(f.Role?.options).toEqual({ Dev: "blue", PO: "grey" });
     setColorMutation("Role", "PO", "green")(f);
     expect((f.Role?.options as Record<string, string>).PO).toBe("green");
   });
   it("keeps an existing color when adding", () => {
     const f = fresh();
-    addOptionMutation("Role", "Dev")(f);
+    addOptionMutation("Role", "Dev", "red")(f);
     expect((f.Role?.options as Record<string, string>).Dev).toBe("blue");
   });
+	it("cycles new option colors without grey, black, white", () => {
+		const seen = Array.from({ length: 10 }, (_, i) => nextOptionColor(i));
+		expect(new Set(seen).size).toBe(10);
+		expect(seen).not.toContain("grey");
+		expect(seen).not.toContain("black");
+		expect(seen).not.toContain("white");
+		expect(nextOptionColor(0)).toBe("red");
+		expect(nextOptionColor(10)).toBe(nextOptionColor(0));
+	});
+	it("adds an option with the given color", () => {
+		const fields: RawFields = { Status: { type: "select", options: {} } };
+		addOptionMutation("Status", "A", "blue")(fields);
+		expect(fields.Status?.options).toEqual({ A: "blue" });
+	});
 	it("treats prototype names as ordinary options", () => {
 		for (const name of ["constructor", "__proto__", "toString"]) {
 			const fields: RawFields = { Status: { options: {} } };
-			addOptionMutation("Status", name)(fields);
+			addOptionMutation("Status", name, "grey")(fields);
 			const opts = fields.Status?.options as Record<string, unknown>;
 			expect(Object.hasOwn(opts, name)).toBe(true);
 			expect(opts[name]).toBe("grey");

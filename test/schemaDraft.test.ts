@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parse } from "yaml";
-import { applyTypeChoice, conflictHint, draftsToEdits, knownFieldDrafts, mismatchHint, removals, renameKey, renames, typeChoice, typeChoices, TYPES, validateDrafts, type FieldDraft, type OtherDefinition } from "../src/schema-settings/schemaDraft";
+import { applyTypeChoice, conflictHint, draftsToEdits, knownFieldDrafts, mismatchHint, optionSuggestions, removals, renameKey, renames, typeChoice, typeChoices, TYPES, validateDrafts, type FieldDraft, type OtherDefinition } from "../src/schema-settings/schemaDraft";
 import { updateSchemaSource } from "../src/schema/SchemaWriter";
 import type { BaseColumns, RawFields } from "../src/schema/baseDoc";
 import type { PropertyType } from "../src/internals/typeRegistry";
@@ -220,6 +220,23 @@ describe("schemaDraft", () => {
 			expect(draft.type).toBe("select");
 			applyTypeChoice(draft, "native");
 			expect(draft).toMatchObject({ type: "native", override: null });
+		});
+		it("suggests note values by frequency, excluding existing options", () => {
+			const values = ["Aktiv", ["MMO", "RPG"], "Aktiv", 3, null, ["RPG"], "Done"];
+			expect(optionSuggestions(values, [{ value: "Done", color: "red" }])).toEqual([
+				{ value: "Aktiv", count: 2 }, { value: "RPG", count: 2 }, { value: "MMO", count: 1 },
+			]);
+		});
+		it("sets multiple from a list type when switching to select or relation", () => {
+			const list = d({ detected: "multitext" });
+			applyTypeChoice(list, "select");
+			expect(list.multiple).toBe(true);
+			const text = d({ detected: "text", multiple: true });
+			applyTypeChoice(text, "select");
+			expect(text.multiple).toBe(false);
+			const keep = d({ type: "select", multiple: false, detected: "multitext" });
+			applyTypeChoice(keep, "relation");
+			expect(keep.multiple).toBe(false);
 		});
 		it("labels the conflicting type through the registry", () => {
 			const others: OtherDefinition[] = [{ basePath: "Meetings.base", field: { type: "multitext" }, shared: 1 }];

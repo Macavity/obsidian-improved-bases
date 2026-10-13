@@ -1,4 +1,4 @@
-import type { Color, SelectField } from "../schema/types";
+import { COLORS, type Color, type SelectField } from "../schema/types";
 import type { RawFields } from "../schema/SchemaWriter";
 import { isUnsafeKey, setOption } from "../schema/keys";
 import { isRecord } from "../schema/parse";
@@ -46,11 +46,18 @@ function optionsOf(fields: RawFields, fieldName: string): Record<string, unknown
 	return created;
 }
 
-/** Adds an option with color grey; an existing option is kept as is. */
-export function addOptionMutation(fieldName: string, value: string): (f: RawFields) => void {
+const PALETTE = COLORS.filter((c) => c !== "grey" && c !== "black" && c !== "white");
+
+/** Color for a new option: cycles the palette (no grey, black, white) by the number of existing options. */
+export function nextOptionColor(existingCount: number): Color {
+	return PALETTE[existingCount % PALETTE.length] ?? "red";
+}
+
+/** Adds an option with the given color; an existing option is kept as is. */
+export function addOptionMutation(fieldName: string, value: string, color: Color): (f: RawFields) => void {
 	return (fields) => {
 		const options = optionsOf(fields, fieldName);
-		if (options && !Object.hasOwn(options, value)) setOption(options, value, "grey");
+		if (options && !Object.hasOwn(options, value)) setOption(options, value, color);
 	};
 }
 

@@ -1,7 +1,7 @@
 import { ButtonComponent, Modal, setIcon, ToggleComponent, type App } from "obsidian";
 import { referencesName } from "../schema/baseDoc";
 import { openOptionEditMenu } from "../widgets/pickers";
-import { toList } from "../widgets/values";
+import { nextOptionColor, toList } from "../widgets/values";
 import { renderIcon } from "../widgets/icons";
 import type { OverlayRegistry } from "../widgets/types";
 import { propertyTypeOf, type PropertyType } from "../internals/typeRegistry";
@@ -548,7 +548,7 @@ export class SchemaSettingsModal extends Modal {
 		const values = [...found].sort((a, b) => a.localeCompare(b)).filter((v) => !known.has(v));
 		if (!values.length) return;
 		const add = (value: string): void => {
-			if (!draft.options.some((o) => o.value === value)) draft.options.push({ value, color: "grey" });
+			if (!draft.options.some((o) => o.value === value)) draft.options.push({ value, color: nextOptionColor(draft.options.length) });
 		};
 		const row = el.createDiv({ cls: "improved-bases-option-suggestions" });
 		row.createSpan({ cls: "improved-bases-suggestions-label", text: "In notes:" });
@@ -583,7 +583,7 @@ export class SchemaSettingsModal extends Modal {
 			const submit = (): void => {
 				const value = input.value.trim();
 				if (!value) return;
-				draft.options.push({ value, color: "grey" });
+				draft.options.push({ value, color: nextOptionColor(draft.options.length) });
 				rerender();
 				container.querySelector<HTMLElement>(".improved-bases-option-add-button")?.click();
 			};

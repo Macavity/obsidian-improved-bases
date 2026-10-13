@@ -1,6 +1,7 @@
 import { isColor, isRelation, isSelect, type BaseSchema, type Color, type FieldSchema } from "../schema/types";
 import { findOwnKey, isUnsafeKey, setOption } from "../schema/keys";
 import type { BaseColumns, ColumnEdits, RawFields } from "../schema/baseDoc";
+import { toList } from "../widgets/values";
 import { propertyTypeOf, type PropertyType } from "../internals/typeRegistry";
 
 /** Field kinds in the dialog: native (Obsidian's own type), or a plugin customization. */
@@ -61,9 +62,20 @@ export function typeChoice(draft: FieldDraft, types: readonly PropertyType[]): T
 	return type === null ? "native" : `${NATIVE_PREFIX}${type}`;
 }
 
+const LIST_TYPES = ["multitext", "tags", "aliases"];
+
+/** Distinct note values that are not options yet, with their counts: most frequent first, ties alphabetical. */
+export function optionSuggestions(values: readonly unknown[], options: readonly OptionDraft[]): { value: string; count: number }[] {
+	const known = new Set(options.map((o) => o.value));
+	const counts = new Map<string, number>();
+	for (const v of values.flatMap(toList)) if (!known.has(v)) counts.set(v, (counts.get(v) ?? 0) + 1);
+	return [...counts].map(([value, count]) => ({ value, count })).sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
+}
+
 /** Applies a choice: Obsidian's own type drops the override, another id becomes one; plugin types keep their details. */
 export function applyTypeChoice(draft: FieldDraft, choice: TypeChoice): void {
 	if (choice === "relation" || choice === "select") {
+		if (draft.type === "native") draft.multiple = LIST_TYPES.includes(draft.detected ?? "");
 		draft.type = choice;
 		return;
 	}
