@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { App } from "obsidian";
 import { SchemaSettingsModal, type SchemaSettingsInput } from "../src/schema-settings/SchemaSettingsModal";
-import type { FieldDraft } from "../src/schema-settings/schemaDraft";
+import type { FieldDraft, OptionDraft } from "../src/schema-settings/schemaDraft";
+import { confirmOptionDelete } from "../src/widgets/OptionDeleteModal";
 import { OverlayRegistry } from "../src/widgets/types";
 import { openOptionEditMenu } from "../src/widgets/pickers";
 import { nextOptionColor } from "../src/widgets/values";
@@ -9,6 +10,7 @@ import type { Color } from "../src/schema/types";
 import type { PropertyType } from "../src/internals/typeRegistry";
 
 vi.mock("../src/widgets/pickers", () => ({ openOptionEditMenu: vi.fn() }));
+vi.mock("../src/widgets/OptionDeleteModal", () => ({ confirmOptionDelete: vi.fn() }));
 type ChipHandlers = { onRename: () => void; onRemove: () => void; onColor: (c: Color) => void };
 const lastMenu = () => vi.mocked(openOptionEditMenu).mock.calls.at(-1)?.[2] as ChipHandlers;
 const chips = (el: HTMLElement) => Array.from(el.querySelectorAll(".improved-bases-option-chip")).map((p) => p.textContent);
@@ -23,6 +25,7 @@ const d = (p: Partial<FieldDraft>): FieldDraft => ({
 	originalName: null, originalBase: null, name: "X", type: "native", detected: null,
 	override: null, removed: false, multiple: false, options: [], ...p,
 });
+const opt = (value: string, color: Color, p: Partial<OptionDraft> = {}): OptionDraft => ({ value, color, original: null, removal: null, ...p });
 const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 const names = (el: HTMLElement) => Array.from(el.querySelectorAll<HTMLInputElement>(".improved-bases-field-name")).map((i) => i.value);
 const details = (el: HTMLElement) => Array.from(el.querySelectorAll(".improved-bases-field-details")).map((x) => x.textContent);
@@ -65,13 +68,14 @@ function open(state: SchemaSettingsInput["state"], { countAffected: count, ...op
 beforeEach(() => {
 	document.body.innerHTML = "";
 	vi.mocked(openOptionEditMenu).mockClear();
+	vi.mocked(confirmOptionDelete).mockReset();
 });
 
 describe("SchemaSettingsModal", () => {
 	const suggestions = (el: HTMLElement) => Array.from(el.querySelectorAll(".improved-bases-option-suggestion")).map((p) => p.textContent);
 	it("suggests the values found in the notes as options, one by one or all at once", () => {
 		const memberValues = vi.fn((name: string) => (name === "Status" ? ["Todo", ["Open", "Done"], "Open", 3] : []));
-		const { el, q } = open({ kind: "fields", drafts: [d({ name: "Status", type: "select", options: [{ value: "Open", color: "blue" }] })] }, { memberValues });
+		const { el, q } = open({ kind: "fields", drafts: [d({ name: "Status", type: "select", options: [opt("Open", "blue")] })] }, { memberValues });
 		q<HTMLButtonElement>(".improved-bases-field-disclosure").click();
 		expect(suggestions(el)).toEqual(["Done · 1", "Todo · 1"]);
 		q<HTMLButtonElement>('.improved-bases-option-suggestion[aria-label="Add option Todo"]').click();
@@ -97,14 +101,14 @@ describe("SchemaSettingsModal", () => {
 		expect(chips(el)).toEqual(values);
 	});
 	it("gives a clicked suggestion the next palette color and removes the chip", () => {
-		const options = [{ value: "Open", color: "blue" as Color }];
+		const options = [opt("Open", "blue")];
 		const { el, q, onSave } = open({ kind: "fields", drafts: [d({ name: "Status", type: "select", options })] }, { memberValues: () => ["Todo", "Todo", "Open"] });
 		q<HTMLButtonElement>(".improved-bases-field-disclosure").click();
 		expect(suggestions(el)).toEqual(["Todo · 2"]);
 		q<HTMLButtonElement>('.improved-bases-option-suggestion[aria-label="Add option Todo"]').click();
 		expect(suggestions(el)).toEqual([]);
 		q<HTMLButtonElement>(".improved-bases-save").click();
-		expect(onSave.mock.calls[0]?.[0][0]?.options[1]).toEqual({ value: "Todo", color: nextOptionColor(1) });
+		expect(onSave.mock.calls[0]?.[0][0]?.options[1]).toEqual(opt("Todo", nextOptionColor(1)));
 	});
 	it("reads the suggestions of the original name for a renamed field", () => {
 		const memberValues = vi.fn((_name: string) => ["a"]);
@@ -133,7 +137,7 @@ describe("SchemaSettingsModal", () => {
 			kind: "fields",
 			drafts: [
 				d({ name: "Lead", type: "relation", base: "Teams.base", multiple: true }),
-				d({ name: "Status", type: "select", multiple: true, options: [{ value: "A", color: "red" }, { value: "B", color: "blue" }] }),
+				d({ name: "Status", type: "select", multiple: true, options: [opt("A", "red"), opt("B", "blue")] }),
 				d({ name: " ", detected: "text" }),
 			],
 		});
@@ -191,7 +195,7 @@ describe("SchemaSettingsModal", () => {
 	});
 
 	it("re-renders the body when the type changes and keeps options", () => {
-		const { el, q } = open({ kind: "fields", drafts: [d({ name: "S", type: "select", options: [{ value: "A", color: "red" }] })] });
+		const { el, q } = open({ kind: "fields", drafts: [d({ name: "S", type: "select", options: [opt("A", "red")] })] });
 		q<HTMLElement>(".improved-bases-field-disclosure").click();
 		expect(el.querySelectorAll(".improved-bases-option-chip")).toHaveLength(1);
 		const type = q<HTMLSelectElement>(".improved-bases-field-type");
@@ -224,8 +228,8 @@ describe("SchemaSettingsModal", () => {
 		expect(el.querySelectorAll(".improved-bases-option-chip")).toHaveLength(1);
 	});
 
-	it("edits options: add, rename, recolor, remove, and toggles multiple", () => {
-		const { el, q } = open({ kind: "fields", drafts: [d({ name: "S", type: "select", options: [{ value: "A", color: "red" }] })] });
+	it("edits options: add, rename, recolor, remove, and toggles multiple", async () => {
+		const { el, q } = open({ kind: "fields", drafts: [d({ name: "S", type: "select", options: [opt("A", "red")] })] });
 		q<HTMLElement>(".improved-bases-field-disclosure").click();
 		expect(el.querySelector(".improved-bases-option-new")).toBeNull();
 		q<HTMLElement>(".improved-bases-option-add-button").click();
@@ -250,6 +254,7 @@ describe("SchemaSettingsModal", () => {
 		expect(q(".improved-bases-option-chip").getAttribute("data-color")).toBe("blue");
 		q<HTMLElement>(".improved-bases-option-chip").click();
 		lastMenu().onRemove();
+		await tick();
 		expect(chips(el)).toEqual(["B"]);
 		expect(details(el)).toEqual(["1 option"]);
 		q<HTMLElement>(".improved-bases-field-multiple").click();
@@ -461,6 +466,59 @@ describe("SchemaSettingsModal", () => {
 		q<HTMLElement>(".improved-bases-field-remove").click();
 		await tick();
 		expect(q(".improved-bases-field-confirm").textContent).not.toMatch(/reference/);
+	});
+
+	describe("removing a saved option", () => {
+		const saved = (memberValues: (name: string) => unknown[]) => {
+			const t = open({ kind: "fields", drafts: [d({ originalName: "Status", name: "Status", type: "select", options: [opt("Open", "red", { original: "Open" }), opt("Done", "blue", { original: "Done" })] })] }, { memberValues });
+			t.q<HTMLElement>(".improved-bases-field-disclosure").click();
+			const remove = async (index: number) => {
+				t.el.querySelectorAll<HTMLElement>(".improved-bases-option-chip")[index]?.click();
+				lastMenu().onRemove();
+				await tick();
+			};
+			const status = () => t.q(".improved-bases-rename-status").textContent;
+			return { ...t, remove, status };
+		};
+		it("asks what to do with the notes and shows a removal from the notes as pending", async () => {
+			vi.mocked(confirmOptionDelete).mockResolvedValue("notes");
+			const t = saved((name) => (name === "Status" ? ["Open", ["Open", "Done"], "Done"] : []));
+			await t.remove(0);
+			expect(confirmOptionDelete).toHaveBeenCalledWith(expect.anything(), "Open", 2, expect.anything());
+			expect(chips(t.el)).toEqual(["Done"]);
+			expect(details(t.el)).toEqual(["1 option"]);
+			expect(t.status()).toBe("11 removalOpen removed");
+			t.q<HTMLElement>(".improved-bases-save").click();
+			await tick();
+			expect(t.onSave.mock.calls[0]?.[0][0]?.options[0]).toEqual(opt("Open", "red", { original: "Open", removal: "notes" }));
+		});
+		it("keeps the option when the dialog is cancelled", async () => {
+			vi.mocked(confirmOptionDelete).mockResolvedValue(null);
+			const t = saved(() => ["Open"]);
+			await t.remove(0);
+			expect(chips(t.el)).toEqual(["Open", "Done"]);
+		});
+		it("drops an unused option from the schema without asking", async () => {
+			const t = saved(() => ["Open"]);
+			await t.remove(1);
+			expect(confirmOptionDelete).not.toHaveBeenCalled();
+			expect(chips(t.el)).toEqual(["Open"]);
+			expect(t.status()).toMatch(/written to the base on Save/);
+		});
+		it("shows an option rename as pending and refuses to save it while members are unknown", async () => {
+			const t = open({ kind: "fields", drafts: [d({ originalName: "Status", name: "Status", type: "select", options: [opt("Open", "red", { original: "Open" })] })] }, { membersKnown: () => false });
+			t.q<HTMLElement>(".improved-bases-field-disclosure").click();
+			t.q<HTMLElement>(".improved-bases-option-chip").click();
+			lastMenu().onRename();
+			const input = t.q<HTMLInputElement>(".improved-bases-option-input");
+			input.value = "Offen";
+			input.dispatchEvent(new Event("blur"));
+			expect(t.q(".improved-bases-rename-status").textContent).toBe("11 pending renameOpen → Offen");
+			t.q<HTMLElement>(".improved-bases-save").click();
+			await tick();
+			expect(t.error()).toMatch(/still loading/);
+			expect(t.onSave).not.toHaveBeenCalled();
+		});
 	});
 
 	it("passes removed drafts to save", async () => {

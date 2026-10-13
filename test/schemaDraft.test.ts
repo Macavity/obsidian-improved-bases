@@ -1,12 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { parse } from "yaml";
-import { applyTypeChoice, conflictHint, draftsToEdits, knownFieldDrafts, mismatchHint, optionSuggestions, removals, renameKey, renames, typeChoice, typeChoices, TYPES, validateDrafts, type FieldDraft, type OtherDefinition } from "../src/schema-settings/schemaDraft";
+import { applyTypeChoice, conflictHint, draftsToEdits, knownFieldDrafts, mismatchHint, optionSuggestions, removals, renameKey, renames, typeChoice, typeChoices, TYPES, validateDrafts, optionMigrations, type FieldDraft, type OptionDraft, type OtherDefinition } from "../src/schema-settings/schemaDraft";
+import type { Color } from "../src/schema/types";
 import { updateSchemaSource } from "../src/schema/SchemaWriter";
 import type { BaseColumns, RawFields } from "../src/schema/baseDoc";
 import type { PropertyType } from "../src/internals/typeRegistry";
 import { parseSchema } from "../src/schema/parse";
 
 const d = (p: Partial<FieldDraft>): FieldDraft => ({ originalName: null, originalBase: null, name: "X", type: "native", detected: null, override: null, removed: false, multiple: false, options: [], ...p });
+const o = (value: string, color: Color, p: Partial<OptionDraft> = {}): OptionDraft => ({ value, color, original: null, removal: null, ...p });
 const mutation = (drafts: FieldDraft[], originals: string[]) => draftsToEdits(drafts, originals, 0).mutate;
 const leadOf = (src: string): unknown => (parse(src) as { "improved-bases": { fields: Record<string, unknown> } })["improved-bases"].fields.Lead;
 const none: BaseColumns = { views: [], orderByView: [], configured: [], expressions: [] };
@@ -14,7 +16,7 @@ const none: BaseColumns = { views: [], orderByView: [], configured: [], expressi
 describe("schemaDraft", () => {
 	it("maps schema fields to drafts", () => {
 		const fields = new Map([["role", { name: "Role", field: { type: "select" as const, multiple: true, options: [{ value: "A", color: "red" as const }] } }]]);
-		expect(knownFieldDrafts({ columns: none, schemaFields: fields, memberKeys: [], detected: () => null, currentView: 0 })).toEqual([d({ originalName: "Role", name: "Role", type: "select", multiple: true, options: [{ value: "A", color: "red" }] })]);
+		expect(knownFieldDrafts({ columns: none, schemaFields: fields, memberKeys: [], detected: () => null, currentView: 0 })).toEqual([d({ originalName: "Role", name: "Role", type: "select", multiple: true, options: [o("A", "red", { original: "A" })] })]);
 		const rel = new Map([["lead", { name: "Lead", field: { type: "relation" as const, base: "M.base", multiple: false } }]]);
 		expect(knownFieldDrafts({ columns: none, schemaFields: rel, memberKeys: [], detected: () => null, currentView: 0 })).toEqual([d({ originalName: "Lead", originalBase: "M.base", name: "Lead", type: "relation", base: "M.base" })]);
 	});
@@ -31,14 +33,14 @@ describe("schemaDraft", () => {
 		// a saved target that no longer exists (orphaned base) stays valid, a different missing one does not
 		expect(validateDrafts([d({ originalName: "L", originalBase: "Gone.base", name: "L", type: "relation", base: "Gone.base" })], ["M.base"])).toEqual([]);
 		expect(validateDrafts([d({ originalName: "L", originalBase: "Gone.base", name: "L", type: "relation", base: "Other.base" })], ["M.base"]).join()).toMatch(/base/i);
-		expect(validateDrafts([d({ name: "S", type: "select", options: [{ value: "", color: "red" }] })], []).join()).toMatch(/option/i);
-		expect(validateDrafts([d({ name: "S", type: "select", options: [{ value: "A", color: "red" }, { value: "A", color: "blue" }] })], []).join()).toMatch(/duplicate/i);
-		expect(validateDrafts([d({ name: "S", type: "select", options: [{ value: "A", color: "nope" as never }] })], []).join()).toMatch(/color/i);
+		expect(validateDrafts([d({ name: "S", type: "select", options: [o("", "red")] })], []).join()).toMatch(/option/i);
+		expect(validateDrafts([d({ name: "S", type: "select", options: [o("A", "red"), o("A", "blue")] })], []).join()).toMatch(/duplicate/i);
+		expect(validateDrafts([d({ name: "S", type: "select", options: [o("A", "nope" as never)] })], []).join()).toMatch(/color/i);
 	});
 	it("writes, deletes and renames fields; options replaced in draft order", () => {
 		const f: RawFields = { Role: { type: "select", multiple: false, options: { A: "red" } }, Old: { type: "text" }, Keep: { type: "date" } };
 		mutation([
-			d({ originalName: "Role", name: "Role", type: "select", options: [{ value: "B", color: "blue" }, { value: "A", color: "red" }] }),
+			d({ originalName: "Role", name: "Role", type: "select", options: [o("B", "blue"), o("A", "red")] }),
 			d({ originalName: "Old", name: "New", override: { type: "text" } }),
 			d({ originalName: "Keep", name: "Keep", override: { type: "date" } }),
 			d({ name: "Lead", type: "relation", base: "M.base", multiple: true }),
@@ -50,13 +52,13 @@ describe("schemaDraft", () => {
 	});
 	it("is prototype-safe", () => {
 		const f: RawFields = {};
-		mutation([d({ name: "__proto__", override: { type: "text" } }), d({ name: "S", type: "select", options: [{ value: "__proto__", color: "red" }] })], [])(f);
+		mutation([d({ name: "__proto__", override: { type: "text" } }), d({ name: "S", type: "select", options: [o("__proto__", "red")] })], [])(f);
 		expect(Object.getPrototypeOf(f)).toBe(Object.prototype);
 		expect(Object.hasOwn(f.S!.options as object, "__proto__")).toBe(true);
 	});
 	it("produces a parseable schema through updateSchemaSource", () => {
 		const src = "improved-bases:\n  fields: {}\nviews: []\n";
-		const out = updateSchemaSource(src, mutation([d({ name: "Role", type: "select", options: [{ value: "A", color: "red" }] })], []));
+		const out = updateSchemaSource(src, mutation([d({ name: "Role", type: "select", options: [o("A", "red")] })], []));
 		expect(parseSchema("x.base", parse(out)).errors).toEqual([]);
 	});
 	it("detects renames including case-only", () => {
@@ -108,7 +110,7 @@ describe("schemaDraft", () => {
 	});
 	it("turns drafts into column edits and a schema mutation", () => {
 		const drafts = [
-			d({ originalName: "Status", name: "Stand", type: "select", options: [{ value: "x", color: "red" }] }),
+			d({ originalName: "Status", name: "Stand", type: "select", options: [o("x", "red")] }),
 			d({ originalName: "Team", name: "Team", type: "native" }),
 			d({ originalName: "Alpha", name: "Alpha", type: "native", override: { type: "text" } }),
 			d({ originalName: "Old", name: "Old", removed: true }),
@@ -123,6 +125,32 @@ describe("schemaDraft", () => {
 		expect(removals(drafts)).toEqual(["Old"]);
 		expect(renames(drafts)).toEqual([{ from: "Status", to: "Stand" }]);
 		expect(TYPES).toEqual(["native", "relation", "select"]);
+	});
+	describe("optionMigrations", () => {
+		const select = (options: OptionDraft[], p: Partial<FieldDraft> = {}) => d({ originalName: "Status", name: "Stand ", type: "select", options, ...p });
+		it("lists renamed options under the new field name", () => {
+			expect(optionMigrations([select([o("Offen", "red", { original: "Open" }), o("Done", "blue", { original: "Done" })])]))
+				.toEqual([{ field: "Stand", renames: [{ from: "Open", to: "Offen" }], removals: [] }]);
+		});
+		it("lists options removed from the notes by their saved value", () => {
+			expect(optionMigrations([select([o("Renamed", "red", { original: "Old", removal: "notes" })])]))
+				.toEqual([{ field: "Stand", renames: [], removals: ["Old"] }]);
+		});
+		it("skips schema-only removals, new options and removed or non-select fields", () => {
+			expect(optionMigrations([
+				select([o("Old", "red", { original: "Old", removal: "schema" }), o("New", "blue")]),
+				select([o("B", "red", { original: "A" })], { removed: true }),
+				select([o("B", "red", { original: "A" })], { type: "native" }),
+			])).toEqual([]);
+		});
+	});
+	it("writes neither removed options nor validates them", () => {
+		const draft = d({ originalName: "S", name: "S", type: "select", options: [o("A", "red", { original: "A", removal: "notes" }), o("A", "blue"), o("B", "red", { original: "B", removal: "schema" })] });
+		const f: RawFields = {};
+		mutation([draft], ["S"])(f);
+		expect(f.S).toEqual({ type: "select", multiple: false, options: { A: "blue" } });
+		expect(validateDrafts([draft], [])).toEqual([]);
+		expect(optionSuggestions(["B", "A"], draft.options)).toEqual([{ value: "B", count: 1 }]);
 	});
 	it("rejects live names that a removed field still holds", () => {
 		const gone = d({ originalName: "Status", name: "Status", removed: true });
@@ -179,7 +207,7 @@ describe("schemaDraft", () => {
 			.toBe("Also defined in Meetings.base as text; 3 notes are in both bases. Also defined in X.base as relation to Other.base (multiple); no note is in both bases yet.");
 		// Compatible: same type, multiple and target; select options and colors do not count.
 		expect(conflictHint(relation, [{ basePath: "X.base", field: { type: "relation", base: "Teams.base", multiple: true }, shared: 2 }])).toBeNull();
-		const select = d({ name: "Status", type: "select", multiple: false, options: [{ value: "A", color: "red" }] });
+		const select = d({ name: "Status", type: "select", multiple: false, options: [o("A", "red")] });
 		expect(conflictHint(select, [{ basePath: "X.base", field: { type: "select", multiple: false, options: [{ value: "B", color: "blue" }] }, shared: 2 }])).toBeNull();
 		expect(conflictHint(select, [{ basePath: "X.base", field: { type: "select", multiple: true, options: [] }, shared: 2 }])).toBe("Also defined in X.base as select (multiple); 2 notes are in both bases.");
 		// Native drafts: an overriding type compares, one without override is not defined here.
@@ -223,7 +251,7 @@ describe("schemaDraft", () => {
 		});
 		it("suggests note values by frequency, excluding existing options", () => {
 			const values = ["Aktiv", ["MMO", "RPG"], "Aktiv", 3, null, ["RPG"], "Done"];
-			expect(optionSuggestions(values, [{ value: "Done", color: "red" }])).toEqual([
+			expect(optionSuggestions(values, [o("Done", "red")])).toEqual([
 				{ value: "Aktiv", count: 2 }, { value: "RPG", count: 2 }, { value: "MMO", count: 1 },
 			]);
 		});

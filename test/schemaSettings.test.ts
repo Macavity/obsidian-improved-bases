@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { TFile, type App, type Plugin } from "obsidian";
-import { buildSchemaSettings, countNotesWithKey, migrateRenames, registerSchemaSettings, removeProperties, renameSummary, saveSummary, schemaState } from "../src/schema-settings/schemaSettings";
+import { buildSchemaSettings, countNotesWithKey, migrateRenames, optionSummary, registerSchemaSettings, removeProperties, renameSummary, saveSummary, schemaState } from "../src/schema-settings/schemaSettings";
 import type { FieldDraft } from "../src/schema-settings/schemaDraft";
 import type { SchemaRegistry } from "../src/schema/SchemaRegistry";
 import type { WidgetEnv } from "../src/widgets/types";
@@ -92,6 +92,12 @@ describe("saveSummary", () => {
       "Renamed A → B in 1 note\nRemoved 'X' from 2 notes\nRemoved 'Y' from 1 note, 3 failed\nFilters or formulas still reference 'A', update them manually",
     );
     expect(saveSummary({ renames: "", removed: [], referenced: [] })).toBe("");
+    expect(saveSummary({ renames: "R", removed: [], referenced: [], options: "O" })).toBe("R\nO");
+  });
+  it("formats option migrations", () => {
+    expect(optionSummary({ renamed: 1, removed: 2, failed: 0 })).toBe("Options: renamed in 1 note, removed from 2 notes");
+    expect(optionSummary({ renamed: 0, removed: 0, failed: 3 })).toBe("Options: renamed in 0 notes, removed from 0 notes, 3 failed");
+    expect(optionSummary(null)).toBe("Option values not migrated: base members unknown");
   });
 });
 
@@ -267,6 +273,20 @@ describe("buildSchemaSettings", () => {
     expect(lastNotice()).toMatch(/Renamed Status → Stand in 1 note/);
     expect(lastNotice()).toMatch(/Removed 'Old' from 1 note/);
     expect(lastNotice()).toMatch(/Filters or formulas still reference 'Status'/);
+  });
+  it("migrates renamed and removed option values under the new field name after the field rename", async () => {
+    const t = await build({ members: [mdFile("a.md", { Status: ["Open", "Done"] }), mdFile("b.md", { Status: "Open" }), mdFile("c.md", { Status: "Done" })] });
+    const opt = (value: string, original: string, removal: "notes" | "schema" | null = null) => ({ value, color: "red" as const, original, removal });
+    await t.handlers.onSave([d({ originalName: "Status", name: "Stand", type: "select", options: [opt("Offen", "Open"), opt("Done", "Done", "notes")] })], 0, "");
+    const fm = (i: number) => (t.membership.targetEntries()?.[i] as unknown as { frontmatter: Record<string, unknown> }).frontmatter;
+    expect([fm(0), fm(1), fm(2)]).toEqual([{ Stand: ["Offen"] }, { Stand: "Offen" }, { Stand: null }]);
+    expect(lastNotice()).toContain("Options: renamed in 2 notes, removed from 2 notes");
+  });
+  it("reports option values as not migrated when members are unknown", async () => {
+    const t = await build({ members: null });
+    await t.handlers.onSave([d({ originalName: "Status", name: "Status", type: "select", options: [{ value: "B", color: "red", original: "A", removal: null }] })], 0, "");
+    expect(t.processFrontMatter).not.toHaveBeenCalled();
+    expect(lastNotice()).toContain("Option values not migrated");
   });
   it("writes the base edits and a mutation that renames the schema entry", async () => {
     const t = await build();

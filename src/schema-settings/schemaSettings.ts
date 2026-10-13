@@ -3,7 +3,9 @@ import { installSchemaButton } from "../internals/toolbar";
 import type { SchemaRegistry } from "../schema/SchemaRegistry";
 import type { WidgetEnv } from "../widgets/types";
 import { SchemaSettingsModal, type SchemaSettingsHandlers, type SchemaSettingsInput } from "./SchemaSettingsModal";
-import { draftsToEdits, knownFieldDrafts, removals, renameKey, renames, type FieldDraft, type OtherDefinition } from "./schemaDraft";
+import { draftsToEdits, knownFieldDrafts, optionMigrations, removals, renameKey, renames, type FieldDraft, type OptionMigration, type OtherDefinition } from "./schemaDraft";
+import { migrateOptionValues } from "../schema/optionMigration";
+import { removeValue, renameValue } from "../widgets/values";
 import type { Membership } from "../schema/Membership";
 import { readBaseColumns, referencesName, type BaseColumns } from "../schema/baseDoc";
 import { getMetadataTypeManager } from "../internals/detect";
@@ -136,10 +138,41 @@ export async function countNotesWithKey(app: App, files: TFile[], name: string):
 	return count;
 }
 
+type OptionCounts = { renamed: number; removed: number; failed: number };
+
+/** Renames and removes option values in the notes, field by field; counts add up per migration step. */
+async function migrateOptions(app: App, files: TFile[], migrations: OptionMigration[]): Promise<OptionCounts> {
+	const counts: OptionCounts = { renamed: 0, removed: 0, failed: 0 };
+	for (const { field, renames: pairs, removals: values } of migrations) {
+		for (const { from, to } of pairs) {
+			const r = await migrateOptionValues(app, files, field, (v) => renameValue(v, from, to));
+			counts.renamed += r.changed;
+			counts.failed += r.failed;
+		}
+		for (const value of values) {
+			const r = await migrateOptionValues(app, files, field, (v) => removeValue(v, value));
+			counts.removed += r.changed;
+			counts.failed += r.failed;
+		}
+	}
+	return counts;
+}
+
+const notes = (n: number): string => `${n} ${n === 1 ? "note" : "notes"}`;
+
+/** Notice line for option migrations; `counts` is null when the base members were unknown. */
+export function optionSummary(counts: OptionCounts | null): string {
+	if (counts === null) return "Option values not migrated: base members unknown";
+	const parts = [`Options: renamed in ${notes(counts.renamed)}, removed from ${notes(counts.removed)}`];
+	if (counts.failed > 0) parts.push(`${counts.failed} failed`);
+	return parts.join(", ");
+}
+
 /** Notice body after a save. */
-export function saveSummary(parts: { renames: string; removed: Removal[]; referenced: string[] }): string {
+export function saveSummary(parts: { renames: string; removed: Removal[]; referenced: string[]; options?: string }): string {
 	const lines: string[] = [];
 	if (parts.renames) lines.push(parts.renames);
+	if (parts.options) lines.push(parts.options);
 	for (const r of parts.removed) lines.push(`Removed '${r.name}' from ${r.removed} ${r.removed === 1 ? "note" : "notes"}${r.failed > 0 ? `, ${r.failed} failed` : ""}`);
 	for (const name of parts.referenced) lines.push(`Filters or formulas still reference '${name}', update them manually`);
 	return lines.join("\n");
@@ -230,7 +263,8 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 		await env.writer.update(basePath, mutate, edits, icon);
 		const pairs = renames(drafts);
 		const removedNames = removals(drafts);
-		if (!pairs.length && !removedNames.length) {
+		const options = optionMigrations(drafts);
+		if (!pairs.length && !removedNames.length && !options.length) {
 			new Notice("Schema saved");
 			return;
 		}
@@ -238,8 +272,9 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 		let renameText = renameSummary(pairs, current && pairs.length ? await migrateRenames(app, current, pairs) : null);
 		const removed = current && removedNames.length ? await removeProperties(app, current, removedNames) : [];
 		if (!current && removedNames.length) renameText = [renameText, "Properties not removed: base members unknown"].filter(Boolean).join("\n");
+		const optionText = options.length ? optionSummary(current ? await migrateOptions(app, current, options) : null) : "";
 		const referenced = [...pairs.map((p) => p.from), ...removedNames].filter((n) => referencesName(expressions, n));
-		new Notice(`Schema saved\n${saveSummary({ renames: renameText, removed, referenced })}`);
+		new Notice(`Schema saved\n${saveSummary({ renames: renameText, removed, referenced, options: optionText })}`);
 	};
 	const onReset = (): Promise<void> => env.writer.reset(basePath);
 	const countAffected = async (name: string): Promise<number> => {
