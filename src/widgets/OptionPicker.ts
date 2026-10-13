@@ -251,7 +251,8 @@ export function openOptionPicker(anchor: HTMLElement, host: OptionPickerHost, ov
 	};
 
 	input.addEventListener("keydown", (evt) => {
-		if (!handleKey(evt.key)) return;
+		// While an IME composes (CJK input), Enter and the arrows belong to its candidate list.
+		if (evt.isComposing || !handleKey(evt.key)) return;
 		evt.preventDefault();
 		evt.stopPropagation();
 	});

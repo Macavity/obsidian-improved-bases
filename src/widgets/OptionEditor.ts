@@ -74,6 +74,7 @@ export function openOptionEditor(
 		});
 	}
 	input.addEventListener("keydown", (evt) => {
+		if (evt.isComposing) return;
 		if (evt.key === "Enter") save();
 		else if (evt.key === "Escape") close();
 		else return;

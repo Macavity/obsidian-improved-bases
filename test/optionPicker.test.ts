@@ -218,6 +218,17 @@ describe("openOptionPicker", () => {
 		expect(scroll.mock.contexts.at(-1)).toBe(rows()[2]);
 	});
 
+	it("leaves keys to an IME composition", () => {
+		const { input, popover, commit } = setup();
+		for (const key of ["Enter", "Escape", "ArrowDown"]) {
+			const e = new KeyboardEvent("keydown", { key, isComposing: true, cancelable: true });
+			input().dispatchEvent(e);
+			expect(e.defaultPrevented).toBe(false);
+		}
+		expect(commit).not.toHaveBeenCalled();
+		expect(popover()).not.toBeNull();
+	});
+
 	it("shows a hint for an empty option list", () => {
 		const { popover, key, create } = setup({ options: [] });
 		expect(popover()?.querySelector(".improved-bases-picker-hint")?.textContent).toBe("Type to create an option");

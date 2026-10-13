@@ -85,6 +85,13 @@ describe("openOptionEditor", () => {
 		expect(outer).not.toHaveBeenCalled();
 		document.body.removeEventListener("keydown", outer);
 	});
+	it("leaves Enter and Escape to an IME composition", () => {
+		const { handlers, input, root } = setup();
+		input().value = "Beta";
+		for (const key of ["Enter", "Escape"]) input().dispatchEvent(new KeyboardEvent("keydown", { key, isComposing: true, bubbles: true }));
+		expect(handlers.rename).not.toHaveBeenCalled();
+		expect(root()).not.toBeNull();
+	});
 	it("ignores other keys", () => {
 		const { input, key } = setup();
 		expect(key("a").defaultPrevented).toBe(false);
