@@ -68,3 +68,42 @@ export function setColorMutation(fieldName: string, value: string, color: Color)
 		if (options) setOption(options, value, color);
 	};
 }
+
+/** Value with `from` replaced by `to` (lists are deduplicated); undefined when nothing matches. */
+export function renameValue(value: unknown, from: string, to: string): unknown {
+	if (typeof value === "string") return value === from ? to : undefined;
+	if (!Array.isArray(value) || !value.includes(from)) return undefined;
+	return [...new Set((value as unknown[]).map((v) => (v === from ? to : v)))];
+}
+
+/** Value without `target`: a matching string becomes null, lists drop the element; undefined when nothing matches. */
+export function removeValue(value: unknown, target: string): unknown {
+	if (typeof value === "string") return value === target ? null : undefined;
+	if (!Array.isArray(value) || !value.includes(target)) return undefined;
+	return value.filter((v) => v !== target);
+}
+
+/** Number of notes (one entry each) whose value contains `target`. */
+export function countNotesWithValue(values: readonly unknown[], target: string): number {
+	return values.filter((v) => toList(v).includes(target)).length;
+}
+
+/** Renames an option, keeping its color and its position; no-op when `from` is missing or `to` exists. */
+export function renameOptionMutation(fieldName: string, from: string, to: string): (f: RawFields) => void {
+	return (fields) => {
+		const options = optionsOf(fields, fieldName);
+		const f = options && fields[fieldName];
+		if (!options || !f || !Object.hasOwn(options, from) || Object.hasOwn(options, to)) return;
+		const rebuilt: Record<string, unknown> = {};
+		for (const [key, color] of Object.entries(options)) setOption(rebuilt, key === from ? to : key, color as string);
+		f.options = rebuilt;
+	};
+}
+
+/** Removes an option from the field. */
+export function removeOptionMutation(fieldName: string, value: string): (f: RawFields) => void {
+	return (fields) => {
+		const options = optionsOf(fields, fieldName);
+		if (options && Object.hasOwn(options, value)) delete options[value];
+	};
+}
