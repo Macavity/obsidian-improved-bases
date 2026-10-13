@@ -16,7 +16,7 @@ Every schema change, whether from the [schema settings dialog](../modules/schema
 
 - Save in the schema settings dialog (opened via toolbar button, file menu item or command): all `FieldDraft`s at once, as schema mutation plus column edits (add, rename, remove). A base without schema gets its `improved-bases` key on the first non-empty mutation.
 - "Reset schema" for a base with an invalid section: `writer.reset()` replaces the section with an empty schema.
-- `SelectWidget`: create an option from the menu, or recolor via right-click.
+- `SelectWidget`: create, recolor, rename or delete an option from the [option picker](../modules/widgets.md#option-picker) and its option editor.
 
 ## Sequence diagram
 
@@ -52,7 +52,8 @@ sequenceDiagram
 5. `Membership.sync()` compares per-base signatures (fields plus the base icon) with the previous run, collects the union of old and new field names of changed bases as `affected`, together with every relation field in any schema that targets a changed base (its chips show that base's default icon), starts watching newly referenced relation targets, and stops watching bases no longer needed. If latched, it emits `changed(affected)` immediately; otherwise it re-arms the readiness quiet timer.
 6. `typeInfoPatch.refresh(affected)` bumps the generation so `hullFor()` yields new hull objects, and triggers Obsidian's `changed` per field name. Obsidian rebuilds those cells; the next render goes through [Widget render](./widget-render.md) with the updated field.
 7. After a dialog save with renamed or removed fields, `migrateRenames()` and `removeProperties()` ([schemaSettings.ts](../../src/schema-settings/schemaSettings.ts)) rename (exact key) or delete (case-insensitive) the property keys in the member notes whose frontmatter on disk has them through `fileManager.processFrontMatter`, one file at a time; notes with both keys are skipped on rename. A `Notice` reports renamed, skipped, failed and removed counts, and warns "Filters or formulas still reference 'X', update them manually" when `referencesName()` finds a renamed or removed name in filter or formula expressions. This happens after the base write, so the notes follow the new field names. Both are skipped, with a notice, when the members are unknown.
-8. In the select widget, the local `options` copy is updated optimistically right after the write resolves so the new pill shows its color before the refresh lands.
+8. Option renames and removals marked in the dialog are migrated on Save by `migrateOptions()` ([schemaSettings.ts](../../src/schema-settings/schemaSettings.ts)): one `migrateOptionValues()` pass per note per field with `optionValueEdit()` ([optionMigration.ts](../../src/schema/optionMigration.ts)); notes without a matching value are not written, notes with a field-rename conflict are skipped. In the select widget the same migration runs right after the schema write of an option rename or delete (rejected while members are unknown or the name exists; delete asks first when notes use the value). See [Value mismatch](../concepts/value-mismatch.md).
+9. In the select widget, the local `options` copy is updated optimistically right after the write resolves so the new pill shows its color before the refresh lands.
 
 ## Failure modes
 

@@ -10,7 +10,7 @@ tags:
 
 ## Summary
 
-Improved Bases cannot be built on the public API alone: Obsidian exposes no way to register a property widget per base, and no public query API for Bases. The plugin therefore touches five undocumented surfaces. Every access goes through a detection function in [detect.ts](../../src/internals/detect.ts) or [menu.ts](../../src/internals/menu.ts) that returns `null` when the shape is unexpected, and every caller has a native fallback. The user-visible contract (one notice, widgets off, commands keep working, data never converted) is stated in the [README](../../README.md#unsupported-obsidian-versions).
+Improved Bases cannot be built on the public API alone: Obsidian exposes no way to register a property widget per base, and no public query API for Bases. The plugin therefore touches five undocumented surfaces. Every access goes through a detection function in [detect.ts](../../src/internals/detect.ts) or [menu.ts](../../src/internals/menu.ts) (`itemDom()` only) that returns `null` when the shape is unexpected, and every caller has a native fallback. The user-visible contract (one notice, widgets off, commands keep working, data never converted) is stated in the [README](../../README.md#unsupported-obsidian-versions).
 
 ## Diagram
 
@@ -19,10 +19,10 @@ flowchart TD
   MTM["app.metadataTypeManager<br/>getTypeInfo / registeredTypeWidgets / trigger"] -->|getMetadataTypeManager| Patch[typeInfoPatch]
   CLI["app.cli.handlers.get('base:query')"] -->|getCliHandler, desktop only| CliQuery[cliQuery]
   BV["BasesView + QueryController<br/>(public, but offscreen-host trick)"] --> Collector[CollectorView]
-  Menu["Menu.dom / Menu.scope / MenuItem.dom"] -->|menuInternals, itemDom| Pickers[openOptionMenu]
+  Menu["MenuItem.dom"] -->|itemDom| Pickers[openOptionEditMenu]
   Patch -. missing .-> NativeAll["no patch: everything native,<br/>one Notice, widgetsSupported=false"]
   CliQuery -. missing .-> CollectorOnly["collector only (mobile path)"]
-  Menu -. missing .-> PlainMenu["option menu without search/create"]
+  Menu -. missing .-> PlainMenu["uncolored rows in the dialog color menu"]
 ```
 
 ## Key components
@@ -32,7 +32,7 @@ flowchart TD
 | `app.metadataTypeManager` (`getTypeInfo`, `registeredTypeWidgets`, `trigger`) | `getMetadataTypeManager()` in [detect.ts](../../src/internals/detect.ts); also requires `registeredTypeWidgets.text.render`. The schema dialog additionally reads each widget's `name` (string or getter), `icon` and `reservedKeys` through [typeRegistry.ts](../../src/internals/typeRegistry.ts), each with a fallback | `installTypeInfoPatch()` in [typeInfoPatch.ts](../../src/internals/typeInfoPatch.ts); `widgetsSupported` in [main.ts](../../src/main.ts); `listPropertyTypes()` in [schemaSettings.ts](../../src/schema-settings/schemaSettings.ts) | No patch installed, `widgetsSupported = false`, one `Notice`, settings toggle disabled. |
 | `app.cli.handlers.get("base:query")` | `getCliHandler()` in [detect.ts](../../src/internals/detect.ts), returns `null` off desktop | `cliQuery()` in [cliQuery.ts](../../src/internals/cliQuery.ts) via `createBaseQuery` | `BaseQuery` runs collector-only; first scan waits for the collector push. |
 | `QueryController.runQuery` only runs once the view container `isShown()` | not detected; relied on by `registerCollector()` in [CollectorView.ts](../../src/query/CollectorView.ts) | [Collector view](../concepts/collector-view.md) | Host is a real offscreen `div` in `document.body` (`styles.css` positions it); a hidden window can stall it, which is why the CLI runs first. |
-| `Menu.dom`, `Menu.scope.register/keys`, `MenuItem.dom` | `menuInternals()`, `itemDom()` in [menu.ts](../../src/internals/menu.ts) | `openOptionMenu()`, `colorItem()` in [pickers.ts](../../src/widgets/pickers.ts) | Options remain clickable; no search/create input, no colored rows. |
+| `MenuItem.dom` | `itemDom()` in [menu.ts](../../src/internals/menu.ts) | `colorItem()` in [pickers.ts](../../src/widgets/pickers.ts), for the schema dialog's option color menu | Color rows stay uncolored; the menu still works. The select widget's picker no longer touches menu internals (own popover). |
 | Bases toolbar DOM (`.bases-toolbar`), leaf `view.containerEl` / `view.file`, `.internal-embed[src]` | not detected; `resolveBase()` in [toolbar.ts](../../src/internals/toolbar.ts) returns `null` for unknown shapes | `installSchemaButton()` in [toolbar.ts](../../src/internals/toolbar.ts), registered by `registerSchemaSettings()` in [schemaSettings.ts](../../src/schema-settings/schemaSettings.ts) | No button appears or the click shows a `Notice`; the command and the file menu item still open the dialog. |
 
 All patching uses `monkey-around` (`around(mtm, { getTypeInfo })`) so the wrapper composes with other plugins and can be removed cleanly; `uninstall()` restores the original, clears the hull cache, closes open overlays and re-triggers `changed` for every known field so Obsidian rebuilds native widgets.
