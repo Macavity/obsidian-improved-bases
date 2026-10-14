@@ -6,9 +6,10 @@ import type { SchemaRegistry } from "../src/schema/SchemaRegistry";
 import type { WidgetEnv } from "../src/widgets/types";
 
 const notices = vi.hoisted(() => [] as string[]);
+const hidden = vi.hoisted(() => [] as string[]);
 vi.mock("obsidian", async (importOriginal) => ({
   ...(await importOriginal<typeof import("obsidian")>()),
-  Notice: class { constructor(message: string) { notices.push(message); } },
+  Notice: class { constructor(public message: string) { notices.push(message); } hide() { hidden.push(this.message); } },
 }));
 
 const mdFile = (path: string, frontmatter: Record<string, unknown>) => Object.assign(new TFile(), { path, extension: "md", frontmatter });
@@ -184,22 +185,15 @@ describe("buildSchemaSettings", () => {
       fileManager: { processFrontMatter },
     } as unknown as App;
     const writer = { update: vi.fn(() => Promise.resolve()), reset: vi.fn(() => Promise.resolve()) };
-    // Without `queried` the query never answers, as for a base whose collector stalls.
-    const query = { watch: vi.fn((_: string, cb: (files: TFile[]) => void) => (opts.queried && cb(opts.queried), () => undefined)) };
+    // Without `queried` the query fails, so the members stay unknown.
+    const query = { watch: vi.fn((_: string, cb: (files: TFile[], failed: boolean) => void) => (cb(opts.queried ?? [], !opts.queried), () => undefined)) };
     const membership = { targetEntries: () => all, baseIcon: (p: string) => (p === "M.base" ? opts.icon ?? null : p === "Z.base" ? "🏢" : null) };
     const env = { app, writer, membership, query, overlays: {} } as unknown as WidgetEnv;
     return { app, env, reg, writer, membership, query, processFrontMatter, viewName: opts.viewName ?? null };
   }
   async function build(opts: Parameters<typeof setup>[0] = {}) {
     const t = setup(opts);
-    const stalls = opts.members === null && !opts.queried;
-    if (stalls) vi.useFakeTimers();
-    const built = buildSchemaSettings({ app: t.app } as unknown as Plugin, t.env, t.reg, "M.base", t.viewName);
-    if (stalls) {
-      await vi.runAllTimersAsync();
-      vi.useRealTimers();
-    }
-    return { ...t, ...(await built) };
+    return { ...t, ...(await buildSchemaSettings({ app: t.app } as unknown as Plugin, t.env, t.reg, "M.base", t.viewName)) };
   }
   const lastNotice = () => notices.at(-1) ?? "";
 
@@ -251,6 +245,29 @@ describe("buildSchemaSettings", () => {
     expect(input.state.kind === "fields" && input.state.drafts.map((d) => d.name)).toEqual(["Status"]);
     expect(input.membersKnown()).toBe(true);
     expect(await handlers.countAffected("Status")).toBe(2);
+  });
+  it("migrates the queried members on Save, even once Membership starts with a partial result", async () => {
+    const t = await build({ members: null, queried: [mdFile("a.md", { Old: 1 }), mdFile("b.md", { Old: 2 })] });
+    t.membership.targetEntries = () => [];
+    await t.handlers.onSave([d({ originalName: "Old", name: "New" })], 0, "");
+    expect(t.processFrontMatter).toHaveBeenCalledTimes(2);
+  });
+  it("tells the user while the notes of a large base are read", async () => {
+    vi.useFakeTimers();
+    try {
+      const t = setup({ members: null });
+      let answer!: (files: TFile[], failed: boolean) => void;
+      t.query.watch.mockImplementation((_: string, cb: (files: TFile[], failed: boolean) => void) => ((answer = cb), () => undefined));
+      const built = buildSchemaSettings({ app: t.app } as unknown as Plugin, t.env, t.reg, "M.base", null);
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(lastNotice()).toBe("Reading the notes of M…");
+      answer([mdFile("a.md", { Status: "x" })], false);
+      const { input } = await built;
+      expect(input.memberValues("Status")).toEqual(["x"]);
+      expect(hidden).toContain("Reading the notes of M…");
+    } finally {
+      vi.useRealTimers();
+    }
   });
   it("collects the other bases", async () => {
     const { input } = await build();
@@ -384,6 +401,29 @@ describe("buildSchemaSettings", () => {
 });
 
 describe("registerSchemaSettings", () => {
+  it("ignores a second open while the notes of a base are still being read", async () => {
+    const base = Object.assign(new TFile(), { path: "M.base", extension: "base" });
+    let command: { checkCallback: (checking: boolean) => boolean } | null = null;
+    const app = {
+      workspace: { getActiveFile: () => base, on: vi.fn(), offref: vi.fn(), iterateAllLeaves: vi.fn() },
+      vault: { getFiles: () => [base], getAbstractFileByPath: () => base, cachedRead: () => Promise.resolve("views:\n  - type: table\n    name: A\n") },
+      metadataCache: { getFileCache: () => null },
+    };
+    const plugin = { app, register: vi.fn(), registerEvent: vi.fn(), addCommand: (cmd: unknown) => { command = cmd as typeof command; return cmd; } } as unknown as Plugin;
+    let answer!: (files: TFile[], failed: boolean) => void;
+    const query = { watch: vi.fn((_: string, cb: typeof answer) => ((answer = cb), () => undefined)) };
+    const env = { app, writer: {}, query, membership: { targetEntries: () => null, baseIcon: () => null }, overlays: {} } as unknown as WidgetEnv;
+    registerSchemaSettings(plugin, env, registry([], {}));
+    command!.checkCallback(false);
+    await new Promise((r) => setTimeout(r, 0));
+    command!.checkCallback(false);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(query.watch).toHaveBeenCalledTimes(1);
+    answer([], false);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(document.querySelectorAll(".improved-bases-schema-modal").length).toBe(1);
+    document.querySelectorAll(".improved-bases-schema-modal").forEach((el) => el.remove());
+  });
   it("closes an open dialog when the plugin unloads, and keeps one dialog per instance", async () => {
     const base = Object.assign(new TFile(), { path: "M.base", extension: "base" });
     let command: { checkCallback: (checking: boolean) => boolean } | null = null;

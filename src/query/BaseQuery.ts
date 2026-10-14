@@ -3,27 +3,22 @@ import { cliQuery, cliQueryAvailable } from "../internals/cliQuery";
 import { BaseNotFoundError, registerCollector } from "./CollectorView";
 
 export interface BaseQuery {
-	/** cb fires with the current result after the first scan and on every change (deduplicated). */
-	watch(basePath: string, cb: (files: TFile[]) => void): () => void;
+	/** cb fires with the current result after the first scan and on every change (deduplicated); `failed` marks the `[]` of a failed scan. */
+	watch(basePath: string, cb: Listener): () => void;
 	dispose(): void;
 }
 
-/** The first result of a base, or null when none arrives within `timeoutMs`; the watch ends either way. */
-export function queryOnce(query: BaseQuery, basePath: string, timeoutMs: number): Promise<TFile[] | null> {
+/** The first result of a base, or null when its scan failed; the watch ends either way. */
+export function firstResult(query: BaseQuery, basePath: string): Promise<TFile[] | null> {
 	return new Promise((resolve) => {
 		let done = false;
-		let stop: (() => void) | null = null;
-		const finish = (files: TFile[] | null) => {
+		const stop = query.watch(basePath, (files, failed) => {
 			if (done) return;
 			done = true;
-			window.clearTimeout(timer);
-			stop?.();
-			resolve(files);
-		};
-		const timer = window.setTimeout(() => finish(null), timeoutMs);
-		stop = query.watch(basePath, finish);
-		// A cached result arrives inside `watch`, before `stop` is known.
-		if (done) stop();
+			// A cached result arrives inside `watch`, before `stop` is assigned.
+			queueMicrotask(() => stop());
+			resolve(failed ? null : files);
+		});
 	});
 }
 
@@ -38,12 +33,13 @@ export interface BaseQueryDeps {
 
 const CLI_DEBOUNCE_MS = 200;
 
-type Listener = (files: TFile[]) => void;
+type Listener = (files: TFile[], failed: boolean) => void;
 
 interface Entry {
 	path: string;
 	listeners: Set<Listener>;
 	last: TFile[] | null;
+	failed: boolean;
 	/** Bumped on every (re)mount and unmount; async results from older generations are dropped. */
 	gen: number;
 	mounted: boolean;
@@ -67,12 +63,13 @@ export function createBaseQuery(plugin: Plugin, deps: BaseQueryDeps = {}): BaseQ
 		return app && cliQueryAvailable(app) ? (p) => cliQuery(app, p) : null;
 	};
 
-	const emit = (e: Entry, files: TFile[]) => {
-		if (samePaths(e.last, files)) return;
+	const emit = (e: Entry, files: TFile[], failed = false) => {
+		if (samePaths(e.last, files) && e.failed === failed) return;
 		e.last = files;
+		e.failed = failed;
 		for (const cb of [...e.listeners]) {
 			try {
-				cb(files);
+				cb(files, failed);
 			} catch (err) {
 				console.error(`Improved Bases: listener for ${e.path} failed`, err);
 			}
@@ -93,7 +90,7 @@ export function createBaseQuery(plugin: Plugin, deps: BaseQueryDeps = {}): BaseQ
 			(err: unknown) => {
 				if (gen !== e.gen || e.mode !== "cli") return;
 				console.warn(`Improved Bases: CLI query failed for ${e.path}`, err);
-				emit(e, []);
+				emit(e, [], true);
 			},
 		);
 	};
@@ -145,7 +142,7 @@ export function createBaseQuery(plugin: Plugin, deps: BaseQueryDeps = {}): BaseQ
 					clearTimers(e);
 					e.mode = "collector";
 					emit(e, []);
-				} else if (e.mode !== "cli") emit(e, []);
+				} else if (e.mode !== "cli") emit(e, [], true);
 			},
 		);
 	};
@@ -190,13 +187,13 @@ export function createBaseQuery(plugin: Plugin, deps: BaseQueryDeps = {}): BaseQ
 			let e = entries.get(basePath);
 			const fresh = !e;
 			if (!e) {
-				e = { path: basePath, listeners: new Set(), last: null, gen: 0, mounted: false, unmount: null, mode: "collector", cliTimer: null };
+				e = { path: basePath, listeners: new Set(), last: null, failed: false, gen: 0, mounted: false, unmount: null, mode: "collector", cliTimer: null };
 				entries.set(basePath, e);
 			}
 			const entry = e;
 			entry.listeners.add(cb);
 			if (fresh) mountEntry(entry);
-			else if (entry.last !== null) cb(entry.last);
+			else if (entry.last !== null) cb(entry.last, entry.failed);
 			let active = true;
 			return () => {
 				if (!active) return;

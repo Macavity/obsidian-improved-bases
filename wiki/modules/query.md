@@ -15,7 +15,7 @@ tags:
 ## Responsibilities
 
 - Keep one `Entry` per watched base path with listeners, the last emitted result, a generation counter, and the current mode (`collector` | `cli`).
-- Deduplicate: `emit()` compares path lists and skips identical results; listener errors are caught and logged.
+- Deduplicate: `emit()` compares path lists and the `failed` flag and skips identical results; listeners get `(files, failed)`, where `failed` marks the `[]` emitted after a CLI or collector failure (so a consumer can tell "no members" from "members unknown"; `Membership` ignores it); listener errors are caught and logged.
 - **Mount strategy**: on first watch, run the CLI immediately if available (`mode = "cli"`), then mount the collector; the first collector push switches `mode` to `collector` and cancels any pending CLI timer. See [Base query watch](../flows/base-query-watch.md).
 - **Generation guard**: every (re)mount or unmount bumps `gen`; async results from an older generation are dropped.
 - **Collector fence**: `baseFence(yaml)` in [CollectorView.ts](../../src/query/CollectorView.ts) wraps the YAML in a ```` ```base ```` block whose fence is longer than any backtick run inside the YAML.
@@ -26,7 +26,7 @@ tags:
 ## Public API / entry points
 
 - `createBaseQuery(plugin, deps?)` → `BaseQuery { watch, dispose }`. `deps.mount` and `deps.cli` are injection points for tests (`cli: null` disables the fallback).
-- `queryOnce(query, basePath, timeoutMs)` → the first result, or `null` when none arrives in time; the watch ends either way (also when `watch` replays a cached result synchronously). Used by the schema dialog for bases that `Membership` does not watch.
+- `firstResult(query, basePath)` → the first result, or `null` when that scan failed; no timeout (a large base must finish). The watch ends either way, also when `watch` replays a cached result synchronously. Used by the schema dialog for bases that `Membership` does not watch.
 - `registerCollector(plugin)` → `MountCollector`
 - `COLLECTOR_VIEW`, `COLLECTOR_ICON`, `BaseNotFoundError`
 

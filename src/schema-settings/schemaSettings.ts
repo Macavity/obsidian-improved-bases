@@ -1,6 +1,6 @@
 import { getFrontMatterInfo, Notice, parseYaml, TFile, type App, type Plugin } from "obsidian";
 import { installSchemaButton } from "../internals/toolbar";
-import { queryOnce } from "../query/BaseQuery";
+import { firstResult } from "../query/BaseQuery";
 import type { SchemaRegistry } from "../schema/SchemaRegistry";
 import type { WidgetEnv } from "../widgets/types";
 import { SchemaSettingsModal, type SchemaSettingsHandlers, type SchemaSettingsInput } from "./SchemaSettingsModal";
@@ -17,8 +17,8 @@ type Counts = { renamed: number; conflict: number; failed: number };
 
 type State = SchemaSettingsInput["state"];
 
-/** How long opening the dialog waits for the members of a base without a schema. */
-const MEMBER_QUERY_MS = 3000;
+/** A member query that takes longer than this gets a Notice, so a large base does not look stuck. */
+const SLOW_QUERY_MS = 500;
 
 /** Modal state for a base: its known fields, or the schema errors. */
 export function schemaState(registry: SchemaRegistry, basePath: string, columns: BaseColumns, memberKeys: string[], detected: (name: string) => string | null, currentView: number): State {
@@ -224,12 +224,23 @@ function otherDefinitions(registry: SchemaRegistry, membership: Pick<Membership,
 }
 
 /**
- * Reads the base's members: Membership's live result, else a single query taken when the dialog opens.
+ * Reads the base's members: a single query taken when the dialog opens, else Membership's live result.
  * Membership watches schema bases only, so a base getting its first schema would otherwise show no notes.
+ * The snapshot wins over Membership, whose first result after Save may still be partial.
+ * The query is never cut short: the larger the base, the more its suggestions matter.
  */
 async function memberSource(env: WidgetEnv, basePath: string): Promise<() => TFile[] | null> {
-	const queried = env.membership.targetEntries(basePath) === null ? await queryOnce(env.query, basePath, MEMBER_QUERY_MS) : null;
-	return () => env.membership.targetEntries(basePath) ?? queried;
+	if (env.membership.targetEntries(basePath) !== null) return () => env.membership.targetEntries(basePath);
+	const name = basePath.split("/").pop()?.replace(/\.base$/, "") ?? basePath;
+	let notice: Notice | null = null;
+	const timer = window.setTimeout(() => (notice = new Notice(`Reading the notes of ${name}…`, 0)), SLOW_QUERY_MS);
+	try {
+		const queried = await firstResult(env.query, basePath);
+		return () => queried ?? env.membership.targetEntries(basePath);
+	} finally {
+		window.clearTimeout(timer);
+		(notice as Notice | null)?.hide();
+	}
 }
 
 export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, registry: SchemaRegistry, basePath: string, viewName: string | null): Promise<{ input: SchemaSettingsInput; handlers: SchemaSettingsHandlers }> {
@@ -313,7 +324,11 @@ export function registerSchemaSettings(plugin: Plugin, env: WidgetEnv, registry:
 	let modal: SchemaSettingsModal | null = null;
 	// An open dialog belongs to this plugin instance; a reload must not leave it behind with stale handlers.
 	plugin.register(() => modal?.close());
+	// Reading a large base's notes takes a while; a second click meanwhile must not open a second dialog.
+	let opening = false;
 	const open = async (basePath: string, viewName: string | null): Promise<void> => {
+		if (opening) return;
+		opening = true;
 		try {
 			const { input, handlers } = await buildSchemaSettings(plugin, env, registry, basePath, viewName);
 			modal?.close();
@@ -321,6 +336,8 @@ export function registerSchemaSettings(plugin: Plugin, env: WidgetEnv, registry:
 			modal.open();
 		} catch (e) {
 			new Notice(`Could not open schema settings: ${message(e)}`);
+		} finally {
+			opening = false;
 		}
 	};
 	plugin.addCommand({
