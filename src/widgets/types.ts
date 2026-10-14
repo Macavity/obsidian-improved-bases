@@ -1,4 +1,5 @@
 import type { App } from "obsidian";
+import type { BaseQuery } from "../query/BaseQuery";
 import type { Membership } from "../schema/Membership";
 import type { SchemaWriter } from "../schema/SchemaWriter";
 import type { FieldSchema } from "../schema/types";
@@ -44,6 +45,7 @@ export class OverlayRegistry {
 export interface WidgetEnv {
 	overlays: OverlayRegistry;
 	membership: Membership;
+	query: BaseQuery;
 	writer: SchemaWriter;
 	app: App;
 }

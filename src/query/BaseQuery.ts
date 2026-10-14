@@ -8,6 +8,25 @@ export interface BaseQuery {
 	dispose(): void;
 }
 
+/** The first result of a base, or null when none arrives within `timeoutMs`; the watch ends either way. */
+export function queryOnce(query: BaseQuery, basePath: string, timeoutMs: number): Promise<TFile[] | null> {
+	return new Promise((resolve) => {
+		let done = false;
+		let stop: (() => void) | null = null;
+		const finish = (files: TFile[] | null) => {
+			if (done) return;
+			done = true;
+			window.clearTimeout(timer);
+			stop?.();
+			resolve(files);
+		};
+		const timer = window.setTimeout(() => finish(null), timeoutMs);
+		stop = query.watch(basePath, finish);
+		// A cached result arrives inside `watch`, before `stop` is known.
+		if (done) stop();
+	});
+}
+
 export type MountCollector = (basePath: string, push: (files: TFile[]) => void) => Promise<() => void>;
 type CliRunner = (basePath: string) => Promise<TFile[]>;
 

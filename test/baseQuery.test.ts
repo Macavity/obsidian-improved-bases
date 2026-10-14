@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import type { Plugin, TFile } from "obsidian";
-import { createBaseQuery } from "../src/query/BaseQuery";
+import { createBaseQuery, queryOnce } from "../src/query/BaseQuery";
 import { BaseNotFoundError } from "../src/query/CollectorView";
 
 const plugin = {} as Plugin;
@@ -165,5 +165,36 @@ describe("BaseQuery", () => {
 		handlers.get("changed")!();
 		await vi.advanceTimersByTimeAsync(300);
 		expect(cli).toHaveBeenCalledTimes(2);
+	});
+});
+
+describe("queryOnce", () => {
+	it("resolves with the first result and ends the watch", async () => {
+		const m = fakeMount();
+		const q = createBaseQuery(plugin, { mount: m.mount, cli: null });
+		const once = queryOnce(q, "T.base", 1000);
+		await Promise.resolve();
+		m.pushes.get("T.base")!([file("x")]);
+		expect(await once).toEqual([file("x")]);
+		expect(m.unmounts).toEqual(["T.base"]);
+	});
+
+	it("takes a result that is already there", async () => {
+		const m = fakeMount();
+		const q = createBaseQuery(plugin, { mount: m.mount, cli: null });
+		q.watch("T.base", vi.fn());
+		await Promise.resolve();
+		m.pushes.get("T.base")!([file("x")]);
+		expect(await queryOnce(q, "T.base", 1000)).toEqual([file("x")]);
+	});
+
+	it("gives null when no result arrives in time", async () => {
+		vi.useFakeTimers();
+		const m = fakeMount();
+		const q = createBaseQuery(plugin, { mount: m.mount, cli: null });
+		const once = queryOnce(q, "T.base", 1000);
+		await vi.advanceTimersByTimeAsync(1000);
+		expect(await once).toBeNull();
+		expect(m.unmounts).toEqual(["T.base"]);
 	});
 });

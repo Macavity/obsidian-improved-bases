@@ -26,6 +26,7 @@ tags:
 ## Public API / entry points
 
 - `createBaseQuery(plugin, deps?)` → `BaseQuery { watch, dispose }`. `deps.mount` and `deps.cli` are injection points for tests (`cli: null` disables the fallback).
+- `queryOnce(query, basePath, timeoutMs)` → the first result, or `null` when none arrives in time; the watch ends either way (also when `watch` replays a cached result synchronously). Used by the schema dialog for bases that `Membership` does not watch.
 - `registerCollector(plugin)` → `MountCollector`
 - `COLLECTOR_VIEW`, `COLLECTOR_ICON`, `BaseNotFoundError`
 

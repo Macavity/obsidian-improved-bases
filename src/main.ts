@@ -34,7 +34,7 @@ export default class ImprovedBasesPlugin extends Plugin {
 			this.registry.dispose();
 		});
 		this.writer = new SchemaWriter(this.app);
-		const env = { membership: this.membership, writer: this.writer, app: this.app, overlays: new OverlayRegistry() };
+		const env = { membership: this.membership, query: this.query, writer: this.writer, app: this.app, overlays: new OverlayRegistry() };
 		this.env = env;
 		this.widgetsSupported = getMetadataTypeManager(this.app) !== null;
 		if (!this.widgetsSupported) this.notifyUnsupported();

@@ -165,7 +165,7 @@ describe("countNotesWithKey / removeProperties", () => {
 
 describe("buildSchemaSettings", () => {
   const baseFile = (path: string) => Object.assign(new TFile(), { path, extension: path.split(".").pop() });
-  function setup(opts: { base?: string; viewName?: string | null; memberKeys?: string[]; error?: boolean; members?: TFile[] | null; icon?: string } = {}) {
+  function setup(opts: { base?: string; viewName?: string | null; memberKeys?: string[]; error?: boolean; members?: TFile[] | null; queried?: TFile[]; icon?: string } = {}) {
     const members = opts.members === undefined ? [mdFile("a.md", { Status: "x", Old: "y" }), mdFile("b.md", { Other: "z" })] : opts.members;
     const all = opts.memberKeys ? [...(members ?? []), mdFile("k.md", Object.fromEntries(opts.memberKeys.map((k) => [k, 1])))] : members;
     const reg = registry([], opts.error ? { "M.base": ["bad"] } : {});
@@ -184,13 +184,22 @@ describe("buildSchemaSettings", () => {
       fileManager: { processFrontMatter },
     } as unknown as App;
     const writer = { update: vi.fn(() => Promise.resolve()), reset: vi.fn(() => Promise.resolve()) };
+    // Without `queried` the query never answers, as for a base whose collector stalls.
+    const query = { watch: vi.fn((_: string, cb: (files: TFile[]) => void) => (opts.queried && cb(opts.queried), () => undefined)) };
     const membership = { targetEntries: () => all, baseIcon: (p: string) => (p === "M.base" ? opts.icon ?? null : p === "Z.base" ? "🏢" : null) };
-    const env = { app, writer, membership, overlays: {} } as unknown as WidgetEnv;
-    return { app, env, reg, writer, membership, processFrontMatter, viewName: opts.viewName ?? null };
+    const env = { app, writer, membership, query, overlays: {} } as unknown as WidgetEnv;
+    return { app, env, reg, writer, membership, query, processFrontMatter, viewName: opts.viewName ?? null };
   }
   async function build(opts: Parameters<typeof setup>[0] = {}) {
     const t = setup(opts);
-    return { ...t, ...(await buildSchemaSettings({ app: t.app } as unknown as Plugin, t.env, t.reg, "M.base", t.viewName)) };
+    const stalls = opts.members === null && !opts.queried;
+    if (stalls) vi.useFakeTimers();
+    const built = buildSchemaSettings({ app: t.app } as unknown as Plugin, t.env, t.reg, "M.base", t.viewName);
+    if (stalls) {
+      await vi.runAllTimersAsync();
+      vi.useRealTimers();
+    }
+    return { ...t, ...(await built) };
   }
   const lastNotice = () => notices.at(-1) ?? "";
 
@@ -201,7 +210,7 @@ describe("buildSchemaSettings", () => {
     expect(input.defaultViewIndex).toBe(1);
   });
   it("lists the other bases' definitions of a field with the member overlap", async () => {
-    const t = setup();
+    const t = setup({ queried: [] });
     const other = { basePath: "Z.base", fields: new Map([["team", { name: "Team", field: { type: "text" as const } }]]) };
     const reg = { schemas: () => [other], errors: () => new Map() } as unknown as SchemaRegistry;
     const shared = mdFile("a.md", { Status: "x" });
@@ -233,6 +242,15 @@ describe("buildSchemaSettings", () => {
     expect(input.memberValues("Missing")).toEqual([]);
     const unknown = await build({ members: null });
     expect(unknown.input.memberValues("Status")).toEqual([]);
+  });
+  it("queries the members of a base that is no schema base yet", async () => {
+    const queried = [mdFile("a.md", { Status: "Aktiv" }), mdFile("b.md", { status: "Neu" })];
+    const { input, handlers, query } = await build({ members: null, queried });
+    expect(query.watch).toHaveBeenCalledWith("M.base", expect.any(Function));
+    expect(input.memberValues("Status")).toEqual(["Aktiv", "Neu"]);
+    expect(input.state.kind === "fields" && input.state.drafts.map((d) => d.name)).toEqual(["Status"]);
+    expect(input.membersKnown()).toBe(true);
+    expect(await handlers.countAffected("Status")).toBe(2);
   });
   it("collects the other bases", async () => {
     const { input } = await build();

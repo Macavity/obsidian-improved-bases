@@ -1,5 +1,6 @@
 import { getFrontMatterInfo, Notice, parseYaml, TFile, type App, type Plugin } from "obsidian";
 import { installSchemaButton } from "../internals/toolbar";
+import { queryOnce } from "../query/BaseQuery";
 import type { SchemaRegistry } from "../schema/SchemaRegistry";
 import type { WidgetEnv } from "../widgets/types";
 import { SchemaSettingsModal, type SchemaSettingsHandlers, type SchemaSettingsInput } from "./SchemaSettingsModal";
@@ -15,6 +16,9 @@ type Pairs = { from: string; to: string }[];
 type Counts = { renamed: number; conflict: number; failed: number };
 
 type State = SchemaSettingsInput["state"];
+
+/** How long opening the dialog waits for the members of a base without a schema. */
+const MEMBER_QUERY_MS = 3000;
 
 /** Modal state for a base: its known fields, or the schema errors. */
 export function schemaState(registry: SchemaRegistry, basePath: string, columns: BaseColumns, memberKeys: string[], detected: (name: string) => string | null, currentView: number): State {
@@ -219,12 +223,22 @@ function otherDefinitions(registry: SchemaRegistry, membership: Pick<Membership,
 	return out;
 }
 
+/**
+ * Reads the base's members: Membership's live result, else a single query taken when the dialog opens.
+ * Membership watches schema bases only, so a base getting its first schema would otherwise show no notes.
+ */
+async function memberSource(env: WidgetEnv, basePath: string): Promise<() => TFile[] | null> {
+	const queried = env.membership.targetEntries(basePath) === null ? await queryOnce(env.query, basePath, MEMBER_QUERY_MS) : null;
+	return () => env.membership.targetEntries(basePath) ?? queried;
+}
+
 export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, registry: SchemaRegistry, basePath: string, viewName: string | null): Promise<{ input: SchemaSettingsInput; handlers: SchemaSettingsHandlers }> {
 	const app = plugin.app;
 	const file = app.vault.getAbstractFileByPath(basePath);
 	if (!(file instanceof TFile)) throw new Error("Base not found");
 	const source = await app.vault.cachedRead(file);
-	const members = env.membership.targetEntries(basePath);
+	const currentMembers = await memberSource(env, basePath);
+	const members = currentMembers();
 	const names = new Set<string>();
 	// Lower-cased key to the member values, so the mismatch hint needs no rescan per keystroke.
 	const values = new Map<string, unknown[]>();
@@ -260,7 +274,7 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 		baseIcon: (path) => env.membership.baseIcon(path),
 		basePaths,
 		overlays: env.overlays,
-		membersKnown: () => env.membership.targetEntries(basePath) !== null,
+		membersKnown: () => currentMembers() !== null,
 		otherDefinitions: (name) => otherDefinitions(registry, env.membership, basePath, name),
 		memberValues: (name) => values.get(name.toLowerCase()) ?? [],
 		types: listPropertyTypes(getMetadataTypeManager(app)),
@@ -278,7 +292,7 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 			new Notice("Schema saved");
 			return;
 		}
-		const current = env.membership.targetEntries(basePath);
+		const current = currentMembers();
 		const conflicts: RenameConflicts = new Map();
 		let renameText = renameSummary(pairs, current && pairs.length ? await migrateRenames(app, current, pairs, conflicts) : null);
 		const removed = current && removedNames.length ? await removeProperties(app, current, removedNames) : [];
@@ -289,7 +303,7 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 	};
 	const onReset = (): Promise<void> => env.writer.reset(basePath);
 	const countAffected = async (name: string): Promise<number> => {
-		const current = env.membership.targetEntries(basePath);
+		const current = currentMembers();
 		return current ? countNotesWithKey(app, current, name) : 0;
 	};
 	return { input, handlers: { onSave, onReset, countAffected } };
