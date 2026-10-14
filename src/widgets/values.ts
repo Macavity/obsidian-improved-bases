@@ -1,4 +1,4 @@
-import type { Color, SelectField } from "../schema/types";
+import { COLORS, type Color, type SelectField } from "../schema/types";
 import type { RawFields } from "../schema/SchemaWriter";
 import { isUnsafeKey, setOption } from "../schema/keys";
 import { isRecord } from "../schema/parse";
@@ -24,9 +24,9 @@ export function linkTarget(raw: string): string | null {
 	return target ? target : null;
 }
 
-/** Value in schema format: `multiple` writes a list, otherwise the first value or null. */
+/** Value in schema format: `multiple` writes a list without duplicates, otherwise the first value or null. */
 export function selectOutput(values: string[], multiple: boolean): string | string[] | null {
-	if (multiple) return values;
+	if (multiple) return [...new Set(values)];
 	return values[0] ?? null;
 }
 
@@ -46,18 +46,54 @@ function optionsOf(fields: RawFields, fieldName: string): Record<string, unknown
 	return created;
 }
 
-/** Adds an option with color grey; an existing option is kept as is. */
-export function addOptionMutation(fieldName: string, value: string): (f: RawFields) => void {
+const PALETTE = COLORS.filter((c) => c !== "grey" && c !== "black" && c !== "white");
+
+/** Color for a new option: cycles the palette (no grey, black, white) by the number of existing options. */
+export function nextOptionColor(existingCount: number): Color {
+	return PALETTE[existingCount % PALETTE.length] ?? "red";
+}
+
+/** Adds an option with the given color; an existing option is kept as is. */
+export function addOptionMutation(fieldName: string, value: string, color: Color): (f: RawFields) => void {
 	return (fields) => {
 		const options = optionsOf(fields, fieldName);
-		if (options && !Object.hasOwn(options, value)) setOption(options, value, "grey");
+		if (options && !Object.hasOwn(options, value)) setOption(options, value, color);
 	};
 }
 
-/** Sets the color of an option (creating the option when missing). */
+/** Sets the color of an option; throws `StaleOptionError` when the option is gone (removed elsewhere). */
 export function setColorMutation(fieldName: string, value: string, color: Color): (f: RawFields) => void {
 	return (fields) => {
 		const options = optionsOf(fields, fieldName);
-		if (options) setOption(options, value, color);
+		if (!options || !Object.hasOwn(options, value)) throw new StaleOptionError(`Option "${value}" is gone`);
+		setOption(options, value, color);
+	};
+}
+
+/** Number of notes (one entry each) whose value contains `target`. */
+export function countNotesWithValue(values: readonly unknown[], target: string): number {
+	return values.filter((v) => toList(v).includes(target)).length;
+}
+
+/** Thrown by a mutation whose target option no longer matches the expectation (the schema changed elsewhere). */
+export class StaleOptionError extends Error {}
+
+/** Renames an option, keeping its color and its position; throws `StaleOptionError` when `from` is missing or `to` exists. */
+export function renameOptionMutation(fieldName: string, from: string, to: string): (f: RawFields) => void {
+	return (fields) => {
+		const options = optionsOf(fields, fieldName);
+		const f = options && fields[fieldName];
+		if (!options || !f || !Object.hasOwn(options, from) || Object.hasOwn(options, to)) throw new StaleOptionError(`Cannot rename "${from}" to "${to}"`);
+		const rebuilt: Record<string, unknown> = {};
+		for (const [key, color] of Object.entries(options)) setOption(rebuilt, key === from ? to : key, color as string);
+		f.options = rebuilt;
+	};
+}
+
+/** Removes an option from the field. */
+export function removeOptionMutation(fieldName: string, value: string): (f: RawFields) => void {
+	return (fields) => {
+		const options = optionsOf(fields, fieldName);
+		if (options && Object.hasOwn(options, value)) delete options[value];
 	};
 }

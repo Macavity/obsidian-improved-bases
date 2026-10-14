@@ -1,6 +1,7 @@
 import { isColor, isRelation, isSelect, type BaseSchema, type Color, type FieldSchema } from "../schema/types";
 import { findOwnKey, isUnsafeKey, setOption } from "../schema/keys";
 import type { BaseColumns, ColumnEdits, RawFields } from "../schema/baseDoc";
+import { toList } from "../widgets/values";
 import { propertyTypeOf, type PropertyType } from "../internals/typeRegistry";
 
 /** Field kinds in the dialog: native (Obsidian's own type), or a plugin customization. */
@@ -12,8 +13,17 @@ export const TYPES: readonly DraftType[] = ["native", "relation", "select"];
 /** A dropdown choice: Obsidian's own type (`native`, offered only when it is not selectable itself), a registered type id, or a plugin type. */
 export type TypeChoice = DraftType | `native:${string}`;
 
-/** One select option while editing. */
-export interface OptionDraft { value: string; color: Color }
+/**
+ * One select option while editing; `original` is the saved value (null for new options). A removed option stays
+ * in the draft with `removal` set: "notes" also strips the value from the notes on save, "schema" only the option.
+ */
+export interface OptionDraft { value: string; color: Color; original: string | null; removal: "notes" | "schema" | null }
+
+/** Options that stay in the schema. */
+export const liveOptions = (options: readonly OptionDraft[]): OptionDraft[] => options.filter((o) => o.removal === null);
+
+/** A new option created in the dialog. */
+export const newOption = (value: string, color: Color): OptionDraft => ({ value, color, original: null, removal: null });
 
 /** Editable copy of a field; `originalName` is null for new fields, `originalBase` the saved relation target. */
 export interface FieldDraft {
@@ -61,9 +71,23 @@ export function typeChoice(draft: FieldDraft, types: readonly PropertyType[]): T
 	return type === null ? "native" : `${NATIVE_PREFIX}${type}`;
 }
 
+const LIST_TYPES = ["multitext", "tags", "aliases"];
+
+/** Distinct note values that are not options yet, with their counts: most frequent first, ties alphabetical. Values about to be removed from the notes are left out. */
+export function optionSuggestions(values: readonly unknown[], options: readonly OptionDraft[]): { value: string; count: number }[] {
+	const removed = options.filter((o) => o.removal === "notes").map((o) => o.original ?? o.value);
+	// Notes hold a renamed option's old name until Save migrates them, so it is known too.
+	const renamed = liveOptions(options).flatMap((o) => (o.original === null ? [] : [o.original]));
+	const known = new Set([...liveOptions(options).map((o) => o.value), ...renamed, ...removed]);
+	const counts = new Map<string, number>();
+	for (const v of values.flatMap(toList)) if (!known.has(v)) counts.set(v, (counts.get(v) ?? 0) + 1);
+	return [...counts].map(([value, count]) => ({ value, count })).sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
+}
+
 /** Applies a choice: Obsidian's own type drops the override, another id becomes one; plugin types keep their details. */
 export function applyTypeChoice(draft: FieldDraft, choice: TypeChoice): void {
 	if (choice === "relation" || choice === "select") {
+		if (draft.type === "native") draft.multiple = LIST_TYPES.includes(draft.detected ?? "");
 		draft.type = choice;
 		return;
 	}
@@ -175,7 +199,7 @@ function toDraft(name: string, field: FieldSchema | undefined, label: string | n
 	if (isRelation(field)) {
 		Object.assign(draft, { type: "relation", base: field.base, originalBase: field.base, multiple: field.multiple });
 	} else if (isSelect(field)) {
-		Object.assign(draft, { type: "select", multiple: field.multiple, options: field.options.map((o) => ({ value: o.value, color: o.color })) });
+		Object.assign(draft, { type: "select", multiple: field.multiple, options: field.options.map((o) => ({ value: o.value, color: o.color, original: o.value, removal: null })) });
 	} else {
 		draft.override = { type: field.type };
 	}
@@ -250,7 +274,7 @@ export function validateDrafts(drafts: FieldDraft[], basePaths: string[]): strin
 			// A saved target stays valid even when its file is gone, so unrelated edits can still be saved.
 			errors.push(`Field '${name}': choose a valid base`);
 		} else if (draft.type === "select") {
-			errors.push(...validateOptions(name, draft.options));
+			errors.push(...validateOptions(name, liveOptions(draft.options)));
 		}
 	}
 	return errors;
@@ -292,7 +316,7 @@ function draftToField(draft: FieldDraft): Record<string, unknown> | null {
 	if (draft.type === "native") return draft.override;
 	if (draft.type === "relation") return { type: "relation", base: draft.base, multiple: draft.multiple };
 	const options = Object.create(null) as Record<string, unknown>;
-	for (const o of draft.options) setOption(options, o.value, o.color);
+	for (const o of liveOptions(draft.options)) setOption(options, o.value, o.color);
 	return { type: "select", multiple: draft.multiple, options };
 }
 
@@ -307,6 +331,23 @@ export function renames(drafts: FieldDraft[]): { from: string; to: string }[] {
 		.filter((x) => !x.removed)
 		.filter((x) => x.originalName !== null && x.originalName !== x.name)
 		.map((x) => ({ from: x.originalName as string, to: x.name }));
+}
+
+/** Note migrations of one select field's options. */
+export interface OptionMigration { field: string; renames: { from: string; to: string }[]; removals: string[] }
+
+/** Option renames and "notes" removals per kept select field, under the field's new name; fields with nothing to do are left out. */
+export function optionMigrations(drafts: FieldDraft[]): OptionMigration[] {
+	return drafts
+		.filter((x) => !x.removed && x.type === "select")
+		.map((x) => ({
+			field: x.name.trim(),
+			renames: x.options
+				.filter((o) => o.removal === null && o.original !== null && o.original !== o.value)
+				.map((o) => ({ from: o.original as string, to: o.value })),
+			removals: x.options.filter((o) => o.removal === "notes").map((o) => o.original ?? o.value),
+		}))
+		.filter((m) => m.renames.length > 0 || m.removals.length > 0);
 }
 
 /** Moves a frontmatter value from `from` to `to` without touching prototypes; keys are exact, as in YAML. */

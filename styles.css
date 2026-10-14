@@ -66,8 +66,7 @@
 }
 /* Not `clickable-icon`: themes pad that class (Cupertino 10px) and `.metadata-property-value .clickable-icon` outranks a plugin class, which made the pills taller than the row.
    Two plugin classes, because themes also pad plain buttons via `button:not(.clickable-icon)` (Primary), which outranks one class. */
-.improved-bases-select .improved-bases-chip-remove,
-.improved-bases-select .improved-bases-add {
+.improved-bases-option-picker .improved-bases-chip-remove {
 	flex: 0 0 auto;
 	height: auto;
 	min-height: 0;
@@ -81,27 +80,13 @@
 	line-height: 1.4;
 	cursor: var(--cursor);
 }
-.improved-bases-select .improved-bases-chip-remove:hover,
-.improved-bases-select .improved-bases-add:hover {
+.improved-bases-option-picker .improved-bases-chip-remove:hover {
 	background-color: var(--background-modifier-hover);
 	color: var(--text-normal);
 }
-.improved-bases-select .improved-bases-chip-remove:focus-visible,
-.improved-bases-select .improved-bases-add:focus-visible {
+.improved-bases-option-picker .improved-bases-chip-remove:focus-visible {
 	box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
 }
-/* Table cells show the buttons only on hover or focus, as Obsidian does for its own cell icons */
-.bases-td .improved-bases-chip-remove,
-.bases-td .improved-bases-add {
-	opacity: 0;
-}
-.bases-td:hover .improved-bases-chip-remove,
-.bases-td:hover .improved-bases-add,
-.bases-td:focus-within .improved-bases-chip-remove,
-.bases-td:focus-within .improved-bases-add {
-	opacity: 1;
-}
-
 /* Conflict marker: a note is in several schema bases defining this field; the info icon explains which one applies. */
 .improved-bases-has-conflict {
 	display: flex;
@@ -170,20 +155,82 @@
 	border-radius: 50%;
 	background-color: rgb(var(--ib-rgb));
 }
-.improved-bases-menu-search {
-	padding: var(--size-2-2) var(--size-4-2);
+
+/* Option picker: popover at body, placed once at open (see placePopover). */
+.improved-bases-option-picker {
+	position: fixed;
+	z-index: var(--layer-menu);
+	top: var(--ib-picker-top);
+	bottom: var(--ib-picker-bottom);
+	left: var(--ib-picker-left);
+	width: var(--ib-picker-width);
+	max-height: var(--ib-picker-max-height);
+	display: flex;
+	flex-direction: column;
+	background-color: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	box-shadow: var(--shadow-s);
+	font-size: var(--font-ui-small);
+	overflow: hidden;
 }
-.improved-bases-menu-search input {
-	width: 100%;
+/* Pills and cursor read as one tag field; no frame or focus ring, only a divider to the list. */
+.improved-bases-picker-header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--size-2-2);
+	padding: var(--size-4-2);
+	border-bottom: 1px solid var(--background-modifier-border);
 }
-.improved-bases-menu-create {
-	padding: var(--size-2-3) var(--size-4-3);
+.improved-bases-picker-values {
+	display: contents;
+}
+.improved-bases-picker-header input[type="text"],
+.improved-bases-picker-header input[type="text"]:hover,
+.improved-bases-picker-header input[type="text"]:focus,
+.improved-bases-picker-header input[type="text"]:focus-visible {
+	flex: 1 1 80px;
+	min-width: 80px;
+	height: 20px;
+	line-height: 20px;
+	padding: 0 var(--size-2-1);
+	border: none;
+	background: transparent;
+	box-shadow: none;
+	outline: none;
+}
+.improved-bases-picker-list {
+	flex: 1 1 auto;
+	overflow-y: auto;
+	padding: var(--size-2-2);
+}
+.improved-bases-picker-row,
+.improved-bases-picker-create {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	padding: var(--size-2-3) var(--size-4-2);
+	border-radius: var(--radius-s);
 	cursor: pointer;
+}
+.improved-bases-picker-row:hover,
+.improved-bases-picker-create:hover,
+.improved-bases-picker-row.is-selected,
+.improved-bases-picker-create.is-selected {
+	background-color: var(--background-modifier-hover);
+}
+.improved-bases-picker-check {
+	flex: 0 0 1.2em;
+	text-align: center;
 	color: var(--text-accent);
 }
-.improved-bases-menu-item.is-hidden,
-.improved-bases-menu-create.is-hidden {
-	display: none;
+.improved-bases-picker-create {
+	color: var(--text-accent);
+}
+.improved-bases-picker-hint {
+	padding: var(--size-2-3) var(--size-4-2);
+	color: var(--text-muted);
 }
 
 .improved-bases-form-error {
@@ -584,6 +631,50 @@
 	color: var(--text-muted);
 	--icon-size: var(--icon-xs);
 }
+/* Values found in the member notes, offered as options */
+.improved-bases-schema .improved-bases-option-suggestions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--size-2-2);
+	margin-top: var(--size-2-2);
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+.improved-bases-schema .improved-bases-option-suggestion {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--size-2-1);
+	height: auto;
+	padding: var(--size-2-1) var(--size-2-3);
+	border: 1px dashed var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-normal);
+	cursor: pointer;
+	--icon-size: var(--icon-xs);
+}
+.improved-bases-schema .improved-bases-option-suggestion:hover {
+	border-style: solid;
+	border-color: var(--background-modifier-border-hover);
+	background-color: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+.improved-bases-schema .improved-bases-suggestion-count {
+	opacity: 0.7;
+}
+.improved-bases-schema .improved-bases-suggestions-all {
+	padding: 0 var(--size-2-2);
+	border: 0;
+	box-shadow: none;
+	background: transparent;
+	color: var(--text-accent);
+	font-size: var(--font-ui-smaller);
+	cursor: pointer;
+}
 
 /* Removed rows */
 .improved-bases-schema .improved-bases-field-removed .improved-bases-field-removed-name {
@@ -682,4 +773,65 @@
 	.improved-bases-schema .improved-bases-undo {
 		grid-column: 4;
 	}
+}
+
+/* Option editor: popover at body next to the picker row. */
+.improved-bases-option-editor {
+	position: fixed;
+	z-index: calc(var(--layer-menu) + 1);
+	top: var(--ib-editor-top);
+	left: var(--ib-editor-left);
+	width: var(--ib-editor-width);
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-2);
+	padding: var(--size-4-2);
+	background-color: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	box-shadow: var(--shadow-s);
+	font-size: var(--font-ui-small);
+}
+.improved-bases-option-editor-delete {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	padding: var(--size-2-3) var(--size-4-2);
+	border-radius: var(--radius-s);
+	color: var(--text-error);
+	cursor: pointer;
+}
+.improved-bases-option-editor-delete:hover {
+	background-color: var(--background-modifier-hover);
+}
+.improved-bases-option-editor-colors {
+	display: grid;
+	grid-template-columns: repeat(7, 1fr);
+	gap: var(--size-2-3);
+}
+/* `button[data-color]` outranks Obsidian's button radius, height and squircle corner shape, so the swatches stay circles. */
+.improved-bases-option-editor-colors button[data-color] {
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	border: none;
+	border-radius: 50%;
+	corner-shape: round;
+	box-shadow: none;
+	background-color: rgb(var(--ib-rgb));
+}
+.improved-bases-option-editor-colors button[data-color].is-active {
+	box-shadow: 0 0 0 2px var(--background-primary), 0 0 0 4px var(--text-muted);
+}
+.improved-bases-picker-edit {
+	margin-left: auto;
+	padding: 0 var(--size-2-3);
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	visibility: hidden;
+}
+.improved-bases-picker-row:hover .improved-bases-picker-edit,
+.improved-bases-picker-row.is-selected .improved-bases-picker-edit {
+	visibility: visible;
 }

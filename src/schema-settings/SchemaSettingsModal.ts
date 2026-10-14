@@ -1,10 +1,13 @@
 import { ButtonComponent, Modal, setIcon, ToggleComponent, type App } from "obsidian";
 import { referencesName } from "../schema/baseDoc";
 import { openOptionEditMenu } from "../widgets/pickers";
+import { countNotesWithValue, nextOptionColor } from "../widgets/values";
+import { confirmOptionDelete } from "../widgets/OptionDeleteModal";
 import { renderIcon } from "../widgets/icons";
 import type { OverlayRegistry } from "../widgets/types";
 import { propertyTypeOf, type PropertyType } from "../internals/typeRegistry";
-import { applyTypeChoice, conflictHint, mismatchHint, overrideType, removals, renames, typeChoice, typeChoices, validateDrafts, type FieldDraft, type OptionDraft, type OtherDefinition, type TypeChoice } from "./schemaDraft";
+import { applyTypeChoice, conflictHint, liveOptions, mismatchHint, newOption, optionMigrations, optionSuggestions, overrideType, removals, renames, typeChoice, typeChoices, validateDrafts, type FieldDraft, type OptionDraft, type OtherDefinition, type TypeChoice } from "./schemaDraft";
+import { MEMBERS_LOADING } from "../schema/messages";
 
 export interface SchemaSettingsInput {
 	basePath: string;
@@ -38,7 +41,7 @@ export interface SchemaSettingsHandlers {
 	countAffected: (name: string) => Promise<number>;
 }
 
-const MEMBERS_LOADING = "Base members are still loading, try again in a moment";
+const MAX_SUGGESTIONS = 12;
 const IDLE_STATUS = "Changes are written to the base on Save. Renames and removals also update the member notes.";
 const ICON_HELP = "Emoji shown for this base's entries in relations, unless a note has its own icon property. The system emoji picker opens with ctrl+cmd+space on macOS and with the Windows key + period on Windows.";
 
@@ -289,7 +292,11 @@ export class SchemaSettingsModal extends Modal {
 		el.empty();
 		const pending = renames(this.drafts.map((d) => ({ ...d, name: d.name.trim() }))).filter((r) => r.to !== "");
 		const removed = removals(this.drafts);
-		if (!pending.length && !removed.length) {
+		const options = optionMigrations(this.drafts);
+		const optionRenames = options.flatMap((m) => m.renames.map((r) => `${m.field}: ${r.from} → ${r.to}`));
+		const optionRemovals = options.flatMap((m) => m.removals.map((v) => `${m.field}: ${v} removed`));
+		const total = pending.length + removed.length + optionRenames.length + optionRemovals.length;
+		if (!total) {
 			el.removeClass("has-pending");
 			setIcon(el.createSpan({ cls: "improved-bases-status-icon" }), "lucide-info");
 			el.createSpan({ text: IDLE_STATUS });
@@ -299,10 +306,12 @@ export class SchemaSettingsModal extends Modal {
 		const parts = [];
 		if (pending.length) parts.push(plural(pending.length, "pending rename"));
 		if (removed.length) parts.push(plural(removed.length, "removal"));
-		el.createSpan({ cls: "improved-bases-status-badge", text: String(pending.length + removed.length) });
+		if (optionRenames.length) parts.push(plural(optionRenames.length, "pending option rename"));
+		if (optionRemovals.length) parts.push(plural(optionRemovals.length, "option removal"));
+		el.createSpan({ cls: "improved-bases-status-badge", text: String(total) });
 		const text = el.createDiv({ cls: "improved-bases-status-text" });
 		text.createEl("b", { text: parts.join(", ") });
-		const details = [...pending.map((r) => `${r.from} → ${r.to}`), ...removed.map((name) => `${name} removed`)];
+		const details = [...pending.map((r) => `${r.from} → ${r.to}`), ...removed.map((name) => `${name} removed`), ...optionRenames, ...optionRemovals];
 		const shown = details.slice(0, 2);
 		if (details.length > 2) shown.push(`+${details.length - 2} more`);
 		text.createEl("p", { text: shown.join(" · ") });
@@ -450,8 +459,9 @@ export class SchemaSettingsModal extends Modal {
 	private renderDetails(el: HTMLElement, draft: FieldDraft): void {
 		el.empty();
 		if (draft.type === "select") {
-			for (const option of draft.options.slice(0, 3)) el.createSpan({ cls: "improved-bases-color-dot", attr: { "data-color": option.color } });
-			el.createSpan({ text: plural(draft.options.length, "option") });
+			const options = liveOptions(draft.options);
+			for (const option of options.slice(0, 3)) el.createSpan({ cls: "improved-bases-color-dot", attr: { "data-color": option.color } });
+			el.createSpan({ text: plural(options.length, "option") });
 		} else if (draft.type === "relation") {
 			if (draft.base) this.renderBaseIcon(el.createSpan({ cls: "improved-bases-details-icon" }), draft.base);
 			el.createSpan({ cls: "improved-bases-details-target", text: draft.base ?? "No base chosen" });
@@ -535,8 +545,38 @@ export class SchemaSettingsModal extends Modal {
 			this.renderOptions(el, draft, refresh);
 		};
 		const list = el.createDiv({ cls: "improved-bases-option-list" });
-		for (const option of draft.options) this.renderOption(list, draft, option, rerender);
+		for (const option of liveOptions(draft.options)) this.renderOption(list, draft, option, rerender);
 		this.renderAddOption(el, list, draft, rerender);
+		this.renderSuggestions(el, draft, rerender);
+	}
+
+	/** Note values that are not options yet, most frequent first; a click adds one, "Add all" adds every one. */
+	private renderSuggestions(el: HTMLElement, draft: FieldDraft, rerender: () => void): void {
+		const suggestions = optionSuggestions(this.input.memberValues(draft.originalName ?? draft.name), draft.options);
+		if (!suggestions.length) return;
+		const add = (value: string): void => {
+			const live = liveOptions(draft.options);
+			if (!live.some((o) => o.value === value)) draft.options.push(newOption(value, nextOptionColor(live.length)));
+		};
+		const row = el.createDiv({ cls: "improved-bases-option-suggestions" });
+		row.createSpan({ cls: "improved-bases-suggestions-label", text: "In notes:" });
+		for (const { value, count } of suggestions.slice(0, MAX_SUGGESTIONS)) {
+			const chip = row.createEl("button", { cls: "improved-bases-option-suggestion", attr: { type: "button", "aria-label": `Add option ${value}` } });
+			setIcon(chip.createSpan(), "lucide-plus");
+			chip.createSpan({ text: value });
+			chip.createSpan({ cls: "improved-bases-suggestion-count", text: ` · ${count}` });
+			chip.addEventListener("click", () => {
+				add(value);
+				rerender();
+			});
+		}
+		if (suggestions.length > 1) {
+			const all = row.createEl("button", { cls: "improved-bases-suggestions-all", attr: { type: "button" }, text: `Add all (${suggestions.length})` });
+			all.addEventListener("click", () => {
+				for (const { value } of suggestions) add(value);
+				rerender();
+			});
+		}
 	}
 
 	/** "+ Option" turns into an input; Enter adds and keeps it open, an empty blur or Escape turns it back. */
@@ -549,10 +589,13 @@ export class SchemaSettingsModal extends Modal {
 				cls: "improved-bases-option-new",
 				attr: { type: "text", placeholder: "New option", "aria-label": "New option" },
 			});
+			let done = false;
+			// The rerender detaches the focused input and the browser then fires blur; `done` keeps that from adding twice.
 			const submit = (): void => {
 				const value = input.value.trim();
-				if (!value) return;
-				draft.options.push({ value, color: "grey" });
+				if (!value || done) return;
+				done = true;
+				draft.options.push(newOption(value, nextOptionColor(liveOptions(draft.options).length)));
 				rerender();
 				container.querySelector<HTMLElement>(".improved-bases-option-add-button")?.click();
 			};
@@ -604,10 +647,7 @@ export class SchemaSettingsModal extends Modal {
 		chip.addEventListener("click", (evt) => {
 			openOptionEditMenu(evt, option.color, {
 				onRename: rename,
-				onRemove: () => {
-					draft.options.remove(option);
-					rerender();
-				},
+				onRemove: () => void this.removeOption(draft, option).then(rerender),
 				onColor: (color) => {
 					option.color = color;
 					rerender();
@@ -616,10 +656,21 @@ export class SchemaSettingsModal extends Modal {
 		});
 	}
 
+	/** New options go at once, unused ones only leave the schema; for used ones the user decides whether the notes lose the value. */
+	private async removeOption(draft: FieldDraft, option: OptionDraft): Promise<void> {
+		if (option.original === null) {
+			draft.options.remove(option);
+			return;
+		}
+		const count = countNotesWithValue(this.input.memberValues(draft.originalName ?? draft.name), option.original);
+		const choice = count === 0 ? "schema" : await confirmOptionDelete(this.app, option.original, count, this.input.overlays);
+		if (choice !== null) option.removal = choice;
+	}
+
 	private async save(button: ButtonComponent): Promise<void> {
 		for (const draft of this.drafts) draft.name = draft.name.trim();
 		const errors = validateDrafts(this.drafts, this.input.basePaths);
-		const migrates = renames(this.drafts).length > 0 || removals(this.drafts).length > 0;
+		const migrates = renames(this.drafts).length > 0 || removals(this.drafts).length > 0 || optionMigrations(this.drafts).length > 0;
 		if (migrates && !this.input.membersKnown()) errors.push(MEMBERS_LOADING);
 		if (errors.length) {
 			this.errorEl?.setText(errors.join(". "));

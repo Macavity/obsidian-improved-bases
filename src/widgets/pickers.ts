@@ -1,6 +1,6 @@
 import { FuzzySuggestModal, Menu, renderMatches, type App, type FuzzyMatch, type MenuItem, type TFile } from "obsidian";
-import { itemDom, menuInternals } from "../internals/menu";
-import { COLORS, type Color, type SelectField } from "../schema/types";
+import { itemDom } from "../internals/menu";
+import { COLORS, type Color } from "../schema/types";
 import { renderIcon } from "./icons";
 import type { OverlayRegistry } from "./types";
 
@@ -77,7 +77,6 @@ export class EntryPicker extends FuzzySuggestModal<PickerItem> {
 	}
 }
 
-/** Picks one of the given base paths. */
 const COLOR_LABELS: Record<Color, string> = {
 	red: "Red", orange: "Orange", yellow: "Yellow", green: "Green", lime: "Lime", cyan: "Cyan", blue: "Blue",
 	violet: "Violet", pink: "Pink", brown: "Brown", grey: "Grey", black: "Black", white: "White",
@@ -97,64 +96,6 @@ function track(menu: Menu, overlays: OverlayRegistry): void {
 	menu.onHide(off);
 }
 
-/** DOM menu (not native) listing the options as colored entries, with a search/create input on top. */
-export function openOptionMenu(
-	evt: MouseEvent,
-	field: SelectField,
-	current: string[],
-	onPick: (value: string) => void,
-	onCreate: (value: string) => void,
-	overlays: OverlayRegistry,
-): void {
-	const menu = new Menu();
-	menu.setUseNativeMenu(false);
-	const rows: { value: string; dom: HTMLElement | null }[] = [];
-	for (const option of field.options) {
-		menu.addItem((item) => {
-			colorItem(item, option.value, option.color);
-			item.setChecked(current.includes(option.value));
-			item.onClick(() => onPick(option.value));
-			rows.push({ value: option.value, dom: itemDom(item) });
-		});
-	}
-	track(menu, overlays);
-	menu.showAtMouseEvent(evt);
-
-	// Without the menu internals the options stay reachable by click, just without search/create.
-	const internals = menuInternals(menu);
-	if (!internals) return;
-	const menuDom = internals.dom;
-	const wrap = createDiv({ cls: "improved-bases-menu-search" });
-	const input = wrap.createEl("input", { attr: { type: "text", placeholder: "Search or create", "aria-label": "Search or create" } });
-	menuDom.prepend(wrap);
-	const hint = menuDom.createDiv({ cls: "improved-bases-menu-create is-hidden" });
-	const update = (): void => {
-		const q = input.value.trim().toLowerCase();
-		for (const r of rows) r.dom?.toggleClass("is-hidden", q !== "" && !r.value.toLowerCase().includes(q));
-		const exact = rows.some((r) => r.value.toLowerCase() === q);
-		hint.toggleClass("is-hidden", q === "" || exact);
-		hint.setText(`Create "${input.value.trim()}"`);
-	};
-	input.addEventListener("input", update);
-	const submit = (): void => {
-		const q = input.value.trim();
-		if (!q) return;
-		const exact = rows.find((r) => r.value.toLowerCase() === q.toLowerCase());
-		menu.hide();
-		if (exact) onPick(exact.value);
-		else onCreate(q);
-	};
-	internals.onEnter(submit);
-	hint.addEventListener("click", (e) => {
-		e.stopPropagation();
-		const q = input.value.trim();
-		menu.hide();
-		if (q) onCreate(q);
-	});
-	window.setTimeout(() => input.focus(), 0);
-}
-
-/** DOM menu with the color palette. */
 /** Menu on an option chip in the schema dialog: rename, remove, then the colors (the current one checked). */
 export function openOptionEditMenu(
 	evt: MouseEvent,
@@ -173,19 +114,6 @@ export function openOptionEditMenu(
 			colorItem(item, COLOR_LABELS[color], color);
 			item.setChecked(color === current);
 			item.onClick(() => handlers.onColor(color));
-		});
-	}
-	menu.showAtMouseEvent(evt);
-}
-
-export function openColorMenu(evt: MouseEvent, onPick: (c: Color) => void, overlays: OverlayRegistry): void {
-	const menu = new Menu();
-	menu.setUseNativeMenu(false);
-	track(menu, overlays);
-	for (const color of COLORS) {
-		menu.addItem((item) => {
-			colorItem(item, COLOR_LABELS[color], color);
-			item.onClick(() => onPick(color));
 		});
 	}
 	menu.showAtMouseEvent(evt);
