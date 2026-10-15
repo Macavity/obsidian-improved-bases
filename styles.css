@@ -282,6 +282,30 @@
 	width: 5em;
 }
 
+/* Reading the notes of a base without a schema */
+.improved-bases-schema .improved-bases-members-loading {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	padding: var(--size-4-2) var(--size-4-4);
+	border-bottom: 1px solid var(--background-modifier-border);
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+}
+.improved-bases-schema .improved-bases-members-loading.is-failed {
+	color: var(--text-warning);
+	background-color: rgba(var(--color-orange-rgb), 0.04);
+}
+.improved-bases-schema .improved-bases-members-loading-icon {
+	display: flex;
+}
+.improved-bases-schema .improved-bases-members-loading:not(.is-failed) .improved-bases-members-loading-icon {
+	animation: improved-bases-spin 1s linear infinite;
+}
+@keyframes improved-bases-spin {
+	to { transform: rotate(360deg); }
+}
+
 /* Toolbar: search, target view, add */
 .improved-bases-schema .improved-bases-toolbar {
 	display: flex;

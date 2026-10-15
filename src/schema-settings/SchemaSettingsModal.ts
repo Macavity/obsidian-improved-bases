@@ -21,6 +21,11 @@ export interface SchemaSettingsInput {
 	overlays: OverlayRegistry;
 	/** Whether the members of this base are known; renames and removals need them to migrate the notes. */
 	membersKnown: () => boolean;
+	/**
+	 * Pending read of the notes when the dialog opens before Membership knows them: the drafts including the notes'
+	 * properties, or null when the read failed. Null when nothing is pending.
+	 */
+	members: Promise<FieldDraft[] | null> | null;
 	/** View names of the base; new fields are added as columns to one of them. */
 	views: string[];
 	defaultViewIndex: number;
@@ -70,6 +75,10 @@ function choiceText(draft: FieldDraft, choice: TypeChoice, types: readonly Prope
 	return propertyTypeOf(types, choice.slice("native:".length)).name;
 }
 
+function cloneDraft(d: FieldDraft): FieldDraft {
+	return { ...d, options: d.options.map((o) => ({ ...o })) };
+}
+
 /** Change detection for the footer: the drafts and the base icon as saved. */
 function snapshot(drafts: FieldDraft[], icon: string): string {
 	return JSON.stringify({ drafts, icon });
@@ -105,7 +114,10 @@ export class SchemaSettingsModal extends Modal {
 	private statusEl: HTMLElement | null = null;
 	private buttonsEl: HTMLElement | null = null;
 	private primary: ((b: ButtonComponent) => void) | null = null;
-	private readonly initial: string;
+	/** The drafts as opened, extended by the notes' fields once read; `initial` is their snapshot. */
+	private readonly initialDrafts: FieldDraft[];
+	private initial: string;
+	private closed = false;
 	private focusNext: FieldDraft | null = null;
 	private addView: number;
 	private icon: string;
@@ -120,12 +132,11 @@ export class SchemaSettingsModal extends Modal {
 		private readonly handlers: SchemaSettingsHandlers,
 	) {
 		super(app);
-		this.drafts = input.state.kind === "fields"
-			? input.state.drafts.map((d) => ({ ...d, options: d.options.map((o) => ({ ...o })) }))
-			: [];
+		this.drafts = input.state.kind === "fields" ? input.state.drafts.map(cloneDraft) : [];
 		this.addView = input.defaultViewIndex;
 		this.icon = input.icon;
-		this.initial = snapshot(this.drafts, this.icon);
+		this.initialDrafts = this.drafts.map(cloneDraft);
+		this.initial = snapshot(this.initialDrafts, this.icon);
 	}
 
 	/** Whether saving would change the base. */
@@ -149,6 +160,7 @@ export class SchemaSettingsModal extends Modal {
 	}
 
 	onClose(): void {
+		this.closed = true;
 		this.generation++;
 		this.contentEl.empty();
 	}
@@ -189,11 +201,46 @@ export class SchemaSettingsModal extends Modal {
 		for (const label of ["", "Field name", "Type", "Details", ""]) head.createSpan({ text: label });
 		this.listEl = table.createDiv({ cls: "improved-bases-field-list" });
 		this.renderList();
+		this.awaitMembers(table);
 		this.renderFooter((b) => {
 			b.setButtonText("Save").setCta();
 			b.buttonEl.addClass("improved-bases-save");
 			b.onClick(() => void this.save(b));
 		});
+	}
+
+	/** Reads the notes in the background: a loading line above the table until their fields and suggestions are in. */
+	private awaitMembers(table: HTMLElement): void {
+		const pending = this.input.members;
+		if (!pending) return;
+		const line = this.contentEl.createDiv({ cls: "improved-bases-members-loading" });
+		table.before(line);
+		setIcon(line.createSpan({ cls: "improved-bases-members-loading-icon" }), "lucide-loader-2");
+		line.createSpan({ text: `Reading the notes of ${basename(this.input.basePath)}… Suggestions from notes appear when done.` });
+		void pending.then((drafts) => {
+			if (this.closed) return;
+			if (drafts === null) {
+				line.addClass("is-failed");
+				line.empty();
+				setIcon(line.createSpan({ cls: "improved-bases-members-loading-icon" }), "lucide-alert-triangle");
+				line.createSpan({ text: "Could not read the notes of this base, so there are no suggestions from notes." });
+				return;
+			}
+			line.remove();
+			this.addMemberFields(drafts);
+			this.renderList();
+		});
+	}
+
+	/** Adds the fields only the notes know, behind the known ones and before fields added in the dialog, without counting as a change. */
+	private addMemberFields(drafts: FieldDraft[]): void {
+		const known = new Set(this.initialDrafts.map((d) => (d.originalName ?? d.name).toLowerCase()));
+		const added = drafts.filter((d) => d.originalName !== null && !known.has(d.originalName.toLowerCase()));
+		if (!added.length) return;
+		const firstNew = this.drafts.findIndex((d) => d.originalName === null);
+		this.drafts.splice(firstNew < 0 ? this.drafts.length : firstNew, 0, ...added.map(cloneDraft));
+		this.initialDrafts.push(...added.map(cloneDraft));
+		this.initial = snapshot(this.initialDrafts, this.input.icon);
 	}
 
 	/** The base's default entry icon, next to the modal title. */

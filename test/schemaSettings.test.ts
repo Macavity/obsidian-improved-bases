@@ -6,10 +6,9 @@ import type { SchemaRegistry } from "../src/schema/SchemaRegistry";
 import type { WidgetEnv } from "../src/widgets/types";
 
 const notices = vi.hoisted(() => [] as string[]);
-const hidden = vi.hoisted(() => [] as string[]);
 vi.mock("obsidian", async (importOriginal) => ({
   ...(await importOriginal<typeof import("obsidian")>()),
-  Notice: class { constructor(public message: string) { notices.push(message); } hide() { hidden.push(this.message); } },
+  Notice: class { constructor(message: string) { notices.push(message); } },
 }));
 
 const mdFile = (path: string, frontmatter: Record<string, unknown>) => Object.assign(new TFile(), { path, extension: "md", frontmatter });
@@ -237,37 +236,37 @@ describe("buildSchemaSettings", () => {
     const unknown = await build({ members: null });
     expect(unknown.input.memberValues("Status")).toEqual([]);
   });
-  it("queries the members of a base that is no schema base yet", async () => {
-    const queried = [mdFile("a.md", { Status: "Aktiv" }), mdFile("b.md", { status: "Neu" })];
-    const { input, handlers, query } = await build({ members: null, queried });
-    expect(query.watch).toHaveBeenCalledWith("M.base", expect.any(Function));
+  it("opens without waiting for the notes of a base that is no schema base yet, then reads them", async () => {
+    const t = setup({ members: null });
+    let answer!: (files: TFile[], failed: boolean) => void;
+    t.query.watch.mockImplementation((_: string, cb: typeof answer) => ((answer = cb), () => undefined));
+    const { input, handlers } = await buildSchemaSettings({ app: t.app } as unknown as Plugin, t.env, t.reg, "M.base", null);
+    expect(t.query.watch).toHaveBeenCalledWith("M.base", expect.any(Function));
+    expect(input.membersKnown()).toBe(false);
+    expect(input.memberValues("Status")).toEqual([]);
+    answer([mdFile("a.md", { Status: "Aktiv" }), mdFile("b.md", { status: "Neu" })], false);
+    const drafts = await input.members;
+    expect(drafts?.map((d) => d.name)).toEqual(["Status"]);
     expect(input.memberValues("Status")).toEqual(["Aktiv", "Neu"]);
-    expect(input.state.kind === "fields" && input.state.drafts.map((d) => d.name)).toEqual(["Status"]);
     expect(input.membersKnown()).toBe(true);
     expect(await handlers.countAffected("Status")).toBe(2);
   });
+  it("reports a failed read of the notes as null and keeps the members unknown", async () => {
+    const { input } = await build({ members: null });
+    expect(await input.members).toBeNull();
+    expect(input.membersKnown()).toBe(false);
+  });
+  it("needs no read when Membership knows the members", async () => {
+    const { input, query } = await build();
+    expect(input.members).toBeNull();
+    expect(query.watch).not.toHaveBeenCalled();
+  });
   it("migrates the queried members on Save, even once Membership starts with a partial result", async () => {
     const t = await build({ members: null, queried: [mdFile("a.md", { Old: 1 }), mdFile("b.md", { Old: 2 })] });
+    await t.input.members;
     t.membership.targetEntries = () => [];
     await t.handlers.onSave([d({ originalName: "Old", name: "New" })], 0, "");
     expect(t.processFrontMatter).toHaveBeenCalledTimes(2);
-  });
-  it("tells the user while the notes of a large base are read", async () => {
-    vi.useFakeTimers();
-    try {
-      const t = setup({ members: null });
-      let answer!: (files: TFile[], failed: boolean) => void;
-      t.query.watch.mockImplementation((_: string, cb: (files: TFile[], failed: boolean) => void) => ((answer = cb), () => undefined));
-      const built = buildSchemaSettings({ app: t.app } as unknown as Plugin, t.env, t.reg, "M.base", null);
-      await vi.advanceTimersByTimeAsync(60_000);
-      expect(lastNotice()).toBe("Reading the notes of M…");
-      answer([mdFile("a.md", { Status: "x" })], false);
-      const { input } = await built;
-      expect(input.memberValues("Status")).toEqual(["x"]);
-      expect(hidden).toContain("Reading the notes of M…");
-    } finally {
-      vi.useRealTimers();
-    }
   });
   it("collects the other bases", async () => {
     const { input } = await build();
@@ -401,29 +400,6 @@ describe("buildSchemaSettings", () => {
 });
 
 describe("registerSchemaSettings", () => {
-  it("ignores a second open while the notes of a base are still being read", async () => {
-    const base = Object.assign(new TFile(), { path: "M.base", extension: "base" });
-    let command: { checkCallback: (checking: boolean) => boolean } | null = null;
-    const app = {
-      workspace: { getActiveFile: () => base, on: vi.fn(), offref: vi.fn(), iterateAllLeaves: vi.fn() },
-      vault: { getFiles: () => [base], getAbstractFileByPath: () => base, cachedRead: () => Promise.resolve("views:\n  - type: table\n    name: A\n") },
-      metadataCache: { getFileCache: () => null },
-    };
-    const plugin = { app, register: vi.fn(), registerEvent: vi.fn(), addCommand: (cmd: unknown) => { command = cmd as typeof command; return cmd; } } as unknown as Plugin;
-    let answer!: (files: TFile[], failed: boolean) => void;
-    const query = { watch: vi.fn((_: string, cb: typeof answer) => ((answer = cb), () => undefined)) };
-    const env = { app, writer: {}, query, membership: { targetEntries: () => null, baseIcon: () => null }, overlays: {} } as unknown as WidgetEnv;
-    registerSchemaSettings(plugin, env, registry([], {}));
-    command!.checkCallback(false);
-    await new Promise((r) => setTimeout(r, 0));
-    command!.checkCallback(false);
-    await new Promise((r) => setTimeout(r, 0));
-    expect(query.watch).toHaveBeenCalledTimes(1);
-    answer([], false);
-    await new Promise((r) => setTimeout(r, 0));
-    expect(document.querySelectorAll(".improved-bases-schema-modal").length).toBe(1);
-    document.querySelectorAll(".improved-bases-schema-modal").forEach((el) => el.remove());
-  });
   it("closes an open dialog when the plugin unloads, and keeps one dialog per instance", async () => {
     const base = Object.assign(new TFile(), { path: "M.base", extension: "base" });
     let command: { checkCallback: (checking: boolean) => boolean } | null = null;

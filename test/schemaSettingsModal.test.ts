@@ -45,6 +45,7 @@ function open(state: SchemaSettingsInput["state"], { countAffected: count, ...op
 		baseIcon: (path: string) => (path === "Teams.base" ? "👥" : null),
 		overlays: new OverlayRegistry(),
 		membersKnown: () => true,
+		members: null,
 		views: ["A"],
 		defaultViewIndex: 0,
 		expressions: [],
@@ -569,5 +570,46 @@ describe("SchemaSettingsModal", () => {
 		q<HTMLElement>(".improved-bases-save").click();
 		await tick();
 		expect(onSave).toHaveBeenCalledWith([], 0, "");
+	});
+});
+
+describe("SchemaSettingsModal reading the notes", () => {
+	const pending = () => {
+		let resolve!: (drafts: FieldDraft[] | null) => void;
+		return { members: new Promise<FieldDraft[] | null>((r) => (resolve = r)), resolve: (v: FieldDraft[] | null) => resolve(v) };
+	};
+	const loading = (el: HTMLElement) => el.querySelector(".improved-bases-members-loading")?.textContent ?? null;
+
+	it("opens at once with a loading line and adds the notes' fields when they arrive", async () => {
+		const p = pending();
+		const { el } = open({ kind: "fields", drafts: [d({ originalName: "Team", name: "Team" })] }, { members: p.members });
+		expect(names(el)).toEqual(["Team"]);
+		expect(loading(el)).toBe("Reading the notes of Mitarbeiter… Suggestions from notes appear when done.");
+		p.resolve([d({ originalName: "Status", name: "Status" }), d({ originalName: "Team", name: "Team" })]);
+		await tick();
+		expect(loading(el)).toBeNull();
+		expect(names(el)).toEqual(["Team", "Status"]);
+		expect(el.querySelector(".improved-bases-close")).not.toBeNull();
+	});
+
+	it("keeps edits and puts the notes' fields before newly added fields", async () => {
+		const p = pending();
+		const { el } = open({ kind: "fields", drafts: [d({ originalName: "Team", name: "Team" })] }, { members: p.members });
+		(el.querySelector(".improved-bases-add-field") as HTMLButtonElement).click();
+		const inputs = el.querySelectorAll<HTMLInputElement>(".improved-bases-field-name");
+		inputs[1]!.value = "Neu";
+		inputs[1]!.dispatchEvent(new Event("input"));
+		p.resolve([d({ originalName: "Status", name: "Status" })]);
+		await tick();
+		expect(names(el)).toEqual(["Team", "Status", "Neu"]);
+		expect(el.querySelector(".improved-bases-save")).not.toBeNull();
+	});
+
+	it("says so when the notes could not be read", async () => {
+		const p = pending();
+		const { el } = open({ kind: "fields", drafts: [] }, { members: p.members });
+		p.resolve(null);
+		await tick();
+		expect(loading(el)).toBe("Could not read the notes of this base, so there are no suggestions from notes.");
 	});
 });
