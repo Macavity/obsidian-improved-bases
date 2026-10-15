@@ -117,6 +117,10 @@
 	width: 100%;
 	min-width: 0;
 	overflow: hidden;
+	cursor: pointer;
+	/* Keeps an empty field clickable: without pills the element would collapse to zero height. */
+	min-height: var(--input-height);
+	border-radius: var(--radius-s);
 }
 [data-color] {
 	--ib-rgb: var(--mono-rgb-100);
