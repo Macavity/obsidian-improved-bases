@@ -14,9 +14,10 @@
 	display: none;
 }
 
-/* Relation widget */
-/* Fills the cell so the whole field is a click target; chips stay on one line and overflow to the side. */
-.improved-bases-relation {
+/* Relation and select widget */
+/* Fills the cell so the whole field is a click target, even when empty; chips and pills stay on one line and overflow to the side. */
+.improved-bases-relation,
+.improved-bases-select {
 	display: flex;
 	flex-wrap: nowrap;
 	align-items: center;
@@ -108,16 +109,6 @@
 }
 
 /* Select widget: palette → Obsidian color variables (no variable exists for lime, brown, grey, black, white). */
-/* Same single-line layout as the relation: pills stay side by side and overflow to the side, the cell never grows. */
-.improved-bases-select {
-	display: flex;
-	flex-wrap: nowrap;
-	align-items: center;
-	gap: var(--size-2-2);
-	width: 100%;
-	min-width: 0;
-	overflow: hidden;
-}
 [data-color] {
 	--ib-rgb: var(--mono-rgb-100);
 }
