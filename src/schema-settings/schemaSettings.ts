@@ -1,5 +1,6 @@
 import { getFrontMatterInfo, Notice, parseYaml, TFile, type App, type Plugin } from "obsidian";
 import { installSchemaButton } from "../internals/toolbar";
+import { firstResult } from "../query/BaseQuery";
 import type { SchemaRegistry } from "../schema/SchemaRegistry";
 import type { WidgetEnv } from "../widgets/types";
 import { SchemaSettingsModal, type SchemaSettingsHandlers, type SchemaSettingsInput } from "./SchemaSettingsModal";
@@ -15,6 +16,7 @@ type Pairs = { from: string; to: string }[];
 type Counts = { renamed: number; conflict: number; failed: number };
 
 type State = SchemaSettingsInput["state"];
+
 
 /** Modal state for a base: its known fields, or the schema errors. */
 export function schemaState(registry: SchemaRegistry, basePath: string, columns: BaseColumns, memberKeys: string[], detected: (name: string) => string | null, currentView: number): State {
@@ -219,16 +221,11 @@ function otherDefinitions(registry: SchemaRegistry, membership: Pick<Membership,
 	return out;
 }
 
-export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, registry: SchemaRegistry, basePath: string, viewName: string | null): Promise<{ input: SchemaSettingsInput; handlers: SchemaSettingsHandlers }> {
-	const app = plugin.app;
-	const file = app.vault.getAbstractFileByPath(basePath);
-	if (!(file instanceof TFile)) throw new Error("Base not found");
-	const source = await app.vault.cachedRead(file);
-	const members = env.membership.targetEntries(basePath);
+/** Property names of the notes and their values by lower-cased key, so the hints need no rescan per keystroke. */
+function readMembers(app: App, files: readonly TFile[]): { keys: string[]; values: Map<string, unknown[]> } {
 	const names = new Set<string>();
-	// Lower-cased key to the member values, so the mismatch hint needs no rescan per keystroke.
 	const values = new Map<string, unknown[]>();
-	for (const f of members ?? []) {
+	for (const f of files) {
 		for (const [k, v] of Object.entries(app.metadataCache.getFileCache(f)?.frontmatter ?? {})) {
 			if (k === "position") continue;
 			names.add(k);
@@ -236,23 +233,51 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 			values.set(key, [...(values.get(key) ?? []), v]);
 		}
 	}
-	const memberKeys = [...names].sort();
+	return { keys: [...names].sort(), values };
+}
+
+export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, registry: SchemaRegistry, basePath: string, viewName: string | null): Promise<{ input: SchemaSettingsInput; handlers: SchemaSettingsHandlers }> {
+	const app = plugin.app;
+	const file = app.vault.getAbstractFileByPath(basePath);
+	if (!(file instanceof TFile)) throw new Error("Base not found");
+	const source = await app.vault.cachedRead(file);
+	// Membership watches schema bases only. For a base getting its first schema the notes are read once, in the
+	// background, so the dialog opens at once; that read is never cut short, the larger the base the more its suggestions matter.
+	const watched = env.membership.targetEntries(basePath);
+	let queried: TFile[] | null = null;
+	// The read wins over Membership, whose first result right after Save may still be partial.
+	const currentMembers = (): TFile[] | null => queried ?? env.membership.targetEntries(basePath);
+	const read = readMembers(app, watched ?? []);
+	let values = read.values;
 	const basePaths = app.vault.getFiles().filter((f) => f.extension === "base").map((f) => f.path).sort();
 	let state: State;
 	let views: string[] = [];
 	let defaultViewIndex = 0;
 	let expressions: string[] = [];
+	let columns: BaseColumns | null = null;
 	try {
-		const columns = readBaseColumns(source);
+		columns = readBaseColumns(source);
 		views = columns.views;
 		expressions = columns.expressions;
 		const index = viewName === null ? -1 : views.indexOf(viewName);
 		defaultViewIndex = index < 0 ? 0 : index;
-		state = schemaState(registry, basePath, columns, memberKeys, detectedTypeOf(app), defaultViewIndex);
+		state = schemaState(registry, basePath, columns, read.keys, detectedTypeOf(app), defaultViewIndex);
 	} catch (e) {
 		state = { kind: "error", message: message(e), resettable: false };
 	}
-	const originalNames = state.kind === "fields" ? state.drafts.flatMap((d) => (d.originalName === null ? [] : [d.originalName])) : [];
+	const namesOf = (drafts: FieldDraft[]): string[] => drafts.flatMap((d) => (d.originalName === null ? [] : [d.originalName]));
+	let originalNames = state.kind === "fields" ? namesOf(state.drafts) : [];
+	const fieldsWith = (files: TFile[]): FieldDraft[] | null => {
+		queried = files;
+		const r = readMembers(app, files);
+		values = r.values;
+		if (state.kind !== "fields" || columns === null) return [];
+		const next = schemaState(registry, basePath, columns, r.keys, detectedTypeOf(app), defaultViewIndex);
+		if (next.kind !== "fields") return [];
+		originalNames = [...new Set([...originalNames, ...namesOf(next.drafts)])];
+		return next.drafts;
+	};
+	const members = watched !== null ? null : firstResult(env.query, basePath).then((files) => (files === null ? null : fieldsWith(files)));
 	const input: SchemaSettingsInput = {
 		basePath,
 		state,
@@ -260,7 +285,8 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 		baseIcon: (path) => env.membership.baseIcon(path),
 		basePaths,
 		overlays: env.overlays,
-		membersKnown: () => env.membership.targetEntries(basePath) !== null,
+		membersKnown: () => currentMembers() !== null,
+		members,
 		otherDefinitions: (name) => otherDefinitions(registry, env.membership, basePath, name),
 		memberValues: (name) => values.get(name.toLowerCase()) ?? [],
 		types: listPropertyTypes(getMetadataTypeManager(app)),
@@ -278,7 +304,7 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 			new Notice("Schema saved");
 			return;
 		}
-		const current = env.membership.targetEntries(basePath);
+		const current = currentMembers();
 		const conflicts: RenameConflicts = new Map();
 		let renameText = renameSummary(pairs, current && pairs.length ? await migrateRenames(app, current, pairs, conflicts) : null);
 		const removed = current && removedNames.length ? await removeProperties(app, current, removedNames) : [];
@@ -289,7 +315,7 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 	};
 	const onReset = (): Promise<void> => env.writer.reset(basePath);
 	const countAffected = async (name: string): Promise<number> => {
-		const current = env.membership.targetEntries(basePath);
+		const current = currentMembers();
 		return current ? countNotesWithKey(app, current, name) : 0;
 	};
 	return { input, handlers: { onSave, onReset, countAffected } };

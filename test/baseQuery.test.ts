@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import type { Plugin, TFile } from "obsidian";
-import { createBaseQuery } from "../src/query/BaseQuery";
+import { createBaseQuery, firstResult } from "../src/query/BaseQuery";
 import { BaseNotFoundError } from "../src/query/CollectorView";
 
 const plugin = {} as Plugin;
@@ -43,7 +43,7 @@ describe("BaseQuery", () => {
 		m.pushes.get("T.base")!([file("x")]);
 		const late = vi.fn();
 		q.watch("T.base", late);
-		expect(late).toHaveBeenCalledWith([file("x")]);
+		expect(late).toHaveBeenCalledWith([file("x")], false);
 		expect(m.mount).toHaveBeenCalledTimes(1);
 	});
 
@@ -59,13 +59,26 @@ describe("BaseQuery", () => {
 		expect(unmount).toHaveBeenCalledTimes(1);
 	});
 
-	it("emits [] when mounting fails", async () => {
-		const q = createBaseQuery(plugin, { mount: () => Promise.reject(new Error("Base not found")) });
+	it("emits [] marked as failed when mounting fails", async () => {
+		const q = createBaseQuery(plugin, { mount: () => Promise.reject(new Error("x")), cli: null });
 		const cb = vi.fn();
 		vi.spyOn(console, "warn").mockImplementation(() => {});
-		q.watch("Missing.base", cb);
+		q.watch("T.base", cb);
 		await Promise.resolve(); await Promise.resolve();
-		expect(cb).toHaveBeenCalledWith([]);
+		expect(cb).toHaveBeenCalledWith([], true);
+	});
+
+	it("marks a failed CLI scan and still emits a later empty result", async () => {
+		const m = fakeMount();
+		const q = createBaseQuery(plugin, { mount: m.mount, cli: () => Promise.reject(new Error("x")) });
+		const cb = vi.fn();
+		vi.spyOn(console, "warn").mockImplementation(() => {});
+		q.watch("T.base", cb);
+		await Promise.resolve(); await Promise.resolve();
+		expect(cb).toHaveBeenLastCalledWith([], true);
+		m.pushes.get("T.base")!([]);
+		expect(cb).toHaveBeenLastCalledWith([], false);
+		expect(cb).toHaveBeenCalledTimes(2);
 	});
 
 	it("starts the first scan via CLI immediately", async () => {
@@ -76,7 +89,7 @@ describe("BaseQuery", () => {
 		q.watch("T.base", cb);
 		expect(cli).toHaveBeenCalledWith("T.base");
 		await Promise.resolve(); await Promise.resolve();
-		expect(cb).toHaveBeenCalledWith([{ path: "cli" }]);
+		expect(cb).toHaveBeenCalledWith([{ path: "cli" }], false);
 		q.dispose();
 		expect(m.unmounts).toEqual(["T.base"]);
 	});
@@ -94,7 +107,7 @@ describe("BaseQuery", () => {
 		resolveCli([file("cli")]);
 		await vi.advanceTimersByTimeAsync(0);
 		expect(cb).toHaveBeenCalledTimes(1);
-		expect(cb).toHaveBeenCalledWith([{ path: "collector" }]);
+		expect(cb).toHaveBeenCalledWith([{ path: "collector" }], false);
 		expect(cli).toHaveBeenCalledTimes(1);
 	});
 
@@ -105,7 +118,7 @@ describe("BaseQuery", () => {
 		q.watch("T.base", cb);
 		await Promise.resolve();
 		m.pushes.get("T.base")!([file("x")]);
-		expect(cb).toHaveBeenCalledWith([{ path: "x" }]);
+		expect(cb).toHaveBeenCalledWith([{ path: "x" }], false);
 	});
 
 	it("missing base: empty, no CLI mode, drops the in-flight CLI result", async () => {
@@ -120,7 +133,7 @@ describe("BaseQuery", () => {
 		const cb = vi.fn();
 		q.watch("Missing.base", cb);
 		await vi.advanceTimersByTimeAsync(0);
-		expect(cb).toHaveBeenCalledWith([]);
+		expect(cb).toHaveBeenCalledWith([], false);
 		resolveCli([file("ghost")]);
 		handlers.get("changed")!();
 		await vi.advanceTimersByTimeAsync(10000);
@@ -140,7 +153,7 @@ describe("BaseQuery", () => {
 		q.watch("T.base", good);
 		await Promise.resolve();
 		m.pushes.get("T.base")!([file("x")]);
-		expect(good).toHaveBeenCalledWith([file("x")]);
+		expect(good).toHaveBeenCalledWith([file("x")], false);
 		expect(err).toHaveBeenCalled();
 		err.mockRestore();
 	});
@@ -165,5 +178,32 @@ describe("BaseQuery", () => {
 		handlers.get("changed")!();
 		await vi.advanceTimersByTimeAsync(300);
 		expect(cli).toHaveBeenCalledTimes(2);
+	});
+});
+
+describe("firstResult", () => {
+	it("resolves with the first result and ends the watch", async () => {
+		const m = fakeMount();
+		const q = createBaseQuery(plugin, { mount: m.mount, cli: null });
+		const once = firstResult(q, "T.base");
+		await Promise.resolve();
+		m.pushes.get("T.base")!([file("x")]);
+		expect(await once).toEqual([file("x")]);
+		expect(m.unmounts).toEqual(["T.base"]);
+	});
+
+	it("takes a result that is already there", async () => {
+		const m = fakeMount();
+		const q = createBaseQuery(plugin, { mount: m.mount, cli: null });
+		q.watch("T.base", vi.fn());
+		await Promise.resolve();
+		m.pushes.get("T.base")!([file("x")]);
+		expect(await firstResult(q, "T.base")).toEqual([file("x")]);
+	});
+
+	it("gives null when the query fails", async () => {
+		const q = createBaseQuery(plugin, { mount: () => Promise.reject(new Error("x")), cli: null });
+		vi.spyOn(console, "warn").mockImplementation(() => {});
+		expect(await firstResult(q, "T.base")).toBeNull();
 	});
 });

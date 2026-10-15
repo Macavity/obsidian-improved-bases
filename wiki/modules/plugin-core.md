@@ -14,7 +14,7 @@ tags:
 
 ## Responsibilities
 
-- Construct `BaseQuery`, `SchemaRegistry`, `Membership`, `SchemaWriter` and the shared `WidgetEnv` (`{ membership, writer, app, overlays }`) in `onload()`.
+- Construct `BaseQuery`, `SchemaRegistry`, `Membership`, `SchemaWriter` and the shared `WidgetEnv` (`{ membership, query, writer, app, overlays }`) in `onload()`.
 - Decide `widgetsSupported` via `getMetadataTypeManager()` and show one `Notice` per load when unsupported (`notifyUnsupported()` is idempotent via `notified`).
 - `applyWidgetsEnabled()`: install or uninstall the [getTypeInfo patch](../concepts/hull-widget.md) according to `settings.widgetsEnabled && widgetsSupported`. Called on load and from the settings toggle.
 - Register the schema settings entry points (`registerSchemaSettings()`: command, file menu item, toolbar button) and the settings tab; start the registry scan on `workspace.onLayoutReady`.

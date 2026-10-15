@@ -165,7 +165,7 @@ describe("countNotesWithKey / removeProperties", () => {
 
 describe("buildSchemaSettings", () => {
   const baseFile = (path: string) => Object.assign(new TFile(), { path, extension: path.split(".").pop() });
-  function setup(opts: { base?: string; viewName?: string | null; memberKeys?: string[]; error?: boolean; members?: TFile[] | null; icon?: string } = {}) {
+  function setup(opts: { base?: string; viewName?: string | null; memberKeys?: string[]; error?: boolean; members?: TFile[] | null; queried?: TFile[]; icon?: string } = {}) {
     const members = opts.members === undefined ? [mdFile("a.md", { Status: "x", Old: "y" }), mdFile("b.md", { Other: "z" })] : opts.members;
     const all = opts.memberKeys ? [...(members ?? []), mdFile("k.md", Object.fromEntries(opts.memberKeys.map((k) => [k, 1])))] : members;
     const reg = registry([], opts.error ? { "M.base": ["bad"] } : {});
@@ -184,9 +184,11 @@ describe("buildSchemaSettings", () => {
       fileManager: { processFrontMatter },
     } as unknown as App;
     const writer = { update: vi.fn(() => Promise.resolve()), reset: vi.fn(() => Promise.resolve()) };
+    // Without `queried` the query fails, so the members stay unknown.
+    const query = { watch: vi.fn((_: string, cb: (files: TFile[], failed: boolean) => void) => (cb(opts.queried ?? [], !opts.queried), () => undefined)) };
     const membership = { targetEntries: () => all, baseIcon: (p: string) => (p === "M.base" ? opts.icon ?? null : p === "Z.base" ? "🏢" : null) };
-    const env = { app, writer, membership, overlays: {} } as unknown as WidgetEnv;
-    return { app, env, reg, writer, membership, processFrontMatter, viewName: opts.viewName ?? null };
+    const env = { app, writer, membership, query, overlays: {} } as unknown as WidgetEnv;
+    return { app, env, reg, writer, membership, query, processFrontMatter, viewName: opts.viewName ?? null };
   }
   async function build(opts: Parameters<typeof setup>[0] = {}) {
     const t = setup(opts);
@@ -201,7 +203,7 @@ describe("buildSchemaSettings", () => {
     expect(input.defaultViewIndex).toBe(1);
   });
   it("lists the other bases' definitions of a field with the member overlap", async () => {
-    const t = setup();
+    const t = setup({ queried: [] });
     const other = { basePath: "Z.base", fields: new Map([["team", { name: "Team", field: { type: "text" as const } }]]) };
     const reg = { schemas: () => [other], errors: () => new Map() } as unknown as SchemaRegistry;
     const shared = mdFile("a.md", { Status: "x" });
@@ -233,6 +235,38 @@ describe("buildSchemaSettings", () => {
     expect(input.memberValues("Missing")).toEqual([]);
     const unknown = await build({ members: null });
     expect(unknown.input.memberValues("Status")).toEqual([]);
+  });
+  it("opens without waiting for the notes of a base that is no schema base yet, then reads them", async () => {
+    const t = setup({ members: null });
+    let answer!: (files: TFile[], failed: boolean) => void;
+    t.query.watch.mockImplementation((_: string, cb: typeof answer) => ((answer = cb), () => undefined));
+    const { input, handlers } = await buildSchemaSettings({ app: t.app } as unknown as Plugin, t.env, t.reg, "M.base", null);
+    expect(t.query.watch).toHaveBeenCalledWith("M.base", expect.any(Function));
+    expect(input.membersKnown()).toBe(false);
+    expect(input.memberValues("Status")).toEqual([]);
+    answer([mdFile("a.md", { Status: "Aktiv" }), mdFile("b.md", { status: "Neu" })], false);
+    const drafts = await input.members;
+    expect(drafts?.map((d) => d.name)).toEqual(["Status"]);
+    expect(input.memberValues("Status")).toEqual(["Aktiv", "Neu"]);
+    expect(input.membersKnown()).toBe(true);
+    expect(await handlers.countAffected("Status")).toBe(2);
+  });
+  it("reports a failed read of the notes as null and keeps the members unknown", async () => {
+    const { input } = await build({ members: null });
+    expect(await input.members).toBeNull();
+    expect(input.membersKnown()).toBe(false);
+  });
+  it("needs no read when Membership knows the members", async () => {
+    const { input, query } = await build();
+    expect(input.members).toBeNull();
+    expect(query.watch).not.toHaveBeenCalled();
+  });
+  it("migrates the queried members on Save, even once Membership starts with a partial result", async () => {
+    const t = await build({ members: null, queried: [mdFile("a.md", { Old: 1 }), mdFile("b.md", { Old: 2 })] });
+    await t.input.members;
+    t.membership.targetEntries = () => [];
+    await t.handlers.onSave([d({ originalName: "Old", name: "New" })], 0, "");
+    expect(t.processFrontMatter).toHaveBeenCalledTimes(2);
   });
   it("collects the other bases", async () => {
     const { input } = await build();
