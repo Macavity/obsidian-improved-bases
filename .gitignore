@@ -8,9 +8,9 @@
 # npm
 node_modules
 
-# Don't include the compiled main.js file in the repo.
-# They should be uploaded to GitHub releases instead.
-main.js
+# Build output (main.js plus copied manifest.json/styles.css).
+# Uploaded to GitHub releases instead.
+dist/
 
 # Exclude sourcemaps
 *.map

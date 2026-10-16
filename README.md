@@ -129,14 +129,14 @@ pnpm check    # typecheck + lint + unit tests
 Test vault (`test-vault/`, versioned fixtures; requires the [Obsidian CLI](https://obsidian.md/help/cli)):
 
 ```bash
-pnpm vault:link-test  # link the registered test-vault's plugin dir to this checkout (works from worktrees)
+pnpm vault:link-test  # link the registered test-vault's plugin dir to this checkout's dist/ (works from worktrees)
 pnpm vault:open   # one-time: confirm the dialog in Obsidian, enable community plugins
 pnpm dev          # watch build, then `pnpm reload` after changes
 pnpm smoke        # reset vault, build, reload, run CLI checks
 pnpm perf         # 2000 notes + 10 schema bases, prints timings
 ```
 
-To try the plugin in one of your own vaults, run `pnpm build` and then `pnpm vault:link`: it lists the vaults registered in Obsidian and links the plugin into the one you pick (`pnpm vault:link "My Vault"` skips the prompt). Then enable it under Settings → Community plugins.
+To try the plugin in one of your own vaults, run `pnpm build` and then `pnpm vault:link`: it lists the vaults registered in Obsidian and links the build output `dist/` into the one you pick (`pnpm vault:link "My Vault"` skips the prompt). Then enable it under Settings → Community plugins.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 

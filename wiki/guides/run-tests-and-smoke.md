@@ -15,7 +15,7 @@ Prove a change works at both levels the project supports: fast unit tests withou
 ## Steps
 
 1. **Unit level**: `pnpm check` runs typecheck, lint (including the eslint-disable description check) and vitest. For a single file: `pnpm vitest run test/membership.test.ts`. Tests import `obsidian` through the alias to [test/__mocks__/obsidian.ts](../../test/__mocks__/obsidian.ts); extend the mock if you need a new API surface rather than stubbing per test.
-2. **One-time vault setup** (needs the Obsidian CLI): `pnpm vault:link-test` (symlink `test-vault/.obsidian/plugins/improved-bases` → this checkout), `pnpm vault:open`, confirm the vault dialog, disable Restricted mode, enable the plugin.
+2. **One-time vault setup** (needs the Obsidian CLI): `pnpm vault:link-test` (symlink `test-vault/.obsidian/plugins/improved-bases` → this checkout's `dist/`), `pnpm vault:open`, confirm the vault dialog, disable Restricted mode, enable the plugin.
 3. **Iterate**: `pnpm dev` in one terminal, `pnpm reload` after each rebuild.
 4. **Smoke**: `pnpm smoke` = `vault:reset` + `vault:link-test` + `build` + `reload` + [scripts/smoke.mjs](../../scripts/smoke.mjs). Keep the test-vault window visible; a hidden window throttles the collector and causes the 30 s CLI timeout.
 5. **Perf** (optional, for anything touching startup, membership or queries): `pnpm perf` generates 2000 notes and 10 schema bases, prints `ready` and first-render times, fails above 3 s, and resets the vault.

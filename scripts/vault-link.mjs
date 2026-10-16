@@ -1,4 +1,4 @@
-// Links (or with --copy: copies) the plugin into a vault's .obsidian/plugins/improved-bases. Idempotent.
+// Links the build output dist/ (or with --copy: copies its files) to a vault's .obsidian/plugins/improved-bases. Idempotent.
 // Usage:
 //   node scripts/vault-link.mjs --test            -> the registered test-vault, linked to this checkout (pnpm vault:link-test)
 //   node scripts/vault-link.mjs [vault-name]      -> a vault registered in Obsidian; without a name, pick from a list
@@ -11,6 +11,7 @@ import { REPO, VAULT_PATH, listVaults } from "./lib/cli.mjs";
 const args = process.argv.slice(2);
 const flags = new Set(args.filter((a) => a.startsWith("--")));
 const wanted = args.find((a) => !a.startsWith("--"));
+const DIST = join(REPO, "dist");
 
 /** The registered vault called `name`; throws on several hits, null when none. */
 function findByName(vaults, name) {
@@ -49,13 +50,13 @@ async function pickVault() {
 function copyInstall(target) {
 	mkdirSync(target, { recursive: true });
 	for (const f of ["manifest.json", "main.js", "styles.css"]) {
-		if (existsSync(join(REPO, f))) copyFileSync(join(REPO, f), join(target, f));
+		if (existsSync(join(DIST, f))) copyFileSync(join(DIST, f), join(target, f));
 		else console.warn(`skipped ${f} (missing, run pnpm build)`);
 	}
 	console.log(`copied plugin files to ${target}`);
 }
 
-/** True when `target` already links to this checkout. A link elsewhere (another worktree) is replaced; anything else throws. */
+/** True when `target` already links to this checkout's dist/. A link elsewhere (another worktree) is replaced; anything else throws. */
 function linkExists(target) {
 	let st = null;
 	try {
@@ -67,7 +68,7 @@ function linkExists(target) {
 	try {
 		real = realpathSync(target);
 	} catch {}
-	if (real === realpathSync(REPO)) return true;
+	if (real === realpathSync(DIST)) return true;
 	console.log(`re-linking ${target} (was ${readlinkSync(target)})`);
 	unlinkSync(target);
 	return false;
@@ -78,8 +79,8 @@ function linkInstall(pluginsDir, target, label) {
 		console.log(`link ok: ${target} -> ${readlinkSync(target)}`);
 		return;
 	}
-	if (process.platform === "win32") symlinkSync(resolve(REPO), target, "junction");
-	else symlinkSync(relative(pluginsDir, resolve(REPO)), target);
+	if (process.platform === "win32") symlinkSync(resolve(DIST), target, "junction");
+	else symlinkSync(relative(pluginsDir, resolve(DIST)), target);
 	console.log(`linked ${target} -> ${readlinkSync(target)}`);
 	if (label) console.log(`Enable "Improved Bases" under Settings → Community plugins in "${label}" (or: obsidian vault="${label}" plugin:enable id=improved-bases).`);
 }
@@ -88,6 +89,7 @@ function install(vaultPath, label) {
 	const pluginsDir = join(vaultPath, ".obsidian", "plugins");
 	const target = join(pluginsDir, "improved-bases");
 	mkdirSync(pluginsDir, { recursive: true });
+	mkdirSync(DIST, { recursive: true });
 	if (flags.has("--copy")) copyInstall(target);
 	else linkInstall(pluginsDir, target, label);
 }

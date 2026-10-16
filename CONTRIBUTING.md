@@ -23,16 +23,16 @@ pnpm lint     # check code style
 pnpm lint:fix # auto-fix where possible
 ```
 
-Build artifacts (`main.js`, `manifest.json`, `styles.css`) are produced at the repo root.
+Build artifacts (`main.js`, `manifest.json`, `styles.css`) are produced in `dist/`; `manifest.json` and `styles.css` are copied there from the repo root (also on change during `pnpm dev`).
 
 ## Testing
 
 - Unit: `pnpm test` (vitest + happy-dom, `obsidian` mocked in `test/__mocks__/obsidian.ts`). `pnpm check` = typecheck + lint + test + quality.
-- Integration: `pnpm smoke` runs against the versioned vault `test-vault/`, never against a working vault. All CLI calls go through `scripts/lib/cli.mjs`, which always passes `vault="test-vault"` and aborts unless that vault is registered at the main checkout's `test-vault` (override with `IMPROVED_BASES_TEST_VAULT`). Git worktrees share that vault: `vault:reset` mirrors the worktree's fixtures into it and `vault:link-test` points the plugin symlink at the worktree, so Obsidian always loads the checkout that last ran `smoke`, `perf` or `vault:link-test`.
+- Integration: `pnpm smoke` runs against the versioned vault `test-vault/`, never against a working vault. All CLI calls go through `scripts/lib/cli.mjs`, which always passes `vault="test-vault"` and aborts unless that vault is registered at the main checkout's `test-vault` (override with `IMPROVED_BASES_TEST_VAULT`). Git worktrees share that vault: `vault:reset` mirrors the worktree's fixtures into it and `vault:link-test` points the plugin symlink at the worktree's `dist/`, so Obsidian always loads the checkout that last ran `smoke`, `perf` or `vault:link-test`.
 
 Test vault setup (once):
 
-1. `pnpm vault:link-test` creates the symlink `test-vault/.obsidian/plugins/improved-bases` -> repo root (a symlink, not a Finder alias; `--copy` copies the three files instead).
+1. `pnpm vault:link-test` creates the symlink `test-vault/.obsidian/plugins/improved-bases` -> `dist/` (a symlink, not a Finder alias; `--copy` copies the three files instead).
 2. `pnpm vault:open`, confirm "Open folder as vault" in Obsidian, turn off Restricted mode and make sure `improved-bases` is enabled.
 3. `pnpm dev` in one terminal; `pnpm reload` after each rebuild.
 
@@ -67,7 +67,7 @@ Themes: `pnpm themes:smoke` checks the select cells and the schema dialog in the
 
 ## Releases
 
-Maintainers cut releases by bumping the version in `manifest.json`, `package.json`, and `versions.json`, committing, then tagging and pushing the tag. The release workflow builds and attaches `main.js`, `manifest.json`, and `styles.css` with build provenance attestation.
+Maintainers cut releases by bumping the version in `manifest.json`, `package.json`, and `versions.json`, committing, then tagging and pushing the tag. The release workflow builds and attaches `main.js`, `manifest.json`, and `styles.css` from `dist/` with build provenance attestation.
 
 ## License
 

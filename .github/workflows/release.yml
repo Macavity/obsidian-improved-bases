@@ -51,14 +51,14 @@ jobs:
         id: version
         run: echo "version=$(jq -r .version manifest.json)" >> "$GITHUB_OUTPUT"
 
-      # Collect the release assets that actually exist. main.js and manifest.json
+      # Collect the release assets from dist/ that actually exist. main.js and manifest.json
       # are always present; styles.css is optional, so a plugin that needs no
       # stylesheet doesn't have to ship an empty one just to satisfy the release.
       - name: Collect release assets
         id: assets
         run: |
-          FILES="main.js manifest.json"
-          [ -f styles.css ] && FILES="$FILES styles.css"
+          FILES="dist/main.js dist/manifest.json"
+          [ -f dist/styles.css ] && FILES="$FILES dist/styles.css"
           echo "list=$FILES" >> "$GITHUB_OUTPUT"
           {
             echo "paths<<EOF"

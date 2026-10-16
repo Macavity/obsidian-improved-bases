@@ -2,7 +2,7 @@
 	"name": "improved-bases",
 	"version": "0.0.1",
 	"description": "Relations and colored select fields for Obsidian Bases.",
-	"main": "main.js",
+	"main": "dist/main.js",
 	"type": "module",
 	"scripts": {
 		"preinstall": "node scripts/npm-proxy.mjs",
