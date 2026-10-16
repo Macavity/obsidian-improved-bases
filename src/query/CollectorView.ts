@@ -1,6 +1,6 @@
 import { BasesView, Component, MarkdownRenderer, Plugin, QueryController, TFile, addIcon, parseYaml, removeIcon, stringifyYaml } from "obsidian";
 import type { MountCollector } from "./BaseQuery";
-import type { QueryTarget } from "./target";
+import { viewName, type QueryTarget } from "./target";
 
 export class BaseNotFoundError extends Error {
 	constructor(basePath: string) {
@@ -32,8 +32,6 @@ export function baseFence(yaml: string): string {
 }
 
 /** YAML parses `name: 2024` / `name: true` as non-strings; match them by their string form. */
-const viewName = (name: unknown): unknown => (typeof name === "number" || typeof name === "boolean" ? String(name) : name);
-
 /**
  * The base YAML with its views replaced by the collector view. With a target view, that view's
  * config (filters, sort, limit) is kept and only retyped; the first view of that name wins.

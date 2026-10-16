@@ -183,7 +183,7 @@ describe("SchemaSettingsModal", () => {
 	});
 
 	it("keeps a stored view that no longer exists as an option", async () => {
-		const { el, q } = open({ kind: "fields", drafts: [d({ originalName: "Lead", name: "Lead", type: "relation", base: "Teams.base", view: "Alt", originalView: "Alt" })] }, { viewNames: () => Promise.resolve(["FKs"]) });
+		const { el, q } = open({ kind: "fields", drafts: [d({ originalName: "Lead", name: "Lead", type: "relation", base: "Teams.base", view: "Alt" })] }, { viewNames: () => Promise.resolve(["FKs"]) });
 		q<HTMLButtonElement>(".improved-bases-field-disclosure").click();
 		await tick();
 		expect(viewOptions(el)).toEqual(["All entries", "Alt", "FKs"]);

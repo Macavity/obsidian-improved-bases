@@ -25,11 +25,10 @@ export const liveOptions = (options: readonly OptionDraft[]): OptionDraft[] => o
 /** A new option created in the dialog. */
 export const newOption = (value: string, color: Color): OptionDraft => ({ value, color, original: null, removal: null });
 
-/** Editable copy of a field; `originalName` is null for new fields, `originalBase` the saved relation target, `originalView` its saved view. */
+/** Editable copy of a field; `originalName` is null for new fields, `originalBase` the saved relation target. */
 export interface FieldDraft {
 	originalName: string | null;
 	originalBase: string | null;
-	originalView?: string;
 	name: string;
 	type: DraftType;
 	/** Obsidian's type id for this property ("text", "multitext", "tags", ...) or null. */
@@ -205,7 +204,7 @@ function toDraft(name: string, field: FieldSchema | undefined, label: string | n
 	if (!field) return draft;
 	if (isRelation(field)) {
 		Object.assign(draft, { type: "relation", base: field.base, originalBase: field.base, multiple: field.multiple });
-		if (field.view !== undefined) Object.assign(draft, { view: field.view, originalView: field.view });
+		if (field.view !== undefined) Object.assign(draft, { view: field.view });
 	} else if (isSelect(field)) {
 		Object.assign(draft, { type: "select", multiple: field.multiple, options: field.options.map((o) => ({ value: o.value, color: o.color, original: o.value, removal: null })) });
 	} else {

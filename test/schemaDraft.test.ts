@@ -23,7 +23,7 @@ describe("schemaDraft", () => {
 	it("round-trips a relation view", () => {
 		const rel = new Map([["lead", { name: "Lead", field: { type: "relation" as const, base: "M.base", multiple: false, view: "FKs" } }]]);
 		const [draft] = knownFieldDrafts({ columns: none, schemaFields: rel, memberKeys: [], detected: () => null, currentView: 0 });
-		expect(draft).toMatchObject({ view: "FKs", originalView: "FKs" });
+		expect(draft).toMatchObject({ view: "FKs" });
 		expect(leadOf(updateSchemaSource("improved-bases:\n  fields: {}\n", mutation([draft!], [])))).toEqual({ type: "relation", base: "M.base", multiple: false, view: "FKs" });
 		const cleared = { ...draft!, view: undefined };
 		const out = updateSchemaSource("improved-bases:\n  fields:\n    Lead: { type: relation, base: M.base, multiple: false, view: FKs }\n", mutation([cleared], ["Lead"]));

@@ -1,5 +1,6 @@
 import { isColor, SCHEMA_KEY } from "./types";
 import { isUnsafeKey } from "./keys";
+import { viewName } from "../query/target";
 import type { BaseSchema, FieldSchema, SelectOption } from "./types";
 
 export function isRecord(v: unknown): v is Record<string, unknown> {
@@ -18,11 +19,12 @@ function parseRelation(name: string, raw: Record<string, unknown>, multiple: boo
 		return null;
 	}
 	if (raw.view === undefined) return { type: "relation", base: raw.base, multiple };
-	if (typeof raw.view !== "string" || raw.view.trim() === "") {
+	const view = viewName(raw.view);
+	if (view === null || view.trim() === "") {
 		errors.push(`field "${name}": view must be a non-empty string`);
 		return null;
 	}
-	return { type: "relation", base: raw.base, multiple, view: raw.view };
+	return { type: "relation", base: raw.base, multiple, view };
 }
 
 function parseOptions(name: string, raw: unknown, errors: string[]): SelectOption[] | null {
