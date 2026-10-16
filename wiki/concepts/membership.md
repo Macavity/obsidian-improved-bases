@@ -10,13 +10,14 @@ tags:
 
 ## Definition
 
-**Membership** (`Membership` in [Membership.ts](../../src/schema/Membership.ts)) is the join between the [schema registry](../modules/schema.md) and the [query](../modules/query.md) layer. A file is a *member* of a schema base when it appears in that base's query result. `resolve(filePath, propName)` returns the [field schema](./field-schema.md) that applies, or `null`. It also tracks the result sets of relation target bases (`targetEntries(basePath)`) for the relation picker and exposes a target base's default entry icon (`baseIcon(basePath)`, from the registry's `BaseSchema.icon`, null without one) for the relation chips.
+**Membership** (`Membership` in [Membership.ts](../../src/schema/Membership.ts)) is the join between the [schema registry](../modules/schema.md) and the [query](../modules/query.md) layer. A file is a *member* of a schema base when it appears in that base's query result. `resolve(filePath, propName)` returns the [field schema](./field-schema.md) that applies, or `null`. It also tracks the result sets of relation target bases (`targetEntries(key)`, key = `targetKey()` of the relation's `QueryTarget`, i.e. the base path or `base#view`) for the relation picker and exposes a target base's default entry icon (`baseIcon(basePath)`, from the registry's `BaseSchema.icon`, null without one) for the relation chips.
 
 Three rules:
 
 - **Latch**: `ready` becomes `true` once the registry is loaded, every schema base has a result, `metadataCache` has resolved, and 300 ms (`QUIET_MS`) passed without a new push. Before that `resolve()` returns `null` and everything renders native. The latch never resets.
 - **Conflict**: if a file is in several schema bases defining the same field, `resolveWithBase(file, field, preferredBase)` lets the base of the view being rendered win when it is a candidate, otherwise the first base by path (registry order). The result (`Resolution`) carries the competing definitions in `others`; the [getTypeInfo patch](./hull-widget.md) turns them into an info marker in the field (`renderConflictMarker` in [conflictMarker.ts](../../src/widgets/conflictMarker.ts)). A console warning is logged once per `(file, field)`.
-- **Events**: `changed(fieldNames[])` whenever the applicable fields may have changed (after latch, or schema diff); `targets-changed(basePath)` when a relation target's result set changes.
+- **Keys**: `wantedTargets()` watches every schema base (by path) plus every relation target with its view, each under its `targetKey`; results and member sets are stored per key. Rule: when a view target's query fails (`ViewNotFoundError`, `failed`), its result is dropped, so `targetEntries(key)` returns `null` (unknown) rather than `[]`.
+- **Events**: `changed(fieldNames[])` whenever the applicable fields may have changed (after latch, or schema diff); `targets-changed(key)` when a relation target's result set changes.
 
 ## Why it matters
 
