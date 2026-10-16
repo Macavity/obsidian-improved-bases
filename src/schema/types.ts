@@ -1,7 +1,8 @@
 export const COLORS = ["red", "orange", "yellow", "green", "lime", "cyan", "blue", "violet", "pink", "brown", "grey", "black", "white"] as const;
 export type Color = typeof COLORS[number];
 export const isColor = (v: unknown): v is Color => typeof v === "string" && (COLORS as readonly string[]).includes(v);
-export interface RelationField { type: "relation"; base: string; multiple: boolean }
+/** `view` names the target base's view that decides which entries and columns the picker offers; absent = default view. */
+export interface RelationField { type: "relation"; base: string; multiple: boolean; view?: string }
 export interface SelectOption { value: string; color: Color }
 export interface SelectField { type: "select"; multiple: boolean; options: SelectOption[] }
 /** Obsidian's property type id (`text`, `multitext`, …, or one registered by a plugin); never `relation` or `select`. */
