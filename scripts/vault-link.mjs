@@ -1,9 +1,9 @@
-// Links the build output dist/ (or with --copy: copies its files) to a vault's .obsidian/plugins/improved-bases. Idempotent.
+// Installs the build output dist/ into a vault's .obsidian/plugins/improved-bases. Idempotent.
 // Usage:
-//   node scripts/vault-link.mjs --test            -> the registered test-vault, linked to this checkout (pnpm vault:link-test)
-//   node scripts/vault-link.mjs [vault-name]      -> a vault registered in Obsidian; without a name, pick from a list
-//   --copy copies the three plugin files instead of linking
-import { copyFileSync, existsSync, lstatSync, mkdirSync, readlinkSync, realpathSync, symlinkSync, unlinkSync } from "node:fs";
+//   node scripts/vault-link.mjs --test            -> the registered test-vault, symlinked to this checkout (pnpm vault:link-test)
+//   node scripts/vault-link.mjs [vault-name]      -> a vault registered in Obsidian, gets a copy of dist/ (Obsidian Sync skips symlinks);
+//                                                    without a name, pick from a list
+import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readlinkSync, realpathSync, symlinkSync, unlinkSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { REPO, VAULT_PATH, listVaults } from "./lib/cli.mjs";
@@ -47,13 +47,17 @@ async function pickVault() {
 	return askVault(vaults);
 }
 
-function copyInstall(target) {
-	mkdirSync(target, { recursive: true });
-	for (const f of ["manifest.json", "main.js", "styles.css"]) {
-		if (existsSync(join(DIST, f))) copyFileSync(join(DIST, f), join(target, f));
-		else console.warn(`skipped ${f} (missing, run pnpm build)`);
+/** Copies dist/ into `target`, replacing an old symlink so the copy never lands in dist/ itself. Keeps data.json. */
+function copyInstall(target, label) {
+	if (!existsSync(join(DIST, "main.js"))) throw new Error("dist/main.js missing, run pnpm build first.");
+	if (lstatSync(target, { throwIfNoEntry: false })?.isSymbolicLink()) {
+		console.log(`replacing symlink ${target} (was ${readlinkSync(target)})`);
+		unlinkSync(target);
 	}
-	console.log(`copied plugin files to ${target}`);
+	mkdirSync(target, { recursive: true });
+	for (const f of readdirSync(DIST)) cpSync(join(DIST, f), join(target, f), { recursive: true });
+	console.log(`copied dist/ to ${target}`);
+	console.log(`Enable "Improved Bases" under Settings → Community plugins in "${label}" (or: obsidian vault="${label}" plugin:enable id=improved-bases).`);
 }
 
 /** True when `target` already links to this checkout's dist/. A link elsewhere (another worktree) is replaced; anything else throws. */
@@ -74,7 +78,8 @@ function linkExists(target) {
 	return false;
 }
 
-function linkInstall(pluginsDir, target, label) {
+function linkInstall(pluginsDir, target) {
+	mkdirSync(DIST, { recursive: true });
 	if (linkExists(target)) {
 		console.log(`link ok: ${target} -> ${readlinkSync(target)}`);
 		return;
@@ -82,16 +87,14 @@ function linkInstall(pluginsDir, target, label) {
 	if (process.platform === "win32") symlinkSync(resolve(DIST), target, "junction");
 	else symlinkSync(relative(pluginsDir, resolve(DIST)), target);
 	console.log(`linked ${target} -> ${readlinkSync(target)}`);
-	if (label) console.log(`Enable "Improved Bases" under Settings → Community plugins in "${label}" (or: obsidian vault="${label}" plugin:enable id=improved-bases).`);
 }
 
 function install(vaultPath, label) {
 	const pluginsDir = join(vaultPath, ".obsidian", "plugins");
 	const target = join(pluginsDir, "improved-bases");
 	mkdirSync(pluginsDir, { recursive: true });
-	mkdirSync(DIST, { recursive: true });
-	if (flags.has("--copy")) copyInstall(target);
-	else linkInstall(pluginsDir, target, label);
+	if (label) copyInstall(target, label);
+	else linkInstall(pluginsDir, target);
 }
 
 try {

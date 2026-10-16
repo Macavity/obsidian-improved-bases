@@ -34,7 +34,7 @@ Everything outside `src/` that builds, checks or exercises the plugin. The comma
 | `pnpm lint`, `pnpm lint:fix` | ESLint + eslint-disable check |
 | `pnpm quality`, `pnpm quality:audit` | fallow: whole repo; changed files vs `main` |
 | `pnpm test`, `pnpm check` | vitest; typecheck + lint + test + quality |
-| `pnpm vault:link`, `vault:open`, `vault:reset`, `vault:theme <label|default>`, `reload` | test-vault lifecycle; `vault:theme` downloads a theme from `scripts/themes.json` if needed and activates it |
+| `pnpm vault:link`, `vault:open`, `vault:reset`, `vault:theme <label|default>`, `reload` | test-vault lifecycle; `vault:link` copies `dist/` into a registered vault (replacing an old symlink; Obsidian Sync skips symlinks), `vault:theme` downloads a theme from `scripts/themes.json` if needed and activates it |
 | `pnpm smoke`, `pnpm perf`, `pnpm themes:smoke [label …]` | integration checks against the live app; themes: layout asserts and screenshots per theme and mode |
 
 ## Key files

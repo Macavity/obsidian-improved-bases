@@ -136,7 +136,7 @@ pnpm smoke        # reset vault, build, reload, run CLI checks
 pnpm perf         # 2000 notes + 10 schema bases, prints timings
 ```
 
-To try the plugin in one of your own vaults, run `pnpm build` and then `pnpm vault:link`: it lists the vaults registered in Obsidian and links the build output `dist/` into the one you pick (`pnpm vault:link "My Vault"` skips the prompt). Then enable it under Settings → Community plugins.
+To try the plugin in one of your own vaults, run `pnpm build` and then `pnpm vault:link`: it lists the vaults registered in Obsidian and copies the build output `dist/` into the one you pick (`pnpm vault:link "My Vault"` skips the prompt). It copies rather than symlinks so Obsidian Sync picks the plugin up; rerun it after each build. Then enable it under Settings → Community plugins.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
