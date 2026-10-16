@@ -11,10 +11,10 @@ const QUIET_MS = 300;
 
 const relationTarget = (f: RelationField): QueryTarget => (f.view === undefined ? { base: f.base } : { base: f.base, view: f.view });
 
-/** Field names (lowercase) of relations whose target has `key`; their widgets show its default icon. */
-function relationsTargeting(schemas: BaseSchema[], key: string): string[] {
+/** Field names (lowercase) of relations pointing at the base `basePath` (any view); their widgets show its default icon. */
+function relationsTargeting(schemas: BaseSchema[], basePath: string): string[] {
 	const out: string[] = [];
-	for (const s of schemas) for (const [k, f] of s.fields) if (isRelation(f.field) && targetKey(relationTarget(f.field)) === key) out.push(k);
+	for (const s of schemas) for (const [k, f] of s.fields) if (isRelation(f.field) && f.field.base === basePath) out.push(k);
 	return out;
 }
 

@@ -197,6 +197,31 @@ describe("Membership", () => {
 		expect(cb).toHaveBeenCalledWith(["team"]);
 		expect(m.baseIcon("Teams.base")).toBe("👥");
 	});
+	it("marks view-bound relation fields as changed when the target base changes its icon", () => {
+		const schema = (path: string, raw: Record<string, unknown>) => parseSchema(path, { "improved-bases": raw }).schema as BaseSchema;
+		const teams = (icon?: string) => schema("Teams.base", { ...(icon ? { icon } : {}), fields: {} });
+		const people = schema("A-People.base", { fields: { Lead: { type: "relation", base: "Teams.base", view: "Leads" } } });
+		const { m, push, setSchemas } = setup([teams(), people]);
+		push("A-People.base", []);
+		push("Teams.base", []);
+		push("Teams.base#Leads", []);
+		settle();
+		const cb = vi.fn();
+		m.on("changed", cb);
+		setSchemas([teams("👥"), people]);
+		expect(cb).toHaveBeenCalledWith(["lead"]);
+	});
+	it("stops watching the old view when a field's view changes", () => {
+		const rel = (view: string) => s0("T.base", { Lead: { type: "relation", base: "M.base", view } });
+		const { m, push, setSchemas, unwatched } = setup([rel("A")]);
+		push("T.base", []);
+		push("M.base#A", ["a"]);
+		settle();
+		expect(m.targetEntries("M.base#A")).toEqual([file("a")]);
+		setSchemas([rel("B")]);
+		expect(unwatched).toContain("M.base#A");
+		expect(m.targetEntries("M.base#A")).toBeNull();
+	});
 	it("reports the default icon of a base", () => {
 		const schema = (path: string, raw: Record<string, unknown>) => parseSchema(path, { "improved-bases": raw }).schema as BaseSchema;
 		const { m } = setup([schema("Teams.base", { icon: "👥", fields: {} }), schema("A-People.base", { fields: { Team: { type: "relation", base: "Teams.base" } } })]);

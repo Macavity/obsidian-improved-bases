@@ -31,6 +31,9 @@ export function baseFence(yaml: string): string {
 	return `${fence}base\n${yaml}${yaml.endsWith("\n") ? "" : "\n"}${fence}\n`;
 }
 
+/** YAML parses `name: 2024` / `name: true` as non-strings; match them by their string form. */
+const viewName = (name: unknown): unknown => (typeof name === "number" || typeof name === "boolean" ? String(name) : name);
+
 /**
  * The base YAML with its views replaced by the collector view. With a target view, that view's
  * config (filters, sort, limit) is kept and only retyped; the first view of that name wins.
@@ -39,7 +42,7 @@ export function collectorSource(parsed: Record<string, unknown>, target: QueryTa
 	const collector = { type: COLLECTOR_VIEW, name: "collector", collectorId };
 	if (target.view === undefined) return { ...parsed, views: [collector] };
 	const views: unknown[] = Array.isArray(parsed.views) ? parsed.views : [];
-	const view = views.find((v): v is Record<string, unknown> => typeof v === "object" && v !== null && (v as Record<string, unknown>).name === target.view);
+	const view = views.find((v): v is Record<string, unknown> => typeof v === "object" && v !== null && viewName((v as Record<string, unknown>).name) === target.view);
 	if (!view) throw new ViewNotFoundError(target.base, target.view);
 	return { ...parsed, views: [{ ...view, ...collector }] };
 }

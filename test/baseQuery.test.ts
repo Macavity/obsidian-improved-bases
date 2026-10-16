@@ -221,6 +221,34 @@ describe("BaseQuery", () => {
 		expect(fks).toHaveBeenLastCalledWith([], false);
 	});
 
+	it("resets entries of the old path on rename and mounts those waiting on the new path", async () => {
+		const ev = pluginWithEvents();
+		const pushes = new Map<string, (f: TFile[]) => void>();
+		let nExists = false;
+		const mount = vi.fn((t: QueryTarget, push: (f: TFile[]) => void) => {
+			if (t.base === "N.base" && !nExists) return Promise.reject(new BaseNotFoundError("N.base"));
+			pushes.set(targetKey(t), push);
+			return Promise.resolve(() => {});
+		});
+		vi.spyOn(console, "warn").mockImplementation(() => {});
+		const q = createBaseQuery(ev.plugin, { mount, cli: null });
+		const all = vi.fn(), fks = vi.fn(), waiting = vi.fn();
+		q.watch({ base: "M.base" }, all);
+		q.watch({ base: "M.base", view: "FKs" }, fks);
+		q.watch({ base: "N.base" }, waiting);
+		await Promise.resolve();
+		await Promise.resolve();
+		pushes.get("M.base")!([file("a")]);
+		pushes.get("M.base#FKs")!([file("a")]);
+		nExists = true;
+		ev.trigger("rename", { path: "N.base" }, "M.base");
+		await Promise.resolve();
+		expect(all).toHaveBeenLastCalledWith([], false);
+		expect(fks).toHaveBeenLastCalledWith([], false);
+		pushes.get("N.base")!([file("n")]);
+		expect(waiting).toHaveBeenLastCalledWith([file("n")], false);
+	});
+
 	it("reports a missing view as failed and recovers on modify", async () => {
 		vi.useFakeTimers();
 		const ev = pluginWithEvents();

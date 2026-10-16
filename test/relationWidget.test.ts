@@ -138,6 +138,19 @@ describe("RelationWidget", () => {
 		const items = vi.mocked(EntryPicker).mock.calls[0]![1];
 		expect(items.map((i) => i.file?.path)).toEqual(["Teams/A.md"]);
 	});
+	it("opens one picker for repeated triggers while the view check is pending", async () => {
+		let release!: (v: string[]) => void;
+		vi.mocked(baseViewNames).mockReturnValue(new Promise((r) => (release = r)));
+		const { el } = setup([], { view: "FKs" });
+		const root = el.querySelector<HTMLElement>(".improved-bases-relation")!;
+		root.click();
+		root.click();
+		root.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+		release(["FKs"]);
+		await vi.waitFor(() => expect(EntryPicker).toHaveBeenCalledTimes(1));
+		await Promise.resolve();
+		expect(EntryPicker).toHaveBeenCalledTimes(1);
+	});
 	it("shows a notice and no picker for a missing view", async () => {
 		vi.mocked(baseViewNames).mockResolvedValue(["Alle"]);
 		const { el } = setup([], { view: "FKs" });

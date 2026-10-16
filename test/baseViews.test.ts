@@ -19,6 +19,15 @@ describe("baseViewNames", () => {
 		expect(await baseViewNames(appWith(null), "M.base")).toBeNull();
 		expect(await baseViewNames(appWith("- a\n- b\n"), "M.base")).toBeNull();
 	});
+	it("lists number and boolean names as strings", async () => {
+		const yaml = "views:\n  - name: 2024\n  - name: true\n  - name: [a]\n  - name: \"x\"\n";
+		expect(await baseViewNames(appWith(yaml), "M.base")).toEqual(["2024", "true", "x"]);
+	});
+	it("resolves null when reading the file rejects", async () => {
+		const app = appWith("views: []\n");
+		(app.vault as unknown as { cachedRead: () => Promise<string> }).cachedRead = () => Promise.reject(new Error("gone"));
+		expect(await baseViewNames(app, "M.base")).toBeNull();
+	});
 	it("returns [] without views", async () => {
 		expect(await baseViewNames(appWith("filters: {}\n"), "M.base")).toEqual([]);
 	});

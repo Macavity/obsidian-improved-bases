@@ -17,6 +17,10 @@ describe("collectorSource", () => {
 		expect(src.filters).toBe("g");
 	});
 
+	it("matches number and boolean view names by their string form", () => {
+		const src = collectorSource({ views: [{ type: "table", name: true }, { type: "table", name: 2024, limit: 7 }] }, { base: "M.base", view: "2024" }, "c1");
+		expect(src.views).toEqual([{ type: "improved-bases-collector", name: "collector", collectorId: "c1", limit: 7 }]);
+	});
 	it("takes the first view of a duplicated name", () => {
 		const src = collectorSource({ views: [{ type: "table", name: "A", limit: 1 }, { type: "table", name: "A", limit: 2 }] }, { base: "M.base", view: "A" }, "c1");
 		expect(src.views).toEqual([{ type: "improved-bases-collector", name: "collector", collectorId: "c1", limit: 1 }]);

@@ -1,6 +1,6 @@
 import { parseYaml, TFile, type App } from "obsidian";
 
-/** `views[].name` of a base file in file order (non-string names skipped); null if the file is missing or not a YAML mapping. */
+/** `views[].name` of a base file in file order (number/boolean names as strings, other types skipped); null if the file is missing, unreadable or not a YAML mapping. */
 export async function baseViewNames(app: App, basePath: string): Promise<string[] | null> {
 	const file = app.vault.getAbstractFileByPath(basePath);
 	if (!(file instanceof TFile)) return null;
@@ -15,6 +15,6 @@ export async function baseViewNames(app: App, basePath: string): Promise<string[
 	if (!Array.isArray(views)) return [];
 	return views.flatMap((v: unknown) => {
 		const name = typeof v === "object" && v !== null ? (v as { name?: unknown }).name : undefined;
-		return typeof name === "string" ? [name] : [];
+		return typeof name === "string" ? [name] : typeof name === "number" || typeof name === "boolean" ? [String(name)] : [];
 	});
 }

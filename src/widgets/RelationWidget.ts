@@ -75,14 +75,21 @@ export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, fiel
 		commit(wasActive ? [] : [item.raw]);
 	};
 
+	let opening = false;
 	const openPicker = async (): Promise<void> => {
+		if (opening) return;
 		if (!(app.vault.getAbstractFileByPath(field.base) instanceof TFile)) {
 			new Notice(`Target base not found: ${field.base}`);
 			return;
 		}
-		if (field.view !== undefined && !(await baseViewNames(app, field.base))?.includes(field.view)) {
-			new Notice(`View "${field.view}" not found in ${field.base}`);
-			return;
+		if (field.view !== undefined) {
+			opening = true;
+			const found = (await baseViewNames(app, field.base))?.includes(field.view);
+			opening = false;
+			if (!found) {
+				new Notice(`View "${field.view}" not found in ${field.base}`);
+				return;
+			}
 		}
 		const items = buildItems();
 		new EntryPicker(app, items, (i) => entryIcon(app, i.file, membership.baseIcon(field.base)), (i) => toggle(items, i), env.overlays).open();
