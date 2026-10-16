@@ -31,6 +31,8 @@ export interface SchemaSettingsInput {
 	defaultViewIndex: number;
 	/** Filter and formula expressions, to hint at references to a renamed field. */
 	expressions: string[];
+	/** View names of a base (file order) for the relation's view select; null when the base is missing or unreadable. */
+	viewNames: (basePath: string) => Promise<string[] | null>;
 	/** Other schema bases' definitions of a field name (case-insensitive), for the conflict hint. */
 	otherDefinitions: (name: string) => OtherDefinition[];
 	/** Values of a property across the member notes (case-insensitive key), for the mismatch hint; empty while members are unknown. */
@@ -88,6 +90,12 @@ function typeIcon(draft: FieldDraft, types: readonly PropertyType[]): string {
 	if (draft.type === "relation") return "lucide-link";
 	if (draft.type === "select") return "lucide-circle-dot";
 	return nativeTypeOf(draft, types)?.icon ?? "lucide-text";
+}
+
+/** Details text of a relation: the target base, with its view when one is set. */
+function relationTarget(draft: FieldDraft): string {
+	if (!draft.base) return "No base chosen";
+	return draft.view ? `${draft.base} › ${draft.view}` : draft.base;
 }
 
 /** Only plugin types have details to expand. */
@@ -511,7 +519,7 @@ export class SchemaSettingsModal extends Modal {
 			el.createSpan({ text: plural(options.length, "option") });
 		} else if (draft.type === "relation") {
 			if (draft.base) this.renderBaseIcon(el.createSpan({ cls: "improved-bases-details-icon" }), draft.base);
-			el.createSpan({ cls: "improved-bases-details-target", text: draft.base ?? "No base chosen" });
+			el.createSpan({ cls: "improved-bases-details-target", text: relationTarget(draft) });
 		} else {
 			if (draft.override) el.createEl("em", { cls: "improved-bases-details-tag", text: "Type override" });
 			else el.createSpan({ cls: "improved-bases-details-muted", text: "—" });
@@ -569,8 +577,38 @@ export class SchemaSettingsModal extends Modal {
 				}
 			};
 			refreshIcon();
+			const viewField = el.createDiv({ cls: "improved-bases-editor-field" });
+			let loading = 0;
+			/** Fills the view select for the chosen base; a response that arrives after a newer call or base change is dropped. */
+			const renderView = (): void => {
+				const base = draft.base;
+				const run = ++loading;
+				viewField.empty();
+				viewField.hidden = true;
+				if (!base) return;
+				void this.input.viewNames(base).then((names) => {
+					if (run !== loading || draft.base !== base || !viewField.isConnected) return;
+					viewField.hidden = false;
+					viewField.createSpan({ text: "View" });
+					const viewBox = viewField.createDiv({ cls: "improved-bases-type-select improved-bases-base-select" });
+					const viewSelect = viewBox.createEl("select", { cls: "improved-bases-field-view", attr: { "aria-label": "View" } });
+					viewSelect.createEl("option", { text: "All entries", attr: { value: "" } });
+					const list = names ?? [];
+					const all = draft.view && !list.includes(draft.view) ? [draft.view, ...list] : list;
+					for (const name of all) viewSelect.createEl("option", { text: name, attr: { value: name } });
+					viewSelect.value = draft.view ?? "";
+					setIcon(viewBox.createSpan({ cls: "improved-bases-type-chevron" }), "lucide-chevron-down");
+					viewSelect.addEventListener("change", () => {
+						draft.view = viewSelect.value || undefined;
+						refresh();
+					});
+				});
+			};
+			renderView();
 			select.addEventListener("change", () => {
 				draft.base = select.value || undefined;
+				draft.view = undefined;
+				renderView();
 				select.querySelector('option[value=""]')?.remove();
 				refreshIcon();
 				refresh();

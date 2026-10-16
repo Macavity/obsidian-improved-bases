@@ -25,3 +25,23 @@ views:
     columnSize:
       note.team: 237
       note.Role: 133
+  - type: table
+    name: Leads
+    filters:
+      or:
+        - Role == "Manager"
+        - Role == "Product Owner"
+    order:
+      - file.name
+      - Role
+    sort:
+      - property: file.name
+        direction: DESC
+  - type: table
+    name: Nach Rolle
+    groupBy:
+      property: Role
+      direction: ASC
+    order:
+      - file.name
+      - Role

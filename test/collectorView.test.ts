@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { BasesView, MarkdownRenderer, type Plugin, type TFile } from "obsidian";
-import { BaseNotFoundError, registerCollector } from "../src/query/CollectorView";
+import { BaseNotFoundError, ViewNotFoundError, registerCollector } from "../src/query/CollectorView";
 
 type ViewDef = { factory: (controller: unknown) => BasesView };
 
@@ -26,14 +26,14 @@ beforeEach(() => {
 describe("registerCollector", () => {
 	it("rejects missing or non-mapping bases", async () => {
 		const { mount } = setup({ "L.base": "- a\n" });
-		await expect(mount("X.base", vi.fn())).rejects.toBeInstanceOf(BaseNotFoundError);
-		await expect(mount("L.base", vi.fn())).rejects.toThrow(/YAML mapping/);
+		await expect(mount({ base: "X.base" }, vi.fn())).rejects.toBeInstanceOf(BaseNotFoundError);
+		await expect(mount({ base: "L.base" }, vi.fn())).rejects.toThrow(/YAML mapping/);
 	});
 
 	it("renders a hidden collector view that pushes query results until unmounted", async () => {
 		const { mount, views, render } = setup({ "T.base": "filters: {}\nviews:\n  - type: table\n" });
 		const push = vi.fn();
-		const unmount = await mount("T.base", push);
+		const unmount = await mount({ base: "T.base" }, push);
 		const host = document.body.querySelector(".improved-bases-collector-host");
 		expect(host?.getAttribute("aria-hidden")).toBe("true");
 		const md = render.mock.calls[0]?.[1] ?? "";
@@ -54,10 +54,19 @@ describe("registerCollector", () => {
 		expect(push).toHaveBeenCalledTimes(1);
 	});
 
+	it("renders the named view as the collector and rejects a missing one", async () => {
+		const { mount, render } = setup({ "M.base": "views:\n  - type: table\n    name: All\n  - type: table\n    name: FKs\n    limit: 5\n" });
+		await mount({ base: "M.base", view: "FKs" }, vi.fn());
+		const md = render.mock.calls[0]?.[1] ?? "";
+		expect(md).toContain("limit: 5");
+		expect(md).not.toContain("name: All");
+		await expect(mount({ base: "M.base", view: "Gone" }, vi.fn())).rejects.toBeInstanceOf(ViewNotFoundError);
+	});
+
 	it("cleans up when rendering fails", async () => {
 		const { mount, render } = setup({ "T.base": "views: []\n" });
 		render.mockRejectedValueOnce(new Error("render failed"));
-		await expect(mount("T.base", vi.fn())).rejects.toThrow("render failed");
+		await expect(mount({ base: "T.base" }, vi.fn())).rejects.toThrow("render failed");
 		expect(document.body.querySelector(".improved-bases-collector-host")).toBeNull();
 	});
 });

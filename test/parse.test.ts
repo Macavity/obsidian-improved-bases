@@ -91,4 +91,18 @@ describe("parseSchema unsafe names", () => {
     expect(schema).toBeNull();
     expect(errors[0]).toMatch(/reserved/);
   });
+
+  it("parses an optional relation view", () => {
+    const rel = (view: unknown) => ({ "improved-bases": { fields: { Lead: { type: "relation", base: "M.base", view } } } });
+    const good = parseSchema("A.base", rel("FKs"));
+    expect(good.schema?.fields.get("lead")?.field).toEqual({ type: "relation", base: "M.base", multiple: false, view: "FKs" });
+    // YAML reads an unquoted `view: 2024` as a number; Bases view names match it as text.
+    expect(parseSchema("A.base", rel(2024)).schema?.fields.get("lead")?.field).toEqual({ type: "relation", base: "M.base", multiple: false, view: "2024" });
+    expect(parseSchema("A.base", rel(true)).schema?.fields.get("lead")?.field).toMatchObject({ view: "true" });
+    for (const view of ["", "  ", null, ["x"], { a: 1 }]) {
+      expect(parseSchema("A.base", rel(view)).errors.join()).toContain('field "Lead": view must be a non-empty string');
+    }
+    const none = parseSchema("A.base", { "improved-bases": { fields: { Lead: { type: "relation", base: "M.base" } } } });
+    expect(none.schema?.fields.get("lead")?.field).not.toHaveProperty("view");
+  });
 });

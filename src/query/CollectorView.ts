@@ -1,10 +1,18 @@
 import { BasesView, Component, MarkdownRenderer, Plugin, QueryController, TFile, addIcon, parseYaml, removeIcon, stringifyYaml } from "obsidian";
 import type { MountCollector } from "./BaseQuery";
+import { viewName, type QueryTarget } from "./target";
 
 export class BaseNotFoundError extends Error {
 	constructor(basePath: string) {
 		super(`Base not found: ${basePath}`);
 		this.name = "BaseNotFoundError";
+	}
+}
+
+export class ViewNotFoundError extends Error {
+	constructor(basePath: string, view: string) {
+		super(`View "${view}" not found in ${basePath}`);
+		this.name = "ViewNotFoundError";
 	}
 }
 
@@ -21,6 +29,20 @@ export function baseFence(yaml: string): string {
 	const longest = Math.max(0, ...(yaml.match(/`+/g) ?? []).map((m) => m.length));
 	const fence = "`".repeat(Math.max(3, longest + 1));
 	return `${fence}base\n${yaml}${yaml.endsWith("\n") ? "" : "\n"}${fence}\n`;
+}
+
+/** YAML parses `name: 2024` / `name: true` as non-strings; match them by their string form. */
+/**
+ * The base YAML with its views replaced by the collector view. With a target view, that view's
+ * config (filters, sort, limit) is kept and only retyped; the first view of that name wins.
+ */
+export function collectorSource(parsed: Record<string, unknown>, target: QueryTarget, collectorId: string): Record<string, unknown> {
+	const collector = { type: COLLECTOR_VIEW, name: "collector", collectorId };
+	if (target.view === undefined) return { ...parsed, views: [collector] };
+	const views: unknown[] = Array.isArray(parsed.views) ? parsed.views : [];
+	const view = views.find((v): v is Record<string, unknown> => typeof v === "object" && v !== null && viewName((v as Record<string, unknown>).name) === target.view);
+	if (!view) throw new ViewNotFoundError(target.base, target.view);
+	return { ...parsed, views: [{ ...view, ...collector }] };
 }
 
 type Push = (files: TFile[]) => void;
@@ -57,7 +79,8 @@ export function registerCollector(plugin: Plugin): MountCollector {
 		factory: (controller) => new CollectorView(controller, listeners),
 	});
 
-	return async (basePath, push) => {
+	return async (target, push) => {
+		const basePath = target.base;
 		await new Promise<void>((resolve) => app.workspace.onLayoutReady(resolve));
 		const file = app.vault.getFileByPath(basePath);
 		if (!file) throw new BaseNotFoundError(basePath);
@@ -66,7 +89,7 @@ export function registerCollector(plugin: Plugin): MountCollector {
 			throw new Error(`Base is not a YAML mapping: ${basePath}`);
 		}
 		const id = `c${++seq}`;
-		const source = { ...(parsed as Record<string, unknown>), views: [{ type: COLLECTOR_VIEW, name: "collector", collectorId: id }] };
+		const source = collectorSource(parsed as Record<string, unknown>, target, id);
 
 		const host = document.body.createDiv({ cls: HOST_CLASS, attr: { "aria-hidden": "true" } });
 		const component = new Component();

@@ -1,18 +1,19 @@
 import { App, EventRef, Plugin, TAbstractFile, TFile } from "obsidian";
 import { cliQuery, cliQueryAvailable } from "../internals/cliQuery";
-import { BaseNotFoundError, registerCollector } from "./CollectorView";
+import { BaseNotFoundError, ViewNotFoundError, registerCollector } from "./CollectorView";
+import { QueryTarget, targetKey } from "./target";
 
 export interface BaseQuery {
 	/** cb fires with the current result after the first scan and on every change (deduplicated); `failed` marks the `[]` of a failed scan. */
-	watch(basePath: string, cb: Listener): () => void;
+	watch(target: QueryTarget, cb: Listener): () => void;
 	dispose(): void;
 }
 
-/** The first result of a base, or null when its scan failed; the watch ends either way. */
-export function firstResult(query: BaseQuery, basePath: string): Promise<TFile[] | null> {
+/** The first result of a target, or null when its scan failed; the watch ends either way. */
+export function firstResult(query: BaseQuery, target: QueryTarget): Promise<TFile[] | null> {
 	return new Promise((resolve) => {
 		let done = false;
-		const stop = query.watch(basePath, (files, failed) => {
+		const stop = query.watch(target, (files, failed) => {
 			if (done) return;
 			done = true;
 			// A cached result arrives inside `watch`, before `stop` is assigned.
@@ -22,8 +23,8 @@ export function firstResult(query: BaseQuery, basePath: string): Promise<TFile[]
 	});
 }
 
-export type MountCollector = (basePath: string, push: (files: TFile[]) => void) => Promise<() => void>;
-type CliRunner = (basePath: string) => Promise<TFile[]>;
+export type MountCollector = (target: QueryTarget, push: (files: TFile[]) => void) => Promise<() => void>;
+type CliRunner = (target: QueryTarget) => Promise<TFile[]>;
 
 export interface BaseQueryDeps {
 	mount?: MountCollector;
@@ -36,7 +37,9 @@ const CLI_DEBOUNCE_MS = 200;
 type Listener = (files: TFile[], failed: boolean) => void;
 
 interface Entry {
-	path: string;
+	target: QueryTarget;
+	/** targetKey(target), for logs and the entries map. */
+	key: string;
 	listeners: Set<Listener>;
 	last: TFile[] | null;
 	failed: boolean;
@@ -71,7 +74,7 @@ export function createBaseQuery(plugin: Plugin, deps: BaseQueryDeps = {}): BaseQ
 			try {
 				cb(files, failed);
 			} catch (err) {
-				console.error(`Improved Bases: listener for ${e.path} failed`, err);
+				console.error(`Improved Bases: listener for ${e.key} failed`, err);
 			}
 		}
 	};
@@ -85,11 +88,11 @@ export function createBaseQuery(plugin: Plugin, deps: BaseQueryDeps = {}): BaseQ
 		const cli = cliRunner();
 		if (!cli) return;
 		const gen = e.gen;
-		cli(e.path).then(
+		cli(e.target).then(
 			(files) => gen === e.gen && e.mode === "cli" && emit(e, files),
 			(err: unknown) => {
 				if (gen !== e.gen || e.mode !== "cli") return;
-				console.warn(`Improved Bases: CLI query failed for ${e.path}`, err);
+				console.warn(`Improved Bases: CLI query failed for ${e.key}`, err);
 				emit(e, [], true);
 			},
 		);
@@ -121,7 +124,7 @@ export function createBaseQuery(plugin: Plugin, deps: BaseQueryDeps = {}): BaseQ
 			e.mode = "cli";
 			runCli(e);
 		}
-		mount(e.path, (files) => {
+		mount(e.target, (files) => {
 			if (gen !== e.gen) return;
 			if (e.cliTimer !== null) window.clearTimeout(e.cliTimer);
 			e.cliTimer = null;
@@ -134,14 +137,15 @@ export function createBaseQuery(plugin: Plugin, deps: BaseQueryDeps = {}): BaseQ
 			},
 			(err: unknown) => {
 				if (gen !== e.gen) return;
-				console.warn(`Improved Bases: collector failed for ${e.path}`, err);
+				console.warn(`Improved Bases: collector failed for ${e.key}`, err);
 				e.mounted = false;
-				// A missing base stays empty until `create` remounts it; other failures keep refreshing via CLI.
-				if (err instanceof BaseNotFoundError) {
+				// A missing base or view stays put until `create`/`modify` remounts it; other failures keep refreshing via CLI.
+				if (err instanceof BaseNotFoundError || err instanceof ViewNotFoundError) {
 					e.gen++;
 					clearTimers(e);
 					e.mode = "collector";
-					emit(e, []);
+					// A missing view is a failed scan: its result is unknown, not empty.
+					emit(e, [], err instanceof ViewNotFoundError);
 				} else if (e.mode !== "cli") emit(e, [], true);
 			},
 		);
@@ -155,40 +159,38 @@ export function createBaseQuery(plugin: Plugin, deps: BaseQueryDeps = {}): BaseQ
 	if (app?.vault) {
 		const { vault, metadataCache } = app;
 		const on = (ref: EventRef, source: { offref(ref: EventRef): void }) => refs.push({ off: () => source.offref(ref) });
+		/** All entries of a base: the whole base and each of its views. */
+		const ofBase = (path: string) => [...entries.values()].filter((e) => e.target.base === path);
 		const cliRefresh = () => {
 			for (const e of entries.values()) if (e.mode === "cli") scheduleCli(e);
 		};
 		on(vault.on("modify", (f: TAbstractFile) => {
-			const e = entries.get(f.path);
-			if (e) mountEntry(e);
+			for (const e of ofBase(f.path)) mountEntry(e);
 		}), vault);
 		on(vault.on("create", (f: TAbstractFile) => {
-			const e = entries.get(f.path);
-			if (e && !e.mounted) mountEntry(e);
+			for (const e of ofBase(f.path)) if (!e.mounted) mountEntry(e);
 			cliRefresh();
 		}), vault);
 		on(vault.on("delete", (f: TAbstractFile) => {
-			const e = entries.get(f.path);
-			if (e) reset(e);
+			for (const e of ofBase(f.path)) reset(e);
 			cliRefresh();
 		}), vault);
 		on(vault.on("rename", (f: TAbstractFile, oldPath: string) => {
-			const old = entries.get(oldPath);
-			if (old) reset(old);
-			const e = entries.get(f.path);
-			if (e) mountEntry(e);
+			for (const e of ofBase(oldPath)) reset(e);
+			for (const e of ofBase(f.path)) mountEntry(e);
 			cliRefresh();
 		}), vault);
 		on(metadataCache.on("changed", cliRefresh), metadataCache);
 	}
 
 	return {
-		watch(basePath, cb) {
-			let e = entries.get(basePath);
+		watch(target, cb) {
+			const key = targetKey(target);
+			let e = entries.get(key);
 			const fresh = !e;
 			if (!e) {
-				e = { path: basePath, listeners: new Set(), last: null, failed: false, gen: 0, mounted: false, unmount: null, mode: "collector", cliTimer: null };
-				entries.set(basePath, e);
+				e = { target, key, listeners: new Set(), last: null, failed: false, gen: 0, mounted: false, unmount: null, mode: "collector", cliTimer: null };
+				entries.set(key, e);
 			}
 			const entry = e;
 			entry.listeners.add(cb);
@@ -199,9 +201,9 @@ export function createBaseQuery(plugin: Plugin, deps: BaseQueryDeps = {}): BaseQ
 				if (!active) return;
 				active = false;
 				entry.listeners.delete(cb);
-				if (entry.listeners.size > 0 || entries.get(basePath) !== entry) return;
+				if (entry.listeners.size > 0 || entries.get(key) !== entry) return;
 				unmountEntry(entry);
-				entries.delete(basePath);
+				entries.delete(key);
 			};
 		},
 		dispose() {

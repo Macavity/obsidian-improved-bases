@@ -10,7 +10,7 @@ tags:
 
 ## Definition
 
-The **collector view** (`CollectorView extends BasesView`, type id `improved-bases-collector`, in [CollectorView.ts](../../src/query/CollectorView.ts)) is a Bases view that renders nothing. Its only job is `onDataUpdated()`: read `collectorId` from the view config and push `this.data.data.map(e => e.file)` to the listener registered under that id. To get one running for a base, `registerCollector()` renders the base as a ```` ```base ```` code block, with its `views` replaced by a single collector view, into an offscreen host `div` in `document.body`.
+The **collector view** (`CollectorView extends BasesView`, type id `improved-bases-collector`, in [CollectorView.ts](../../src/query/CollectorView.ts)) is a Bases view that renders nothing. Its only job is `onDataUpdated()`: read `collectorId` from the view config and push `this.data.data.map(e => e.file)` to the listener registered under that id. To get one running for a base, `registerCollector()` renders the base as a ```` ```base ```` code block, with its `views` replaced by a single collector view (`collectorSource()`; for a target view that view's own config is kept, so its filters, sort and limit apply, and a missing view throws `ViewNotFoundError`; number/boolean YAML names match by their string form), into an offscreen host `div` in `document.body`.
 
 ## Why it matters
 
@@ -18,7 +18,7 @@ Obsidian has no public query API for Bases. The collector is the closest thing: 
 
 ## Where it lives
 
-- [CollectorView.ts](../../src/query/CollectorView.ts): `CollectorView`, `registerCollector()`, `COLLECTOR_VIEW`, `COLLECTOR_ICON`, `BaseNotFoundError`.
+- [CollectorView.ts](../../src/query/CollectorView.ts): `CollectorView`, `registerCollector()`, `COLLECTOR_VIEW`, `COLLECTOR_ICON`, `BaseNotFoundError`, `ViewNotFoundError`, `collectorSource()`.
 - [styles.css](../../styles.css): `.improved-bases-collector-host` offscreen positioning and hiding the view-selector entry by icon class.
 - Mounted by `createBaseQuery()` in [BaseQuery.ts](../../src/query/BaseQuery.ts); the smoke script counts hosts to verify cleanup ([Tooling](../modules/tooling.md)).
 

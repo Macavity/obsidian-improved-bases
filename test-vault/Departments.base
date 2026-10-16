@@ -1,3 +1,10 @@
+improved-bases:
+  fields:
+    Lead:
+      type: relation
+      base: Mitarbeiter.base
+      multiple: false
+      view: Leads
 filters:
   and:
     - file.inFolder("Departments")
@@ -6,3 +13,4 @@ views:
     name: Tabelle
     order:
       - file.name
+      - Lead
