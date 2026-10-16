@@ -4,8 +4,19 @@ import { RelationWidget } from "../src/widgets/RelationWidget";
 import { EntryPicker } from "../src/widgets/pickers";
 import type { PickerItem } from "../src/widgets/pickers";
 import type { RelationField } from "../src/schema/types";
+import { baseViewNames } from "../src/schema/baseViews";
 import { OverlayRegistry, type PropertyRenderContext, type WidgetEnv } from "../src/widgets/types";
 
+const notices: string[] = [];
+vi.mock("obsidian", async (orig) => ({
+	...(await orig<Record<string, unknown>>()),
+	Notice: class {
+		constructor(message: string) {
+			notices.push(message);
+		}
+	},
+}));
+vi.mock("../src/schema/baseViews", () => ({ baseViewNames: vi.fn() }));
 vi.mock("../src/widgets/pickers", () => ({
 	EntryPicker: vi.fn(function (this: { open: () => void }) {
 		this.open = vi.fn();
@@ -14,7 +25,7 @@ vi.mock("../src/widgets/pickers", () => ({
 
 const tfile = (path: string): TFile => Object.assign(new TFile(), { path, extension: "md" });
 
-function setup(value: unknown, opts: { multiple?: boolean; members?: TFile[] | null; baseExists?: boolean; icons?: Record<string, string>; icon?: string } = {}) {
+function setup(value: unknown, opts: { multiple?: boolean; members?: TFile[] | null; baseExists?: boolean; icons?: Record<string, string>; icon?: string; view?: string; byKey?: Record<string, TFile[] | null> } = {}) {
 	const members = opts.members === undefined ? [tfile("Teams/A.md")] : opts.members;
 	const files: Record<string, TFile> = { "Teams/A.md": tfile("Teams/A.md"), "Other/B.md": tfile("Other/B.md") };
 	const app = {
@@ -28,10 +39,10 @@ function setup(value: unknown, opts: { multiple?: boolean; members?: TFile[] | n
 		renderContext: {},
 	} as unknown as App;
 	const baseIcon = vi.fn((p: string) => (p === "Teams.base" ? opts.icon ?? null : null));
-	const env = { app, membership: { targetEntries: () => members, baseIcon }, overlays: new OverlayRegistry(), writer: {} } as unknown as WidgetEnv;
+	const env = { app, membership: { targetEntries: (k: string) => (opts.byKey ? opts.byKey[k] ?? null : members), baseIcon }, overlays: new OverlayRegistry(), writer: {} } as unknown as WidgetEnv;
 	const onChange = vi.fn();
 	const ctx = { app, key: "lead", sourcePath: "n.md", onChange, blur: vi.fn() } as PropertyRenderContext;
-	const field: RelationField = { type: "relation", base: "Teams.base", multiple: opts.multiple ?? true };
+	const field: RelationField = { type: "relation", base: "Teams.base", multiple: opts.multiple ?? true, ...(opts.view === undefined ? {} : { view: opts.view }) };
 	const el = document.body.createDiv();
 	const handle = RelationWidget(el, value, ctx, field, env);
 	return { el, onChange, handle, chips: () => Array.from(el.querySelectorAll(".improved-bases-chip")) };
@@ -40,6 +51,7 @@ function setup(value: unknown, opts: { multiple?: boolean; members?: TFile[] | n
 beforeEach(() => {
 	document.body.innerHTML = "";
 	vi.mocked(EntryPicker).mockClear();
+	notices.length = 0;
 });
 
 describe("RelationWidget", () => {
@@ -117,5 +129,24 @@ describe("RelationWidget", () => {
 		const { el } = setup([], { baseExists: false });
 		el.querySelector<HTMLElement>(".improved-bases-relation")?.click();
 		expect(EntryPicker).not.toHaveBeenCalled();
+	});
+	it("offers only the view's entries", async () => {
+		vi.mocked(baseViewNames).mockResolvedValue(["Alle", "FKs"]);
+		const { el } = setup([], { view: "FKs", byKey: { "Teams.base#FKs": [tfile("Teams/A.md")], "Teams.base": [tfile("Teams/A.md"), tfile("Other/B.md")] } });
+		el.querySelector<HTMLElement>(".improved-bases-relation")?.click();
+		await vi.waitFor(() => expect(EntryPicker).toHaveBeenCalledTimes(1));
+		const items = vi.mocked(EntryPicker).mock.calls[0]![1];
+		expect(items.map((i) => i.file?.path)).toEqual(["Teams/A.md"]);
+	});
+	it("shows a notice and no picker for a missing view", async () => {
+		vi.mocked(baseViewNames).mockResolvedValue(["Alle"]);
+		const { el } = setup([], { view: "FKs" });
+		el.querySelector<HTMLElement>(".improved-bases-relation")?.click();
+		await vi.waitFor(() => expect(notices).toEqual(['View "FKs" not found in Teams.base']));
+		expect(EntryPicker).not.toHaveBeenCalled();
+	});
+	it("does not mark chips foreign while the view result is unknown", () => {
+		const { chips } = setup(["[[B]]"], { view: "FKs", byKey: {} });
+		expect(chips()[0]?.classList.contains("is-foreign")).toBe(false);
 	});
 });

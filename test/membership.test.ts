@@ -4,7 +4,7 @@ import type { TFile } from "obsidian";
 import { Membership } from "../src/schema/Membership";
 import type { SchemaRegistry } from "../src/schema/SchemaRegistry";
 import type { BaseQuery } from "../src/query/BaseQuery";
-import type { QueryTarget } from "../src/query/target";
+import { targetKey, type QueryTarget } from "../src/query/target";
 import { parseSchema } from "../src/schema/parse";
 import type { BaseSchema } from "../src/schema/types";
 
@@ -52,10 +52,11 @@ function setup(initial?: BaseSchema[], opts: { cache?: boolean; loaded?: boolean
 		on: (_n: string, cb: () => void) => void handlers.add(cb),
 		off: (_n: string, cb: () => void) => void handlers.delete(cb),
 	} as unknown as SchemaRegistry;
-	const pushes = new Map<string, (f: TFile[]) => void>();
+	const pushes = new Map<string, (f: TFile[], failed?: boolean) => void>();
 	const unwatched: string[] = [];
 	const query = {
-		watch: ({ base: p }: QueryTarget, cb: (f: TFile[]) => void) => {
+		watch: (t: QueryTarget, cb: (f: TFile[], failed?: boolean) => void) => {
+			const p = targetKey(t);
 			pushes.set(p, cb);
 			return () => void unwatched.push(p);
 		},
@@ -63,6 +64,7 @@ function setup(initial?: BaseSchema[], opts: { cache?: boolean; loaded?: boolean
 	} as BaseQuery;
 	const m = new Membership(registry, query, opts.cache ? { cache } : {});
 	const push = (p: string, paths: string[]) => pushes.get(p)?.(paths.map(file));
+	const pushFailed = (p: string) => pushes.get(p)?.([], true);
 	const setSchemas = (next: BaseSchema[]) => {
 		schemas = next;
 		for (const h of handlers) h();
@@ -71,10 +73,28 @@ function setup(initial?: BaseSchema[], opts: { cache?: boolean; loaded?: boolean
 		loaded = true;
 		for (const h of handlers) h();
 	};
-	return { m, push, s, setSchemas, unwatched, pushes, fireResolved, setLoaded };
+	return { m, push, pushFailed, s, setSchemas, unwatched, pushes, fireResolved, setLoaded };
 }
 
 describe("Membership", () => {
+	it("watches a relation view separately and treats its failure as unknown", () => {
+		const { m, push, pushFailed } = setup([s0("T.base", { Lead: { type: "relation", base: "M.base", view: "FKs" } })]);
+		push("T.base", ["t1"]);
+		push("M.base#FKs", ["fk"]);
+		settle();
+		expect(m.targetEntries("M.base#FKs")).toEqual([file("fk")]);
+		expect(m.targetEntries("M.base")).toBeNull();
+		pushFailed("M.base#FKs");
+		expect(m.targetEntries("M.base#FKs")).toBeNull();
+	});
+	it("keeps failed results of plain targets as []", () => {
+		const { m, push, pushFailed } = setup([s0("T.base", { Lead: { type: "relation", base: "M.base" } })]);
+		push("T.base", ["t1"]);
+		push("M.base", ["x"]);
+		settle();
+		pushFailed("M.base");
+		expect(m.targetEntries("M.base")).toEqual([]);
+	});
 	it("shapesFor collects value shapes per field name", () => {
 		const { m } = setup([
 			s0("A.base", { Team: { type: "relation", base: "T.base" }, Tags: { type: "select", multiple: true }, N: { type: "number" } }),

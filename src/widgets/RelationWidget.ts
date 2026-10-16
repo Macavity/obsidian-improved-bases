@@ -1,5 +1,7 @@
 import { LinkValue, Notice, TFile } from "obsidian";
+import { baseViewNames } from "../schema/baseViews";
 import type { RelationField } from "../schema/types";
+import { targetKey } from "../query/target";
 import { entryIcon, renderIcon } from "./icons";
 import { EntryPicker, type PickerItem } from "./pickers";
 import type { PluginWidget } from "./types";
@@ -10,6 +12,7 @@ const NOT_IN_TARGET = "Not in target base";
 /** Link chips; clicking the field opens a checkbox picker over the target base entries. */
 export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, field, env) => {
 	const { app, membership } = env;
+	const key = targetKey({ base: field.base, view: field.view });
 	let links = toList(value);
 	// A list for `multiple: false` (or a string for `multiple: true`) is a valid value: shown like any other and only
 	// rewritten into the schema shape on the next edit, as Obsidian does after a property type change.
@@ -33,7 +36,7 @@ export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, fiel
 
 	/** Paths of the target base entries, or null while the query result is unknown. */
 	const targetPaths = (): Set<string> | null => {
-		const entries = membership.targetEntries(field.base);
+		const entries = membership.targetEntries(key);
 		return entries ? new Set(entries.map((f) => f.path)) : null;
 	};
 
@@ -48,7 +51,7 @@ export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, fiel
 			return { raw, file, label: file?.basename ?? raw, active: true, foreign: isForeign(inTarget, file) };
 		});
 		const activePaths = new Set(active.flatMap((i) => (i.file ? [i.file.path] : [])));
-		const rest = (membership.targetEntries(field.base) ?? [])
+		const rest = (membership.targetEntries(key) ?? [])
 			.filter((file) => !activePaths.has(file.path))
 			.map((file): PickerItem => ({
 				raw: `[[${app.metadataCache.fileToLinktext(file, ctx.sourcePath, true)}]]`,
@@ -72,9 +75,13 @@ export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, fiel
 		commit(wasActive ? [] : [item.raw]);
 	};
 
-	const openPicker = (): void => {
+	const openPicker = async (): Promise<void> => {
 		if (!(app.vault.getAbstractFileByPath(field.base) instanceof TFile)) {
 			new Notice(`Target base not found: ${field.base}`);
+			return;
+		}
+		if (field.view !== undefined && !(await baseViewNames(app, field.base))?.includes(field.view)) {
+			new Notice(`View "${field.view}" not found in ${field.base}`);
 			return;
 		}
 		const items = buildItems();
@@ -113,13 +120,13 @@ export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, fiel
 	// Obsidian renders wikilinks as `span.internal-link`, markdown links as `a`.
 	root.addEventListener("click", (evt) => {
 		if (evt.target instanceof Element && evt.target.closest("a, .internal-link")) return;
-		openPicker();
+		void openPicker();
 	});
 	root.addEventListener("keydown", (evt) => {
 		// Keys from a focused link inside the field belong to the link.
 		if (evt.target !== root || (evt.key !== "Enter" && evt.key !== " ")) return;
 		evt.preventDefault();
-		openPicker();
+		void openPicker();
 	});
 
 	draw();

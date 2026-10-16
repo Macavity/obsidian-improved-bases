@@ -1,26 +1,29 @@
 import { Events } from "obsidian";
 import type { EventRef, MetadataCache, TFile } from "obsidian";
 import type { BaseQuery } from "../query/BaseQuery";
+import { targetKey, type QueryTarget } from "../query/target";
 import type { SchemaRegistry } from "./SchemaRegistry";
-import { isRelation, isSelect, type BaseSchema, type FieldSchema } from "./types";
+import { isRelation, isSelect, type BaseSchema, type FieldSchema, type RelationField } from "./types";
 
 const sig = (s: BaseSchema): string => JSON.stringify([s.icon ?? null, [...s.fields]]);
 
 const QUIET_MS = 300;
 
-/** Field names (lowercase) of relations whose target is `basePath`; their widgets show its default icon. */
-function relationsTargeting(schemas: BaseSchema[], basePath: string): string[] {
+const relationTarget = (f: RelationField): QueryTarget => (f.view === undefined ? { base: f.base } : { base: f.base, view: f.view });
+
+/** Field names (lowercase) of relations whose target has `key`; their widgets show its default icon. */
+function relationsTargeting(schemas: BaseSchema[], key: string): string[] {
 	const out: string[] = [];
-	for (const s of schemas) for (const [k, f] of s.fields) if (isRelation(f.field) && f.field.base === basePath) out.push(k);
+	for (const s of schemas) for (const [k, f] of s.fields) if (isRelation(f.field) && targetKey(relationTarget(f.field)) === key) out.push(k);
 	return out;
 }
 
-/** Paths to watch: every schema base plus every relation target. */
-function wantedPaths(schemas: BaseSchema[]): Set<string> {
-	const wanted = new Set<string>();
+/** Targets to watch by key: every schema base plus every relation target (with its view). */
+function wantedTargets(schemas: BaseSchema[]): Map<string, QueryTarget> {
+	const wanted = new Map<string, QueryTarget>();
 	for (const s of schemas) {
-		wanted.add(s.basePath);
-		for (const { field } of s.fields.values()) if (isRelation(field)) wanted.add(field.base);
+		wanted.set(s.basePath, { base: s.basePath });
+		for (const { field } of s.fields.values()) if (isRelation(field)) wanted.set(targetKey(relationTarget(field)), relationTarget(field));
 	}
 	return wanted;
 }
@@ -132,8 +135,9 @@ export class Membership extends Events {
 		return { field: winner.field, basePath: winner.basePath, name: winner.name, others };
 	}
 
-	targetEntries(basePath: string): TFile[] | null {
-		return this.results.get(basePath) ?? null;
+	/** Query result of a target by `targetKey` (= the path for a schema base); null while unknown. */
+	targetEntries(key: string): TFile[] | null {
+		return this.results.get(key) ?? null;
 	}
 
 	/** Default entry icon of a base (its schema's `icon`); null without one. */
@@ -176,15 +180,15 @@ export class Membership extends Events {
 
 	private sync(): void {
 		const schemas = this.registry.schemas();
-		const wanted = wantedPaths(schemas);
+		const wanted = wantedTargets(schemas);
 		this.pruneWatches(wanted);
 		const affected = this.affectedFields(schemas);
-		for (const path of wanted) if (!this.watches.has(path)) this.watch(path);
+		for (const [key, target] of wanted) if (!this.watches.has(key)) this.watch(key, target);
 		this.checkReady(affected);
 	}
 
 	/** Stops watching bases that no schema needs any more and forgets their results. */
-	private pruneWatches(wanted: Set<string>): void {
+	private pruneWatches(wanted: Map<string, QueryTarget>): void {
 		for (const [path, stop] of [...this.watches]) {
 			if (wanted.has(path)) continue;
 			stop();
@@ -210,21 +214,27 @@ export class Membership extends Events {
 		return affected;
 	}
 
-	private watch(path: string): void {
-		this.watches.set(path, this.query.watch({ base: path }, (files) => this.onResult(path, files)));
+	private watch(key: string, target: QueryTarget): void {
+		this.watches.set(key, this.query.watch(target, (files, failed) => this.onResult(key, files, target.view !== undefined && failed === true)));
 	}
 
-	private onResult(path: string, files: TFile[]): void {
-		this.results.set(path, files);
-		this.members.set(path, new Set(files.map((f) => f.path)));
+	/** `unknown`: a view target whose query failed; its result is dropped so widgets treat it as not yet known. */
+	private onResult(path: string, files: TFile[], unknown: boolean): void {
+		if (unknown) {
+			this.results.delete(path);
+			this.members.delete(path);
+		} else {
+			this.results.set(path, files);
+			this.members.set(path, new Set(files.map((f) => f.path)));
+		}
 		const schema = this.registry.schemas().find((s) => s.basePath === path);
 		this.checkReady(schema ? schema.fields.keys() : []);
 		if (this.latched && this.isRelationTarget(path)) this.trigger("targets-changed", path);
 	}
 
-	private isRelationTarget(path: string): boolean {
+	private isRelationTarget(key: string): boolean {
 		for (const s of this.registry.schemas()) {
-			for (const { field } of s.fields.values()) if (isRelation(field) && field.base === path) return true;
+			for (const { field } of s.fields.values()) if (isRelation(field) && targetKey(relationTarget(field)) === key) return true;
 		}
 		return false;
 	}
