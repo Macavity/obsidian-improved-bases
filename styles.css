@@ -480,6 +480,7 @@
 	line-height: 1;
 }
 .improved-bases-schema .improved-bases-field-type,
+.improved-bases-schema .improved-bases-field-view,
 .improved-bases-schema .improved-bases-field-base {
 	width: 100%;
 	height: 100%;
@@ -494,6 +495,7 @@
 	cursor: pointer;
 }
 .improved-bases-schema .improved-bases-field-type:focus,
+.improved-bases-schema .improved-bases-field-view:focus,
 .improved-bases-schema .improved-bases-field-base:focus {
 	outline: none;
 	box-shadow: none;

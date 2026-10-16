@@ -20,6 +20,22 @@ describe("schemaDraft", () => {
 		const rel = new Map([["lead", { name: "Lead", field: { type: "relation" as const, base: "M.base", multiple: false } }]]);
 		expect(knownFieldDrafts({ columns: none, schemaFields: rel, memberKeys: [], detected: () => null, currentView: 0 })).toEqual([d({ originalName: "Lead", originalBase: "M.base", name: "Lead", type: "relation", base: "M.base" })]);
 	});
+	it("round-trips a relation view", () => {
+		const rel = new Map([["lead", { name: "Lead", field: { type: "relation" as const, base: "M.base", multiple: false, view: "FKs" } }]]);
+		const [draft] = knownFieldDrafts({ columns: none, schemaFields: rel, memberKeys: [], detected: () => null, currentView: 0 });
+		expect(draft).toMatchObject({ view: "FKs", originalView: "FKs" });
+		expect(leadOf(updateSchemaSource("improved-bases:\n  fields: {}\n", mutation([draft!], [])))).toEqual({ type: "relation", base: "M.base", multiple: false, view: "FKs" });
+		const cleared = { ...draft!, view: undefined };
+		const out = updateSchemaSource("improved-bases:\n  fields:\n    Lead: { type: relation, base: M.base, multiple: false, view: FKs }\n", mutation([cleared], ["Lead"]));
+		expect(leadOf(out)).toEqual({ type: "relation", base: "M.base", multiple: false });
+	});
+	it("warns about a different view only when notes overlap", () => {
+		const mine = d({ name: "Lead", type: "relation", base: "M.base", view: "FKs" });
+		const other = (shared: number): OtherDefinition => ({ basePath: "P.base", field: { type: "relation", base: "M.base", multiple: false, view: "PM" }, shared });
+		expect(conflictHint(mine, [other(0)])).toBeNull();
+		expect(conflictHint(mine, [other(2)])).toBe("Also defined in P.base as relation to M.base (view PM); 2 notes are in both bases.");
+		expect(conflictHint(mine, [{ basePath: "P.base", field: { type: "relation", base: "X.base", multiple: false }, shared: 0 }])).not.toBeNull();
+	});
 	it("writes a relation without an icon", () => {
 		const out = updateSchemaSource("improved-bases:\n  fields: {}\n", mutation([d({ name: "Lead", type: "relation", base: "M.base" })], []));
 		expect(leadOf(out)).toEqual({ type: "relation", base: "M.base", multiple: false });

@@ -11,6 +11,7 @@ import { readBaseColumns, referencesName, type BaseColumns } from "../schema/bas
 import { getMetadataTypeManager } from "../internals/detect";
 import { listPropertyTypes } from "../internals/typeRegistry";
 import { findOwnKey } from "../schema/keys";
+import { baseViewNames } from "../schema/baseViews";
 
 type Pairs = { from: string; to: string }[];
 type Counts = { renamed: number; conflict: number; failed: number };
@@ -284,6 +285,7 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 		icon: env.membership.baseIcon(basePath) ?? "",
 		baseIcon: (path) => env.membership.baseIcon(path),
 		basePaths,
+		viewNames: (path) => baseViewNames(app, path),
 		overlays: env.overlays,
 		membersKnown: () => currentMembers() !== null,
 		members,

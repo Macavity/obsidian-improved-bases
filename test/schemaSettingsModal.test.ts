@@ -46,6 +46,7 @@ function open(state: SchemaSettingsInput["state"], { countAffected: count, ...op
 		overlays: new OverlayRegistry(),
 		membersKnown: () => true,
 		members: null,
+		viewNames: () => Promise.resolve(null),
 		views: ["A"],
 		defaultViewIndex: 0,
 		expressions: [],
@@ -157,6 +158,50 @@ describe("SchemaSettingsModal", () => {
 		expect(el.querySelector(".improved-bases-field-multiple")).not.toBeNull();
 		q<HTMLElement>(".improved-bases-field-disclosure").click();
 		expect(expanded(el)).toEqual([false, false, false]);
+	});
+
+	const viewOptions = (el: HTMLElement) => Array.from(el.querySelectorAll<HTMLOptionElement>(".improved-bases-field-view option")).map((o) => o.textContent);
+
+	it("offers the target base's views and resets the view on base change", async () => {
+		const viewNames = vi.fn((path: string) => Promise.resolve(path === "Teams.base" ? ["Alle", "FKs"] : ["Solo"]));
+		const { el, q } = open({ kind: "fields", drafts: [d({ originalName: "Lead", name: "Lead", type: "relation", base: "Teams.base" })] }, { viewNames });
+		q<HTMLButtonElement>(".improved-bases-field-disclosure").click();
+		await tick();
+		expect(viewOptions(el)).toEqual(["All entries", "Alle", "FKs"]);
+		const view = q<HTMLSelectElement>(".improved-bases-field-view");
+		expect(view.getAttribute("aria-label")).toBe("View");
+		view.value = "FKs";
+		view.dispatchEvent(new Event("change"));
+		expect(details(el)).toEqual(["👥Teams.base › FKs"]);
+		const base = q<HTMLSelectElement>(".improved-bases-field-base");
+		base.value = "Other.base";
+		base.dispatchEvent(new Event("change"));
+		await tick();
+		expect(viewOptions(el)).toEqual(["All entries", "Solo"]);
+		expect(q<HTMLSelectElement>(".improved-bases-field-view").value).toBe("");
+		expect(details(el)).toEqual(["Other.base"]);
+	});
+
+	it("keeps a stored view that no longer exists as an option", async () => {
+		const { el, q } = open({ kind: "fields", drafts: [d({ originalName: "Lead", name: "Lead", type: "relation", base: "Teams.base", view: "Alt", originalView: "Alt" })] }, { viewNames: () => Promise.resolve(["FKs"]) });
+		q<HTMLButtonElement>(".improved-bases-field-disclosure").click();
+		await tick();
+		expect(viewOptions(el)).toEqual(["All entries", "Alt", "FKs"]);
+		expect(q<HTMLSelectElement>(".improved-bases-field-view").value).toBe("Alt");
+	});
+
+	it("drops a view list that arrives after the base changed", async () => {
+		let resolveFirst: (v: string[]) => void = () => {};
+		const viewNames = vi.fn((path: string) => (path === "Teams.base" ? new Promise<string[]>((r) => { resolveFirst = r; }) : Promise.resolve(["Solo"])));
+		const { el, q } = open({ kind: "fields", drafts: [d({ originalName: "Lead", name: "Lead", type: "relation", base: "Teams.base" })] }, { viewNames });
+		q<HTMLButtonElement>(".improved-bases-field-disclosure").click();
+		const base = q<HTMLSelectElement>(".improved-bases-field-base");
+		base.value = "Other.base";
+		base.dispatchEvent(new Event("change"));
+		await tick();
+		resolveFirst(["Stale"]);
+		await tick();
+		expect(viewOptions(el)).toEqual(["All entries", "Solo"]);
 	});
 
 	it("filters the rows by the search text", () => {

@@ -25,10 +25,11 @@ export const liveOptions = (options: readonly OptionDraft[]): OptionDraft[] => o
 /** A new option created in the dialog. */
 export const newOption = (value: string, color: Color): OptionDraft => ({ value, color, original: null, removal: null });
 
-/** Editable copy of a field; `originalName` is null for new fields, `originalBase` the saved relation target. */
+/** Editable copy of a field; `originalName` is null for new fields, `originalBase` the saved relation target, `originalView` its saved view. */
 export interface FieldDraft {
 	originalName: string | null;
 	originalBase: string | null;
+	originalView?: string;
 	name: string;
 	type: DraftType;
 	/** Obsidian's type id for this property ("text", "multitext", "tags", ...) or null. */
@@ -38,6 +39,8 @@ export interface FieldDraft {
 	removed: boolean;
 	multiple: boolean;
 	base?: string;
+	/** Relation target view; absent = all entries of the base. */
+	view?: string;
 	options: OptionDraft[];
 }
 
@@ -99,29 +102,32 @@ export function applyTypeChoice(draft: FieldDraft, choice: TypeChoice): void {
 /** Another schema base's definition of the same field name, with the number of this base's members that are also in it. */
 export interface OtherDefinition { basePath: string; field: FieldSchema; shared: number }
 
+interface Shape { type: string; multiple: boolean; base: string | null; view: string | null }
+
 /** The shape a draft would write, for comparing with other bases' definitions; null when the draft defines nothing. */
-function draftShape(draft: FieldDraft): { type: string; multiple: boolean; base: string | null } | null {
-	if (draft.type === "relation") return { type: "relation", multiple: draft.multiple, base: draft.base ?? null };
-	if (draft.type === "select") return { type: "select", multiple: draft.multiple, base: null };
+function draftShape(draft: FieldDraft): Shape | null {
+	if (draft.type === "relation") return { type: "relation", multiple: draft.multiple, base: draft.base ?? null, view: draft.view ?? null };
+	if (draft.type === "select") return { type: "select", multiple: draft.multiple, base: null, view: null };
 	const override = overrideType(draft);
-	return override !== null ? { type: override, multiple: false, base: null } : null;
+	return override !== null ? { type: override, multiple: false, base: null, view: null } : null;
 }
 
-function fieldShape(field: FieldSchema): { type: string; multiple: boolean; base: string | null } {
-	if (isRelation(field)) return { type: "relation", multiple: field.multiple, base: field.base };
-	if (isSelect(field)) return { type: "select", multiple: field.multiple, base: null };
-	return { type: field.type, multiple: false, base: null };
+function fieldShape(field: FieldSchema): Shape {
+	if (isRelation(field)) return { type: "relation", multiple: field.multiple, base: field.base, view: field.view ?? null };
+	if (isSelect(field)) return { type: "select", multiple: field.multiple, base: null, view: null };
+	return { type: field.type, multiple: false, base: null, view: null };
 }
 
 function describe(field: FieldSchema, label: (type: string) => string): string {
 	const shape = fieldShape(field);
-	const parts = [shape.type === "relation" ? `relation to ${shape.base}` : shape.type === "select" ? "select" : label(shape.type)];
+	const parts = [shape.type === "relation" ? `relation to ${shape.base}${shape.view === null ? "" : ` (view ${shape.view})`}` : shape.type === "select" ? "select" : label(shape.type)];
 	if (shape.multiple) parts.push("(multiple)");
 	return parts.join(" ");
 }
 
 /**
- * Advises (never blocks) when another base defines the same field with a different type, `multiple` or target.
+ * Advises (never blocks) when another base defines the same field with a different type, `multiple` or target base.
+ * A definition differing only in the target view counts only when notes are in both bases.
  * Select options and colors do not count. Null without a conflict. `label` names a native type id for the hint.
  */
 export function conflictHint(draft: FieldDraft, others: OtherDefinition[], label: (type: string) => string = (t) => t): string | null {
@@ -129,7 +135,8 @@ export function conflictHint(draft: FieldDraft, others: OtherDefinition[], label
 	if (!mine) return null;
 	const conflicts = others.filter((o) => {
 		const theirs = fieldShape(o.field);
-		return theirs.type !== mine.type || theirs.multiple !== mine.multiple || theirs.base !== mine.base;
+		if (theirs.type !== mine.type || theirs.multiple !== mine.multiple || theirs.base !== mine.base) return true;
+		return theirs.view !== mine.view && o.shared > 0;
 	});
 	if (!conflicts.length) return null;
 	const overlap = (n: number): string => (n === 0 ? "no note is in both bases yet" : n === 1 ? "1 note is in both bases" : `${n} notes are in both bases`);
@@ -198,6 +205,7 @@ function toDraft(name: string, field: FieldSchema | undefined, label: string | n
 	if (!field) return draft;
 	if (isRelation(field)) {
 		Object.assign(draft, { type: "relation", base: field.base, originalBase: field.base, multiple: field.multiple });
+		if (field.view !== undefined) Object.assign(draft, { view: field.view, originalView: field.view });
 	} else if (isSelect(field)) {
 		Object.assign(draft, { type: "select", multiple: field.multiple, options: field.options.map((o) => ({ value: o.value, color: o.color, original: o.value, removal: null })) });
 	} else {
@@ -314,7 +322,7 @@ function applyDrafts(f: RawFields, live: FieldDraft[], originalNames: string[]):
 /** Raw schema value for one draft. */
 function draftToField(draft: FieldDraft): Record<string, unknown> | null {
 	if (draft.type === "native") return draft.override;
-	if (draft.type === "relation") return { type: "relation", base: draft.base, multiple: draft.multiple };
+	if (draft.type === "relation") return { type: "relation", base: draft.base, multiple: draft.multiple, ...(draft.view ? { view: draft.view } : {}) };
 	const options = Object.create(null) as Record<string, unknown>;
 	for (const o of liveOptions(draft.options)) setOption(options, o.value, o.color);
 	return { type: "select", multiple: draft.multiple, options };
