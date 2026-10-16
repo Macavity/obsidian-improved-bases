@@ -4,6 +4,7 @@ import type { TFile } from "obsidian";
 import { Membership } from "../src/schema/Membership";
 import type { SchemaRegistry } from "../src/schema/SchemaRegistry";
 import type { BaseQuery } from "../src/query/BaseQuery";
+import type { QueryTarget } from "../src/query/target";
 import { parseSchema } from "../src/schema/parse";
 import type { BaseSchema } from "../src/schema/types";
 
@@ -54,7 +55,7 @@ function setup(initial?: BaseSchema[], opts: { cache?: boolean; loaded?: boolean
 	const pushes = new Map<string, (f: TFile[]) => void>();
 	const unwatched: string[] = [];
 	const query = {
-		watch: (p: string, cb: (f: TFile[]) => void) => {
+		watch: ({ base: p }: QueryTarget, cb: (f: TFile[]) => void) => {
 			pushes.set(p, cb);
 			return () => void unwatched.push(p);
 		},

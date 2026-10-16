@@ -211,7 +211,7 @@ export class Membership extends Events {
 	}
 
 	private watch(path: string): void {
-		this.watches.set(path, this.query.watch(path, (files) => this.onResult(path, files)));
+		this.watches.set(path, this.query.watch({ base: path }, (files) => this.onResult(path, files)));
 	}
 
 	private onResult(path: string, files: TFile[]): void {

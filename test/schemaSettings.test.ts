@@ -241,7 +241,7 @@ describe("buildSchemaSettings", () => {
     let answer!: (files: TFile[], failed: boolean) => void;
     t.query.watch.mockImplementation((_: string, cb: typeof answer) => ((answer = cb), () => undefined));
     const { input, handlers } = await buildSchemaSettings({ app: t.app } as unknown as Plugin, t.env, t.reg, "M.base", null);
-    expect(t.query.watch).toHaveBeenCalledWith("M.base", expect.any(Function));
+    expect(t.query.watch).toHaveBeenCalledWith({ base: "M.base" }, expect.any(Function));
     expect(input.membersKnown()).toBe(false);
     expect(input.memberValues("Status")).toEqual([]);
     answer([mdFile("a.md", { Status: "Aktiv" }), mdFile("b.md", { status: "Neu" })], false);

@@ -277,7 +277,7 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 		originalNames = [...new Set([...originalNames, ...namesOf(next.drafts)])];
 		return next.drafts;
 	};
-	const members = watched !== null ? null : firstResult(env.query, basePath).then((files) => (files === null ? null : fieldsWith(files)));
+	const members = watched !== null ? null : firstResult(env.query, { base: basePath }).then((files) => (files === null ? null : fieldsWith(files)));
 	const input: SchemaSettingsInput = {
 		basePath,
 		state,
