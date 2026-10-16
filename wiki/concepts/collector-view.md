@@ -10,7 +10,7 @@ tags:
 
 ## Definition
 
-The **collector view** (`CollectorView extends BasesView`, type id `improved-bases-collector`, in [CollectorView.ts](../../src/query/CollectorView.ts)) is a Bases view that renders nothing. Its only job is `onDataUpdated()`: read `collectorId` from the view config and push `this.data.data.map(e => e.file)` to the listener registered under that id. To get one running for a base, `registerCollector()` renders the base as a ```` ```base ```` code block, with its `views` replaced by a single collector view (`collectorSource()`; for a target view that view's own config is kept, so its filters, sort and limit apply, and a missing view throws `ViewNotFoundError`), into an offscreen host `div` in `document.body`.
+The **collector view** (`CollectorView extends BasesView`, type id `improved-bases-collector`, in [CollectorView.ts](../../src/query/CollectorView.ts)) is a Bases view that renders nothing. Its only job is `onDataUpdated()`: read `collectorId` from the view config and push `this.data.data.map(e => e.file)` to the listener registered under that id. To get one running for a base, `registerCollector()` renders the base as a ```` ```base ```` code block, with its `views` replaced by a single collector view (`collectorSource()`; for a target view that view's own config is kept, so its filters, sort and limit apply, and a missing view throws `ViewNotFoundError`; number/boolean YAML names match by their string form), into an offscreen host `div` in `document.body`.
 
 ## Why it matters
 
