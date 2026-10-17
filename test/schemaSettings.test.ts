@@ -196,6 +196,13 @@ describe("buildSchemaSettings", () => {
   }
   const lastNotice = () => notices.at(-1) ?? "";
 
+  it("passes focus on to the modal input", async () => {
+    const t = setup();
+    const { input } = await buildSchemaSettings({ app: t.app } as unknown as Plugin, t.env, t.reg, "M.base", null, { name: "Status", type: "select" });
+    expect(input.focus).toEqual({ name: "Status", type: "select" });
+    expect((await build()).input.focus).toBeUndefined();
+  });
+
   it("prefills known fields ordered by the current view", async () => {
     const { input } = await build({ base: "views:\n  - type: table\n    name: A\n    order: [file.name, Team]\n  - type: cards\n    name: B\n    order: [Status]\n", viewName: "B", memberKeys: ["created"], members: [] });
     expect(input.state.kind === "fields" && input.state.drafts.map((d) => d.name)).toEqual(["Status", "created", "Team"]);
@@ -426,5 +433,25 @@ describe("registerSchemaSettings", () => {
     expect(dialogs()).toBe(1);
     for (const cb of cleanups) cb();
     expect(dialogs()).toBe(0);
+  });
+
+  it("open maps the focus type to a choice and opens the dialog on the field", async () => {
+    const base = Object.assign(new TFile(), { path: "M.base", extension: "base" });
+    const app = {
+      workspace: { getActiveFile: () => base, on: vi.fn(), offref: vi.fn(), iterateAllLeaves: vi.fn() },
+      vault: { getFiles: () => [base], getAbstractFileByPath: () => base, cachedRead: () => Promise.resolve("views:\n  - type: table\n    name: A\n") },
+      metadataCache: { getFileCache: () => null },
+    };
+    const plugin = { app, register: vi.fn(), registerEvent: vi.fn(), addCommand: vi.fn() } as unknown as Plugin;
+    const env = { app, writer: {}, membership: { targetEntries: () => [], baseIcon: () => null }, overlays: {} } as unknown as WidgetEnv;
+    const { open } = registerSchemaSettings(plugin, env, registry([], {}));
+    document.body.innerHTML = "";
+    await open("M.base", null, { name: "Lead", type: "select" });
+    const type = () => document.querySelector<HTMLSelectElement>(".improved-bases-field-type")?.value;
+    expect(type()).toBe("select");
+    expect(document.querySelector<HTMLElement>(".improved-bases-field-row")?.classList.contains("is-expanded")).toBe(true);
+    await open("M.base", null, { name: "Lead", type: "text" });
+    expect(document.querySelectorAll(".improved-bases-schema-modal")).toHaveLength(1);
+    expect(type()).toBe("native:text");
   });
 });

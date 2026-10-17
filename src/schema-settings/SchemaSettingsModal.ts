@@ -6,7 +6,7 @@ import { confirmOptionDelete } from "../widgets/OptionDeleteModal";
 import { renderIcon } from "../widgets/icons";
 import type { OverlayRegistry } from "../widgets/types";
 import { propertyTypeOf, type PropertyType } from "../internals/typeRegistry";
-import { applyTypeChoice, conflictHint, liveOptions, mismatchHint, newOption, optionMigrations, optionSuggestions, overrideType, removals, renames, typeChoice, typeChoices, validateDrafts, type FieldDraft, type OptionDraft, type OtherDefinition, type TypeChoice } from "./schemaDraft";
+import { applyTypeChoice, conflictHint, focusDraft, liveOptions, mismatchHint, newFieldDraft, newOption, optionMigrations, optionSuggestions, overrideType, removals, renames, typeChoice, typeChoices, validateDrafts, type FieldDraft, type OptionDraft, type OtherDefinition, type TypeChoice } from "./schemaDraft";
 import { MEMBERS_LOADING } from "../schema/messages";
 
 export interface SchemaSettingsInput {
@@ -39,6 +39,8 @@ export interface SchemaSettingsInput {
 	memberValues: (name: string) => unknown[];
 	/** Property types as Obsidian registers them, reserved ones included for labels; the dropdown offers the unreserved ones. */
 	types: PropertyType[];
+	/** A field to open on: preset to the choice (this makes the dialog dirty), expanded and scrolled into view; created when missing. */
+	focus?: { name: string; type: TypeChoice };
 }
 
 export interface SchemaSettingsHandlers {
@@ -127,6 +129,8 @@ export class SchemaSettingsModal extends Modal {
 	private initial: string;
 	private closed = false;
 	private focusNext: FieldDraft | null = null;
+	/** The draft `input.focus` points at, scrolled into view once its row exists. */
+	private focused: FieldDraft | null = null;
 	private addView: number;
 	private icon: string;
 	private query = "";
@@ -145,6 +149,10 @@ export class SchemaSettingsModal extends Modal {
 		this.icon = input.icon;
 		this.initialDrafts = this.drafts.map(cloneDraft);
 		this.initial = snapshot(this.initialDrafts, this.icon);
+		if (input.focus && input.state.kind === "fields") {
+			this.focused = focusDraft(this.drafts, input.focus, input.types);
+			this.expanded.add(this.focused);
+		}
 	}
 
 	/** Whether saving would change the base. */
@@ -282,10 +290,7 @@ export class SchemaSettingsModal extends Modal {
 		setIcon(add.createSpan({ cls: "improved-bases-add-field-icon" }), "lucide-plus");
 		add.createSpan({ text: "Add field" });
 		add.addEventListener("click", () => {
-			const draft: FieldDraft = {
-				originalName: null, originalBase: null, name: "", type: "native", detected: null,
-				override: null, removed: false, multiple: false, options: [],
-			};
+			const draft = newFieldDraft();
 			this.drafts.push(draft);
 			this.focusNext = draft;
 			this.query = "";
@@ -503,6 +508,10 @@ export class SchemaSettingsModal extends Modal {
 			refresh();
 		});
 		trash.addEventListener("click", () => this.requestRemoval(row, draft));
+		if (this.focused === draft) {
+			this.focused = null;
+			row.scrollIntoView({ block: "center" });
+		}
 		if (this.focusNext === draft) {
 			this.focusNext = null;
 			window.setTimeout(() => name.focus(), 0);

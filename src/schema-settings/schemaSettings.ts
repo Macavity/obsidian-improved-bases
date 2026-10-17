@@ -4,7 +4,7 @@ import { firstResult } from "../query/BaseQuery";
 import type { SchemaRegistry } from "../schema/SchemaRegistry";
 import type { WidgetEnv } from "../widgets/types";
 import { SchemaSettingsModal, type SchemaSettingsHandlers, type SchemaSettingsInput } from "./SchemaSettingsModal";
-import { draftsToEdits, knownFieldDrafts, optionMigrations, removals, renameKey, renames, type FieldDraft, type OptionMigration, type OtherDefinition } from "./schemaDraft";
+import { draftsToEdits, knownFieldDrafts, optionMigrations, removals, renameKey, renames, type FieldDraft, type OptionMigration, type OtherDefinition, type TypeChoice } from "./schemaDraft";
 import { migrateOptionValues, optionValueEdit } from "../schema/optionMigration";
 import type { Membership } from "../schema/Membership";
 import { readBaseColumns, referencesName, type BaseColumns } from "../schema/baseDoc";
@@ -237,7 +237,7 @@ function readMembers(app: App, files: readonly TFile[]): { keys: string[]; value
 	return { keys: [...names].sort(), values };
 }
 
-export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, registry: SchemaRegistry, basePath: string, viewName: string | null): Promise<{ input: SchemaSettingsInput; handlers: SchemaSettingsHandlers }> {
+export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, registry: SchemaRegistry, basePath: string, viewName: string | null, focus?: SchemaSettingsInput["focus"]): Promise<{ input: SchemaSettingsInput; handlers: SchemaSettingsHandlers }> {
 	const app = plugin.app;
 	const file = app.vault.getAbstractFileByPath(basePath);
 	if (!(file instanceof TFile)) throw new Error("Base not found");
@@ -295,6 +295,7 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 		views,
 		defaultViewIndex,
 		expressions,
+		...(focus ? { focus } : {}),
 	};
 	const onSave = async (drafts: FieldDraft[], addView: number, icon: string): Promise<void> => {
 		const { edits, mutate } = draftsToEdits(drafts, originalNames, addView);
@@ -323,13 +324,18 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 	return { input, handlers: { onSave, onReset, countAffected } };
 }
 
-export function registerSchemaSettings(plugin: Plugin, env: WidgetEnv, registry: SchemaRegistry): void {
+/** The dropdown choice for a type id: plugin types map to themselves, any other id is a native override. */
+function choiceOf(type: string): TypeChoice {
+	return type === "select" || type === "relation" ? type : `native:${type}`;
+}
+
+export function registerSchemaSettings(plugin: Plugin, env: WidgetEnv, registry: SchemaRegistry): { open: (basePath: string, viewName: string | null, focus?: { name: string; type: string }) => Promise<void> } {
 	let modal: SchemaSettingsModal | null = null;
 	// An open dialog belongs to this plugin instance; a reload must not leave it behind with stale handlers.
 	plugin.register(() => modal?.close());
-	const open = async (basePath: string, viewName: string | null): Promise<void> => {
+	const open = async (basePath: string, viewName: string | null, focus?: { name: string; type: string }): Promise<void> => {
 		try {
-			const { input, handlers } = await buildSchemaSettings(plugin, env, registry, basePath, viewName);
+			const { input, handlers } = await buildSchemaSettings(plugin, env, registry, basePath, viewName, focus && { name: focus.name, type: choiceOf(focus.type) });
 			modal?.close();
 			modal = new SchemaSettingsModal(plugin.app, input, handlers);
 			modal.open();
@@ -355,4 +361,5 @@ export function registerSchemaSettings(plugin: Plugin, env: WidgetEnv, registry:
 		}),
 	);
 	plugin.register(installSchemaButton(plugin.app, (path, view) => void open(path, view)));
+	return { open };
 }

@@ -657,4 +657,23 @@ describe("SchemaSettingsModal reading the notes", () => {
 		await tick();
 		expect(loading(el)).toBe("Could not read the notes of this base, so there are no suggestions from notes.");
 	});
+
+	it("focus presets and expands the field; the dialog is dirty, Save is not called by itself", () => {
+		const scroll = vi.fn();
+		Element.prototype.scrollIntoView = scroll;
+		const lead = d({ originalName: "Lead", name: "Lead", detected: "text" });
+		const { el, q, onSave, modal } = open({ kind: "fields", drafts: [d({ originalName: "A", name: "A" }), lead] }, { focus: { name: "lead", type: "select" } });
+		expect(expanded(el)).toEqual([false, true]);
+		expect(q<HTMLSelectElement>(".improved-bases-field-row:nth-child(2) .improved-bases-field-type").value).toBe("select");
+		expect(q<HTMLButtonElement>(".improved-bases-save").disabled).toBe(false);
+		expect(scroll).toHaveBeenCalled();
+		modal.close();
+		expect(onSave).not.toHaveBeenCalled();
+		expect(lead.type).toBe("native");
+	});
+	it("focus on an unknown field adds it", () => {
+		const { el } = open({ kind: "fields", drafts: [] }, { focus: { name: "New", type: "relation" } });
+		expect(names(el)).toEqual(["New"]);
+		expect(expanded(el)).toEqual([true]);
+	});
 });
