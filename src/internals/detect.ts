@@ -42,6 +42,8 @@ export interface MetadataTypeManager {
 	registeredTypeWidgets: Record<string, TypeWidget | undefined>;
 	getTypeInfo(name: string, value: unknown): TypeInfo;
 	trigger(name: string, ...args: unknown[]): void;
+	/** Writes the global type for a property (`types.json`); absent on versions without it. */
+	setType?: (name: string, type: string) => unknown;
 }
 
 /** Returns `app.metadataTypeManager` when it has the shape the getTypeInfo patch needs, else null. */

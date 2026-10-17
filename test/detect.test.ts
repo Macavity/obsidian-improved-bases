@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Platform, type App } from "obsidian";
-import { getCliHandler } from "../src/internals/detect";
+import { getCliHandler, getMetadataTypeManager } from "../src/internals/detect";
 
 const app = (cli: unknown): App => ({ cli }) as unknown as App;
 const handler = () => "ok";
@@ -25,5 +25,16 @@ describe("getCliHandler", () => {
 	it("is desktop-only", () => {
 		Platform.isDesktop = false;
 		expect(getCliHandler(app({ handlers: new Map([["eval", { handler }]]) }), "eval")).toBeNull();
+	});
+});
+
+describe("getMetadataTypeManager", () => {
+	const widget = { type: "text", validate: () => true, render: () => null };
+	const mtm = { registeredTypeWidgets: { text: widget }, getTypeInfo: () => null, trigger: () => {} };
+	it("accepts a manager without setType", () => {
+		expect(getMetadataTypeManager({ metadataTypeManager: mtm } as unknown as App)).toBe(mtm);
+	});
+	it("rejects a manager without getTypeInfo", () => {
+		expect(getMetadataTypeManager({ metadataTypeManager: { ...mtm, getTypeInfo: undefined } } as unknown as App)).toBeNull();
 	});
 });
