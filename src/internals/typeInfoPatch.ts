@@ -3,6 +3,7 @@ import { around } from "monkey-around";
 import type { Resolution } from "../schema/Membership";
 import { isRelation, isSelect, type RelationField, type SelectField } from "../schema/types";
 import { mismatchText, renderConflictMarker, renderInfoMarker } from "../widgets/conflictMarker";
+import type { HeaderBase } from "./headerTypeChange";
 import { baseContextOf } from "./baseContext";
 import type { PluginWidget, PropertyRenderContext, WidgetEnv, WidgetHandle } from "../widgets/types";
 import { nameOf } from "./typeRegistry";
@@ -30,7 +31,7 @@ interface CacheEntry {
  * plugin widget, native widget of the schema type, or Obsidian's original. Returns null when the internals
  * are missing (unsupported Obsidian version); nothing is patched then.
  */
-export function installTypeInfoPatch(app: App, env: WidgetEnv, widgets: PluginWidgets): TypeInfoPatch | null {
+export function installTypeInfoPatch(app: App, env: WidgetEnv, widgets: PluginWidgets, opts: { pending?: () => HeaderBase | null } = {}): TypeInfoPatch | null {
 	const mtm = getMetadataTypeManager(app);
 	if (!mtm) return null;
 	const { membership } = env;
@@ -170,6 +171,20 @@ export function installTypeInfoPatch(app: App, env: WidgetEnv, widgets: PluginWi
 		return entry.hull;
 	};
 
+	/**
+	 * While a column header menu is open, the menu's checkmark reads `getTypeInfo(name).inferred.type`: it must show the
+	 * type the base assigns, not the global one. Null when nothing is pending or the base has no such entry.
+	 */
+	const pendingInfo = (info: TypeInfo, key: string, hull: TypeWidget): TypeInfo | null => {
+		const base = opts.pending?.();
+		const entry = base ? env.membership.entryOf(base.basePath, key) : null;
+		if (!entry) return null;
+		const shown = Object.hasOwn(mtm.registeredTypeWidgets, entry.type) ? mtm.registeredTypeWidgets[entry.type] : undefined;
+		if (!shown) return null;
+		const widget: TypeWidget = { ...hull, type: shown.type, icon: shown.icon, name: shown.name };
+		return { ...info, expected: widget, inferred: widget };
+	};
+
 	const uninstallPatch = around(mtm, {
 		getTypeInfo(next) {
 			return function (this: MetadataTypeManager, name: string, value: unknown): TypeInfo {
@@ -180,6 +195,8 @@ export function installTypeInfoPatch(app: App, env: WidgetEnv, widgets: PluginWi
 					const key = String(name).toLowerCase();
 					if (!membership.knownFieldNames().has(key)) return info;
 					const hull = hullFor(info, key);
+					const pending = pendingInfo(info, key, hull);
+					if (pending) return pending;
 					return { ...info, expected: hull, inferred: hull };
 				} catch (e) {
 					console.error("Improved Bases: getTypeInfo patch failed", e);

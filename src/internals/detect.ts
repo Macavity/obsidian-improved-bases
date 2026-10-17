@@ -53,3 +53,10 @@ export function getMetadataTypeManager(app: App): MetadataTypeManager | null {
 	if (typeof mtm.registeredTypeWidgets?.text?.render !== "function") return null;
 	return mtm as MetadataTypeManager;
 }
+
+/** Property names (as stored) with a global type in `types.json`, with that type; empty when the internals differ. */
+export function assignedTypes(mtm: MetadataTypeManager): [string, string][] {
+	const types = (mtm as { types?: unknown }).types;
+	if (typeof types !== "object" || types === null) return [];
+	return Object.entries(types).filter((e): e is [string, string] => typeof e[1] === "string");
+}

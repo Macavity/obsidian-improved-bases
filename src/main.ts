@@ -1,5 +1,10 @@
 import { Notice, Plugin } from "obsidian";
 import { installTypeInfoPatch, TypeInfoPatch } from "./internals/typeInfoPatch";
+import { installHeaderTypeChange, type HeaderBase, type HeaderTypeChange } from "./internals/headerTypeChange";
+import { registerPluginTypes, type PluginTypeRegistration } from "./internals/typeRegistration";
+import { resolveBase } from "./internals/toolbar";
+import { createGenericRelationWidget } from "./widgets/GenericRelationWidget";
+import { createGenericSelectWidget } from "./widgets/GenericSelectWidget";
 import { BaseQuery, createBaseQuery } from "./query/BaseQuery";
 import { Membership } from "./schema/Membership";
 import { SchemaRegistry } from "./schema/SchemaRegistry";
@@ -8,7 +13,7 @@ import { OverlayRegistry, WidgetEnv } from "./widgets/types";
 import { RelationWidget } from "./widgets/RelationWidget";
 import { SelectWidget } from "./widgets/SelectWidget";
 import { registerSchemaSettings } from "./schema-settings/schemaSettings";
-import { getMetadataTypeManager } from "./internals/detect";
+import { assignedTypes, getMetadataTypeManager } from "./internals/detect";
 import { ImprovedBasesSettings, ImprovedBasesSettingTab, mergeSettings } from "./settings";
 
 export default class ImprovedBasesPlugin extends Plugin {
@@ -20,6 +25,9 @@ export default class ImprovedBasesPlugin extends Plugin {
 	typeInfoPatch: TypeInfoPatch | null = null;
 	/** False when Obsidian internals are missing; widgets then stay off, commands keep working. */
 	widgetsSupported = true;
+	private registration: PluginTypeRegistration | null = null;
+	private headerTypeChange: HeaderTypeChange | null = null;
+	private schemaSettings: { open: (basePath: string, viewName: string | null, focus?: { name: string; type: string }) => Promise<void> } | null = null;
 	private env: WidgetEnv;
 	private notified = false;
 
@@ -38,12 +46,9 @@ export default class ImprovedBasesPlugin extends Plugin {
 		this.env = env;
 		this.widgetsSupported = getMetadataTypeManager(this.app) !== null;
 		if (!this.widgetsSupported) this.notifyUnsupported();
+		this.schemaSettings = registerSchemaSettings(this, env, this.registry);
 		this.applyWidgetsEnabled();
-		this.register(() => {
-			this.typeInfoPatch?.uninstall();
-			this.typeInfoPatch = null;
-		});
-		registerSchemaSettings(this, env, this.registry);
+		this.register(() => this.disableWidgets());
 		this.app.workspace.onLayoutReady(() => void this.registry.load());
 		this.addSettingTab(new ImprovedBasesSettingTab(this.app, this));
 	}
@@ -54,19 +59,64 @@ export default class ImprovedBasesPlugin extends Plugin {
 		new Notice(`${this.manifest.name}: this Obsidian version is not supported`);
 	}
 
-	/** Installs or removes the getTypeInfo patch according to `settings.widgetsEnabled`. */
+	/** Installs or removes property types, the getTypeInfo patch and the header hook according to `settings.widgetsEnabled`. */
 	applyWidgetsEnabled() {
 		if (this.settings.widgetsEnabled && this.widgetsSupported) {
 			if (this.typeInfoPatch) return;
-			this.typeInfoPatch = installTypeInfoPatch(this.app, this.env, { relation: RelationWidget, select: SelectWidget });
-			if (!this.typeInfoPatch) {
-				// Settings controls read `widgetsSupported` on the next render; an open tab is not re-rendered.
-				this.widgetsSupported = false;
-				this.notifyUnsupported();
+			this.enableWidgets();
+		} else {
+			this.disableWidgets();
+		}
+	}
+
+	private enableWidgets() {
+		const mtm = getMetadataTypeManager(this.app);
+		if (!mtm) return;
+		const registration = registerPluginTypes(mtm, { select: createGenericSelectWidget(this.env), relation: createGenericRelationWidget(this.env) });
+		for (const id of registration.skipped) new Notice(`${this.manifest.name}: property type "${id}" is already registered by another plugin`);
+		this.registration = registration;
+		let header: HeaderTypeChange | null = null;
+		this.typeInfoPatch = installTypeInfoPatch(this.app, this.env, { relation: RelationWidget, select: SelectWidget }, { pending: () => header?.pending() ?? null });
+		if (!this.typeInfoPatch) {
+			registration.unregister();
+			this.registration = null;
+			// Settings controls read `widgetsSupported` on the next render; an open tab is not re-rendered.
+			this.widgetsSupported = false;
+			this.notifyUnsupported();
+			return;
+		}
+		header = installHeaderTypeChange(document, mtm, {
+			resolve: (cell) => {
+				const el = cell.closest(".internal-embed, .block-language-base, .view-content");
+				const base = el && resolveBase(this.app, el);
+				return base ? { basePath: base.path, viewName: base.viewName } : null;
+			},
+			pluginTypes: () => registration.registered,
+			hasBaseEntry: (basePath, key) => this.registry.schemas().some((s) => s.basePath === basePath && s.fields.has(key)),
+			open: (base: HeaderBase, focus) => void this.schemaSettings?.open(base.basePath, base.viewName, focus),
+		});
+		this.headerTypeChange = header;
+	}
+
+	private disableWidgets() {
+		this.headerTypeChange?.uninstall();
+		this.headerTypeChange = null;
+		this.typeInfoPatch?.uninstall();
+		this.typeInfoPatch = null;
+		const registration = this.registration;
+		this.registration = null;
+		if (!registration) return;
+		registration.unregister();
+		// Fields typed select/relation fall back to text; cells and panels still hold the removed widgets.
+		const mtm = getMetadataTypeManager(this.app);
+		if (!mtm) return;
+		for (const [name, type] of assignedTypes(mtm)) {
+			if (!registration.registered.has(type as never)) continue;
+			try {
+				mtm.trigger("changed", name);
+			} catch (e) {
+				console.error("Improved Bases: refresh failed", e);
 			}
-		} else if (this.typeInfoPatch) {
-			this.typeInfoPatch.uninstall();
-			this.typeInfoPatch = null;
 		}
 	}
 
