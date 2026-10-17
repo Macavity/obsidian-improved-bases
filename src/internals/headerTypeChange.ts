@@ -17,8 +17,13 @@ export interface HeaderTypeChangeOptions {
 }
 
 export interface HeaderTypeChange {
+	/** Listens in `doc` (main window or popout); attaching twice is a no-op. */
+	attach(doc: Document): void;
+	detach(doc: Document): void;
 	/** Header context remembered since the last right-click on a column header, if not yet discarded. */
 	pending(): HeaderBase | null;
+	/** Base of the right-clicked header, only while its `contextmenu` event is dispatched (the menu reads its checkmark then). */
+	menuBase(): HeaderBase | null;
 	uninstall(): void;
 }
 
@@ -34,34 +39,63 @@ const closest = (target: EventTarget | null, selector: string): Element | null =
  * Wraps `metadataTypeManager.setType`: a type change chosen from a base column header opens the schema dialog
  * when the type is a plugin type or the base has its own entry for the field. The original always runs first.
  *
- * The header context is discarded after the first `setType` and on the next input outside a menu, because native
- * menus (macOS default) put no `.menu` in the DOM and swallow Escape and outside clicks.
+ * The header context is discarded after the first `setType` and on the next input outside a menu in any attached
+ * document, because native menus (macOS default) put no `.menu` in the DOM and swallow Escape and outside clicks.
  * Residual risk: a `setType` from another source (e.g. programmatic) while a context is pending, with no input in
  * between, is attributed to the header.
  *
+ * `menuBase` is a separate, shorter window: Bases builds the menu (and reads the checkmark) in the cell's bubble
+ * listener, so it opens in the capture listener and closes in a bubble listener on the window. A microtask would
+ * run before the cell listener for real events; a `setTimeout(0)` closes it when propagation was stopped.
+ *
  * Returns null when `setType` is missing.
  */
-export function installHeaderTypeChange(doc: Document, mtm: MetadataTypeManager, opts: HeaderTypeChangeOptions): HeaderTypeChange | null {
+export function installHeaderTypeChange(mtm: MetadataTypeManager, opts: HeaderTypeChangeOptions): HeaderTypeChange | null {
 	if (typeof mtm.setType !== "function") return null;
 	let context: HeaderBase | null = null;
+	let menu: HeaderBase | null = null;
+	const attached = new Map<Document, () => void>();
 
-	const onContextMenu = (e: Event): void => {
-		context = null;
-		const cell = closest(e.target, HEADER_CELL_SELECTOR);
-		if (!cell) return;
+	const resolve = (cell: Element): HeaderBase | null => {
 		try {
-			context = opts.resolve(cell);
+			return opts.resolve(cell);
 		} catch (err) {
 			console.error("Improved Bases: could not resolve the base of a column header", err);
+			return null;
 		}
 	};
-	// Pointer events inside a DOM menu belong to the item click that calls setType.
-	const onPointer = (e: Event): void => {
-		if (!closest(e.target, MENU_SELECTOR)) context = null;
-	};
-	// Keyboard navigation inside an open DOM menu keeps the context; with a native menu the page gets no keys.
-	const onKeyDown = (): void => {
-		if (!doc.querySelector(MENU_SELECTOR)) context = null;
+
+	const listen = (doc: Document): (() => void) => {
+		const win = doc.defaultView;
+		const onContextMenu = (e: Event): void => {
+			const cell = closest(e.target, HEADER_CELL_SELECTOR);
+			context = cell ? resolve(cell) : null;
+			menu = context;
+			if (menu) win?.setTimeout(() => (menu = null), 0);
+		};
+		const closeMenu = (): void => {
+			menu = null;
+		};
+		// Pointer events inside a DOM menu belong to the item click that calls setType.
+		const onPointer = (e: Event): void => {
+			if (!closest(e.target, MENU_SELECTOR)) context = null;
+		};
+		// Keyboard navigation inside an open DOM menu keeps the context; with a native menu the page gets no keys.
+		const onKeyDown = (): void => {
+			if (!doc.querySelector(MENU_SELECTOR)) context = null;
+		};
+		const listeners: [string, (e: Event) => void][] = [
+			["contextmenu", onContextMenu],
+			["pointerdown", onPointer],
+			["mousedown", onPointer],
+			["keydown", onKeyDown],
+		];
+		for (const [type, fn] of listeners) doc.addEventListener(type, fn, true);
+		win?.addEventListener("contextmenu", closeMenu);
+		return () => {
+			for (const [type, fn] of listeners) doc.removeEventListener(type, fn, true);
+			win?.removeEventListener("contextmenu", closeMenu);
+		};
 	};
 
 	const afterSetType = (base: HeaderBase, name: string, type: string): void => {
@@ -88,20 +122,23 @@ export function installHeaderTypeChange(doc: Document, mtm: MetadataTypeManager,
 		},
 	});
 
-	const listeners: [string, (e: Event) => void][] = [
-		["contextmenu", onContextMenu],
-		["pointerdown", onPointer],
-		["mousedown", onPointer],
-		["keydown", onKeyDown],
-	];
-	for (const [type, fn] of listeners) doc.addEventListener(type, fn, true);
+	const detach = (doc: Document): void => {
+		attached.get(doc)?.();
+		attached.delete(doc);
+	};
 
 	return {
+		attach(doc) {
+			if (!attached.has(doc)) attached.set(doc, listen(doc));
+		},
+		detach,
 		pending: () => context,
+		menuBase: () => menu,
 		uninstall() {
-			for (const [type, fn] of listeners) doc.removeEventListener(type, fn, true);
+			for (const doc of [...attached.keys()]) detach(doc);
 			uninstallPatch();
 			context = null;
+			menu = null;
 		},
 	};
 }

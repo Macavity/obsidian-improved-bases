@@ -1,4 +1,4 @@
-import { Notice, Plugin } from "obsidian";
+import { Notice, Plugin, type EventRef } from "obsidian";
 import { installTypeInfoPatch, TypeInfoPatch } from "./internals/typeInfoPatch";
 import { installHeaderTypeChange, type HeaderBase, type HeaderTypeChange } from "./internals/headerTypeChange";
 import { registerPluginTypes, type PluginTypeRegistration } from "./internals/typeRegistration";
@@ -39,6 +39,7 @@ export default class ImprovedBasesPlugin extends Plugin {
 	widgetsSupported = true;
 	private registration: PluginTypeRegistration | null = null;
 	private headerTypeChange: HeaderTypeChange | null = null;
+	private windowRefs: EventRef[] = [];
 	private schemaSettings: { open: (basePath: string, viewName: string | null, focus?: { name: string; type: string }) => Promise<void> } | null = null;
 	private env: WidgetEnv;
 	private notified = false;
@@ -88,7 +89,7 @@ export default class ImprovedBasesPlugin extends Plugin {
 		for (const id of registration.skipped) new Notice(`${this.manifest.name}: property type "${id}" is already registered by another plugin`);
 		this.registration = registration;
 		let header: HeaderTypeChange | null = null;
-		this.typeInfoPatch = installTypeInfoPatch(this.app, this.env, { relation: RelationWidget, select: SelectWidget }, { pending: () => header?.pending() ?? null });
+		this.typeInfoPatch = installTypeInfoPatch(this.app, this.env, { relation: RelationWidget, select: SelectWidget }, { menuBase: () => header?.menuBase() ?? null });
 		if (!this.typeInfoPatch) {
 			registration.unregister();
 			this.registration = null;
@@ -97,7 +98,7 @@ export default class ImprovedBasesPlugin extends Plugin {
 			this.notifyUnsupported();
 			return;
 		}
-		header = installHeaderTypeChange(document, mtm, {
+		header = installHeaderTypeChange(mtm, {
 			resolve: (cell) => {
 				const el = cell.closest(".internal-embed, .block-language-base, .view-content");
 				const base = el && resolveBase(this.app, el);
@@ -108,11 +109,23 @@ export default class ImprovedBasesPlugin extends Plugin {
 			open: (base: HeaderBase, focus) => void this.schemaSettings?.open(base.basePath, base.viewName, focus),
 		});
 		this.headerTypeChange = header;
+		if (header) this.attachWindows(header);
 		// Fields typed select/relation still show the default widget Obsidian picked while the ids were unknown.
 		refreshAssigned(mtm, registration.registered);
 	}
 
+	/** The header hook listens in the main window and every popout, including those opened later. */
+	private attachWindows(header: HeaderTypeChange) {
+		const { workspace } = this.app;
+		const docs = new Set<Document>([document]);
+		workspace.iterateAllLeaves((leaf) => docs.add(leaf.view.containerEl.ownerDocument));
+		for (const doc of docs) header.attach(doc);
+		this.windowRefs = [workspace.on("window-open", (win) => header.attach(win.doc)), workspace.on("window-close", (win) => header.detach(win.doc))];
+	}
+
 	private disableWidgets() {
+		for (const ref of this.windowRefs) this.app.workspace.offref(ref);
+		this.windowRefs = [];
 		this.headerTypeChange?.uninstall();
 		this.headerTypeChange = null;
 		this.typeInfoPatch?.uninstall();

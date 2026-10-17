@@ -11,12 +11,13 @@ function setup(entry = false) {
 	const original = vi.fn();
 	const mtm = { registeredTypeWidgets: {}, getTypeInfo: vi.fn(), trigger: vi.fn(), setType: original } as never;
 	const open = vi.fn();
-	const hook = installHeaderTypeChange(document, mtm, {
+	const hook = installHeaderTypeChange(mtm, {
 		resolve: () => ({ basePath: "Departments.base", viewName: "Table" }),
 		pluginTypes: () => new Set(["select", "relation"]),
 		hasBaseEntry: () => entry,
 		open,
 	})!;
+	hook.attach(document);
 	const rightClick = (id: string) => document.getElementById(id)!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
 	return { mtm: mtm as { setType: (n: string, t: string) => unknown }, original, open, hook, rightClick };
 }
@@ -90,9 +91,49 @@ describe("header type change", () => {
 		s.rightClick("lead");
 		expect(s.hook.pending()).toBeNull();
 	});
+	it("exposes the menu base only while the header contextmenu is dispatched", () => {
+		const s = setup();
+		const seen: unknown[] = [];
+		document.getElementById("lead")!.addEventListener("contextmenu", () => seen.push(s.hook.menuBase()));
+		s.rightClick("lead");
+		expect(seen).toEqual([{ basePath: "Departments.base", viewName: "Table" }]);
+		expect(s.hook.menuBase()).toBeNull();
+		expect(s.hook.pending()).not.toBeNull(); // the dialog context outlives the menu window
+		s.hook.uninstall();
+	});
+	it("closes the menu window after the dispatch even when propagation is stopped", async () => {
+		const s = setup();
+		document.getElementById("lead")!.addEventListener("contextmenu", (e) => e.stopPropagation());
+		s.rightClick("lead");
+		await new Promise((r) => setTimeout(r, 0));
+		expect(s.hook.menuBase()).toBeNull();
+		s.hook.uninstall();
+	});
+	it("works in attached popout documents and discards on input in any of them", () => {
+		const s = setup();
+		const frame = document.body.appendChild(document.createElement("iframe"));
+		const doc = frame.contentDocument!;
+		const row = doc.body.appendChild(doc.createElement("div"));
+		row.className = "bases-thead";
+		const cell = row.appendChild(doc.createElement("div"));
+		cell.className = "bases-td";
+		s.hook.attach(doc);
+		s.hook.attach(doc); // idempotent
+		cell.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+		s.mtm.setType("Lead", "select");
+		expect(s.open).toHaveBeenCalledOnce();
+		s.rightClick("lead");
+		doc.body.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+		expect(s.hook.pending()).toBeNull();
+		s.hook.detach(doc);
+		cell.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+		expect(s.hook.pending()).toBeNull();
+		s.hook.uninstall();
+		frame.remove();
+	});
 	it("returns null without setType", () => {
 		const mtm = { registeredTypeWidgets: {}, getTypeInfo: vi.fn(), trigger: vi.fn() } as never;
-		const hook = installHeaderTypeChange(document, mtm, { resolve: () => null, pluginTypes: () => new Set(), hasBaseEntry: () => false, open: vi.fn() });
+		const hook = installHeaderTypeChange(mtm, { resolve: () => null, pluginTypes: () => new Set(), hasBaseEntry: () => false, open: vi.fn() });
 		expect(hook).toBeNull();
 	});
 });

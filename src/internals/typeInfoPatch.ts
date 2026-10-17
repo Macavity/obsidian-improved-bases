@@ -31,7 +31,7 @@ interface CacheEntry {
  * plugin widget, native widget of the schema type, or Obsidian's original. Returns null when the internals
  * are missing (unsupported Obsidian version); nothing is patched then.
  */
-export function installTypeInfoPatch(app: App, env: WidgetEnv, widgets: PluginWidgets, opts: { pending?: () => HeaderBase | null } = {}): TypeInfoPatch | null {
+export function installTypeInfoPatch(app: App, env: WidgetEnv, widgets: PluginWidgets, opts: { menuBase?: () => HeaderBase | null } = {}): TypeInfoPatch | null {
 	const mtm = getMetadataTypeManager(app);
 	if (!mtm) return null;
 	const { membership } = env;
@@ -39,6 +39,8 @@ export function installTypeInfoPatch(app: App, env: WidgetEnv, widgets: PluginWi
 	// The table only rebuilds a cell when the identity of `inferred` changes, so `refresh` bumps the generation.
 	let generation = 0;
 	const cache = new Map<TypeWidget, Map<TypeWidget, Map<string, CacheEntry>>>();
+	// Checkmark widgets per hull and base type: a stable identity keeps Bases from rebuilding cells.
+	const menuWidgets = new WeakMap<TypeWidget, Map<string, TypeWidget>>();
 
 	const original = (info: TypeInfo, value: unknown): TypeWidget => {
 		try {
@@ -171,17 +173,34 @@ export function installTypeInfoPatch(app: App, env: WidgetEnv, widgets: PluginWi
 		return entry.hull;
 	};
 
+	const menuWidget = (hull: TypeWidget, shown: TypeWidget): TypeWidget => {
+		let byType = menuWidgets.get(hull);
+		if (!byType) {
+			byType = new Map<string, TypeWidget>();
+			menuWidgets.set(hull, byType);
+		}
+		let widget = byType.get(shown.type);
+		if (!widget) {
+			widget = { ...hull, type: shown.type, icon: shown.icon, name: shown.name };
+			byType.set(shown.type, widget);
+		}
+		return widget;
+	};
+
 	/**
-	 * While a column header menu is open, the menu's checkmark reads `getTypeInfo(name).inferred.type`: it must show the
-	 * type the base assigns, not the global one. Null when nothing is pending or the base has no such entry.
+	 * While a column header's `contextmenu` is dispatched, the menu's checkmark reads `getTypeInfo(name, undefined)
+	 * .inferred.type`: it must show the type the base assigns, not the global one. Calls with a value (cell renders)
+	 * are left alone. Null outside that window or when the base has no such entry. The right-clicked column's key is
+	 * not checked: the cell shows a display name, so every field with a base entry is covered during the dispatch.
 	 */
-	const pendingInfo = (info: TypeInfo, key: string, hull: TypeWidget): TypeInfo | null => {
-		const base = opts.pending?.();
+	const menuInfo = (info: TypeInfo, key: string, value: unknown, hull: TypeWidget): TypeInfo | null => {
+		if (value !== undefined) return null;
+		const base = opts.menuBase?.();
 		const entry = base ? env.membership.entryOf(base.basePath, key) : null;
 		if (!entry) return null;
 		const shown = Object.hasOwn(mtm.registeredTypeWidgets, entry.type) ? mtm.registeredTypeWidgets[entry.type] : undefined;
 		if (!shown) return null;
-		const widget: TypeWidget = { ...hull, type: shown.type, icon: shown.icon, name: shown.name };
+		const widget = menuWidget(hull, shown);
 		return { ...info, expected: widget, inferred: widget };
 	};
 
@@ -195,8 +214,8 @@ export function installTypeInfoPatch(app: App, env: WidgetEnv, widgets: PluginWi
 					const key = String(name).toLowerCase();
 					if (!membership.knownFieldNames().has(key)) return info;
 					const hull = hullFor(info, key);
-					const pending = pendingInfo(info, key, hull);
-					if (pending) return pending;
+					const menu = menuInfo(info, key, value, hull);
+					if (menu) return menu;
 					return { ...info, expected: hull, inferred: hull };
 				} catch (e) {
 					console.error("Improved Bases: getTypeInfo patch failed", e);

@@ -261,7 +261,7 @@ describe("typeInfoPatch", () => {
   it("returns null when internals are missing", () => {
     expect(installTypeInfoPatch({ metadataTypeManager: {} } as unknown as App, {} as WidgetEnv, {} as PluginWidgets)).toBeNull();
   });
-  describe("pending header base", () => {
+  describe("header menu base", () => {
     const setup = (entry: FieldSchema | null, pendingBase: { basePath: string; viewName: string | null } | null) => {
       const { app, text, mtm } = fakeApp();
       const membership: FakeMembership = {
@@ -274,10 +274,10 @@ describe("typeInfoPatch", () => {
       mtm.registeredTypeWidgets.relation = pluginRel;
       mtm.registeredTypeWidgets.multitext = widget("multitext");
       let pending = pendingBase;
-      installTypeInfoPatch(app, env(membership), widgets({}), { pending: () => pending });
+      installTypeInfoPatch(app, env(membership), widgets({}), { menuBase: () => pending });
       return { mtm, pluginRel, text, clear: () => (pending = null) };
     };
-    it("reports the base type as inferred/expected while pending", () => {
+    it("reports the base type as inferred/expected during the menu dispatch", () => {
       const { mtm, pluginRel, clear } = setup({ type: "relation", base: "X.base", multiple: false }, { basePath: "D.base", viewName: null });
       const info = mtm.getTypeInfo("Lead", undefined);
       expect(info.inferred.type).toBe("relation");
@@ -285,6 +285,13 @@ describe("typeInfoPatch", () => {
       expect(info.inferred.icon).toBe(pluginRel.icon);
       clear();
       expect(mtm.getTypeInfo("Lead", undefined).inferred.type).toBe("text");
+    });
+    it("overrides only calls without a value, with a stable widget identity", () => {
+      const { mtm } = setup({ type: "relation", base: "X.base", multiple: false }, { basePath: "D.base", viewName: null });
+      const first = mtm.getTypeInfo("Lead", undefined).inferred;
+      expect(first.type).toBe("relation");
+      expect(mtm.getTypeInfo("lead", undefined).inferred).toBe(first);
+      expect(mtm.getTypeInfo("Lead", "x").inferred.type).toBe("text"); // a cell render keeps the hull
     });
     it("uses the registered native widget for native types", () => {
       const { mtm } = setup({ type: "multitext" }, { basePath: "D.base", viewName: null });
