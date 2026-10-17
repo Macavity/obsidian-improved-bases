@@ -1,7 +1,7 @@
 {
 	"id": "improved-bases",
 	"name": "Improved Bases",
-	"version": "0.0.1",
+	"version": "0.1.0",
 	"minAppVersion": "1.14.4",
 	"description": "Relations restricted to another base and colored select options, right in the native Bases views and the properties panel.",
 	"author": "Alexander Pape",

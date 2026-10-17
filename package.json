@@ -1,6 +1,6 @@
 {
 	"name": "improved-bases",
-	"version": "0.0.1",
+	"version": "0.1.0",
 	"description": "Relations and colored select fields for Obsidian Bases.",
 	"main": "dist/main.js",
 	"type": "module",
