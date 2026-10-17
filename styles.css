@@ -137,6 +137,7 @@
 	border: 1px solid rgba(var(--ib-rgb), 0.45);
 	color: var(--text-normal);
 }
+.improved-bases-pill.is-neutral { --ib-rgb: 140, 140, 140; }
 .menu-item.improved-bases-menu-item::before {
 	content: "";
 	flex: none;

@@ -17,9 +17,10 @@ export interface OptionPickerHost {
 	/** Writes the property. */
 	commit(values: string[]): void;
 	create(value: string): Promise<SelectOption | null>;
-	recolor(value: string, color: Color): Promise<boolean>;
-	rename(from: string, to: string): Promise<boolean>;
-	remove(value: string): Promise<boolean>;
+	/** `recolor`, `rename` and `remove` are all-or-nothing: without them the picker shows no edit actions. */
+	recolor?: (value: string, color: Color) => Promise<boolean>;
+	rename?: (from: string, to: string) => Promise<boolean>;
+	remove?: (value: string) => Promise<boolean>;
 }
 
 const MIN_WIDTH = 260;
@@ -145,14 +146,13 @@ export function openOptionPicker(anchor: HTMLElement, host: OptionPickerHost, ov
 		el.addEventListener("mouseenter", () => highlight(index));
 		rowEls.push(el);
 		pill(el, row.option.value);
-		const edit = el.createEl("button", {
-			cls: "improved-bases-picker-edit",
-			attr: { type: "button", "aria-label": `Edit option ${row.option.value}` },
-		});
-		setIcon(edit, "lucide-pencil");
+		const edit = editable()
+			? el.createEl("button", { cls: "improved-bases-picker-edit", attr: { type: "button", "aria-label": `Edit option ${row.option.value}` } })
+			: null;
+		if (edit) setIcon(edit, "lucide-pencil");
 		// The slot keeps its width without a check, so the pencils line up.
 		el.createSpan({ cls: "improved-bases-picker-check", text: active ? "✓" : "" });
-		onPress(edit, () => editOption(edit, row.option));
+		if (edit) onPress(edit, () => editOption(edit, row.option));
 		onPress(el, () => activate(row));
 	};
 
@@ -174,7 +174,11 @@ export function openOptionPicker(anchor: HTMLElement, host: OptionPickerHost, ov
 		}
 	}
 
+	const editable = (): boolean => !!(host.recolor && host.rename && host.remove);
+
 	const editOption = (anchorEl: HTMLElement, option: SelectOption): void => {
+		const { recolor, rename, remove } = host;
+		if (!recolor || !rename || !remove) return;
 		editor?.close();
 		const value = option.value;
 		// A rejected host action closes the picker like any other picker failure instead of escaping the editor's `void` calls.
@@ -195,12 +199,12 @@ export function openOptionPicker(anchor: HTMLElement, host: OptionPickerHost, ov
 			option,
 			{
 				rename: (to) =>
-					done(host.rename(value, to), () => {
+					done(rename(value, to), () => {
 						option.value = to;
 						host.values = renameInList(host.values, value, to);
 					}, true),
-				recolor: (color) => done(host.recolor(value, color), () => (option.color = color), false),
-				remove: () => done(host.remove(value), () => (host.options = host.options.filter((o) => o !== option)), true),
+				recolor: (color) => done(recolor(value, color), () => (option.color = color), false),
+				remove: () => done(remove(value), () => (host.options = host.options.filter((o) => o !== option)), true),
 			},
 			overlays,
 		);

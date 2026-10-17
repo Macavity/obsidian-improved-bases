@@ -2,7 +2,9 @@ import { LinkValue, Notice, TFile } from "obsidian";
 import { baseViewNames } from "../schema/baseViews";
 import type { RelationField } from "../schema/types";
 import { targetKey } from "../query/target";
+import { entryItem } from "./entryItem";
 import { entryIcon, renderIcon } from "./icons";
+import { bindOpenTrigger } from "./openTrigger";
 import { EntryPicker, type PickerItem } from "./pickers";
 import type { PluginWidget } from "./types";
 import { linkTarget, relationOutput, toList } from "./values";
@@ -53,13 +55,7 @@ export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, fiel
 		const activePaths = new Set(active.flatMap((i) => (i.file ? [i.file.path] : [])));
 		const rest = (membership.targetEntries(key) ?? [])
 			.filter((file) => !activePaths.has(file.path))
-			.map((file): PickerItem => ({
-				raw: `[[${app.metadataCache.fileToLinktext(file, ctx.sourcePath, true)}]]`,
-				file,
-				label: file.basename,
-				active: false,
-				foreign: false,
-			}));
+			.map((file) => entryItem(app, file, ctx.sourcePath));
 		return [...active, ...rest];
 	};
 
@@ -125,16 +121,9 @@ export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, fiel
 
 	// A click in the field opens the picker; a click on a link keeps the link's own behavior (open, modifier = new tab).
 	// Obsidian renders wikilinks as `span.internal-link`, markdown links as `a`.
-	root.addEventListener("click", (evt) => {
-		if (evt.target instanceof Element && evt.target.closest("a, .internal-link")) return;
-		void openPicker();
-	});
-	root.addEventListener("keydown", (evt) => {
-		// Keys from a focused link inside the field belong to the link.
-		if (evt.target !== root || (evt.key !== "Enter" && evt.key !== " ")) return;
-		evt.preventDefault();
-		void openPicker();
-	});
+	// A click in the field opens the picker; a click on a link keeps the link's own behavior (open, modifier = new tab).
+	// Obsidian renders wikilinks as `span.internal-link`, markdown links as `a`.
+	bindOpenTrigger(root, () => void openPicker(), "a, .internal-link");
 
 	draw();
 	return {

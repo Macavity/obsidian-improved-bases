@@ -4,6 +4,7 @@ import { MEMBERS_LOADING } from "../schema/messages";
 import type { Color, SelectField, SelectOption } from "../schema/types";
 import { findOwnKey, isUnsafeKey } from "../schema/keys";
 import { confirmOptionDelete } from "./OptionDeleteModal";
+import { bindOpenTrigger } from "./openTrigger";
 import { openOptionPicker, type OptionPickerHost } from "./OptionPicker";
 import type { PluginWidget, SchemaSource } from "./types";
 import { addOptionMutation, colorOf, countNotesWithValue, nextOptionColor, removeOptionMutation, renameOptionMutation, selectOutput, setColorMutation, StaleOptionError, toList } from "./values";
@@ -130,12 +131,7 @@ export const SelectWidget: PluginWidget<SelectField> = (el, value, ctx, field, e
 		picker = openOptionPicker(root, host(), env.overlays);
 	};
 
-	root.addEventListener("click", openPicker);
-	root.addEventListener("keydown", (evt) => {
-		if (evt.target !== root || (evt.key !== "Enter" && evt.key !== " ")) return;
-		evt.preventDefault();
-		openPicker();
-	});
+	bindOpenTrigger(root, openPicker);
 
 	const draw = (): void => {
 		try {
