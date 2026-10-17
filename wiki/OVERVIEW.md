@@ -2,7 +2,7 @@
 title: Improved Bases — Overview
 description: "Home page and navigation hub for the Improved Bases codebase wiki: what the plugin is, how it is layered, and where every page lives."
 profile: internal/standard
-source_commit: "b9fb3fc"
+source_commit: "852ffa3"
 tags:
   - wiki
   - overview
@@ -11,7 +11,7 @@ tags:
 
 ## What this is
 
-**Improved Bases** is an [Obsidian](https://obsidian.md) plugin (id `improved-bases`) that adds two field types to Obsidian Bases, defined per `.base` file: **relations** (a property whose values are wikilinks restricted to entries of another base) and **colored selects** (options with colors, editable in place). Field definitions live under an `improved-bases:` key inside the `.base` file itself; the plugin never writes to Obsidian's global `types.json`. The user-facing behavior, schema format and commands are documented in the [README](../README.md); development setup lives in [CONTRIBUTING](../CONTRIBUTING.md), and the original feasibility research in [SPIKE_FINDINGS](../SPIKE_FINDINGS.md).
+**Improved Bases** is an [Obsidian](https://obsidian.md) plugin (id `improved-bases`) that adds two field types to Obsidian Bases, defined per `.base` file: **relations** (a property whose values are wikilinks restricted to entries of another base) and **colored selects** (options with colors, editable in place). Field definitions live under an `improved-bases:` key inside the `.base` file itself; the plugin itself never writes Obsidian's global `types.json`. It does register `select` and `relation` as native property types, so Obsidian's own type menus offer them and write `types.json` on the user's choice. The user-facing behavior, schema format and commands are documented in the [README](../README.md); development setup lives in [CONTRIBUTING](../CONTRIBUTING.md), and the original feasibility research in [SPIKE_FINDINGS](../SPIKE_FINDINGS.md).
 
 The plugin is small (about 2,000 lines of TypeScript in `src/`) but sits on two undocumented Obsidian internals: it patches `metadataTypeManager.getTypeInfo` to swap in its own property widgets, and it reads Bases query results through a hidden Bases view (with the internal `base:query` CLI handler as a desktop fallback). Everything is feature-detected; when the internals are missing the plugin degrades to native rendering while the schema commands keep working. See [Obsidian internals](./architecture/obsidian-internals.md).
 

@@ -10,7 +10,7 @@ tags:
 
 ## Definition
 
-**Membership** (`Membership` in [Membership.ts](../../src/schema/Membership.ts)) is the join between the [schema registry](../modules/schema.md) and the [query](../modules/query.md) layer. A file is a *member* of a schema base when it appears in that base's query result. `resolve(filePath, propName)` returns the [field schema](./field-schema.md) that applies, or `null`. It also tracks the result sets of relation target bases (`targetEntries(key)`, key = `targetKey()` of the relation's `QueryTarget`, i.e. the base path or `base#view`) for the relation picker and exposes a target base's default entry icon (`baseIcon(basePath)`, from the registry's `BaseSchema.icon`, null without one) for the relation chips.
+**Membership** (`Membership` in [Membership.ts](../../src/schema/Membership.ts)) is the join between the [schema registry](../modules/schema.md) and the [query](../modules/query.md) layer. A file is a *member* of a schema base when it appears in that base's query result. `resolve(filePath, propName)` returns the [field schema](./field-schema.md) that applies, or `null`. It also tracks the result sets of relation target bases (`targetEntries(key)`, key = `targetKey()` of the relation's `QueryTarget`, i.e. the base path or `base#view`) for the relation picker and exposes `entryOf(basePath, key)` (a base's own field entry, key lowercase, null without one; used by the header type change checkmark) and a target base's default entry icon (`baseIcon(basePath)`, from the registry's `BaseSchema.icon`, null without one) for the relation chips.
 
 Three rules:
 

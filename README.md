@@ -8,7 +8,9 @@ Requires Obsidian 1.14.4 or newer. Desktop is tested; mobile is being verified.
 
 - **Relations:** a field links to entries of another base. The value is stored as a regular wikilink, so graph, backlinks, hover previews and rename updates keep working. The picker only offers entries of the target base.
 - **Select fields:** options with colors, picked, created, renamed, recolored and deleted from one popover in the field.
-- Field definitions live in the `.base` file itself. A field can mean something different in each base; notes outside a schema base keep Obsidian's global property types. The plugin never writes to `types.json`.
+- Field definitions live in the `.base` file itself. A field can mean something different in each base; notes outside a schema base keep Obsidian's global property types.
+- **Native property types:** Select and Relation are registered as Obsidian property types, so they appear in Obsidian's own type menus everywhere. A global type lives in `types.json`, which Obsidian writes when you pick it; the plugin itself never writes `types.json`. Without a base definition, a globally typed field gets a generic widget: select shows neutral pills with the values used in the vault as options, relation offers a picker over all notes.
+- **Type change from a column header:** right-click a column header in a base and choose a type. This changes the global type. When the choice is Select or Relation, or the base has its own definition for the field, Schema settings opens for that base with the field preselected; cancel leaves the base unchanged.
 - Sorting, grouping and filtering stay native.
 
 ## Where it works
@@ -23,7 +25,8 @@ Requires Obsidian 1.14.4 or newer. Desktop is tested; mobile is being verified.
 Limits:
 
 - Undo (Cmd/Ctrl+Z) works only for edits in the properties panel. The native table has no undo for property edits.
-- There are no context menu entries on properties, only commands (below).
+- Bases' "Edit property" dialog and code-block bases only change the global type; they do not open Schema settings.
+- Turning widgets off unregisters the types: such fields show as text, values are kept.
 - At startup the table briefly shows native widgets before the plugin widgets replace them.
 - If a note belongs to several schema bases that define the same field, the base you are looking at wins (in its table or embed). Elsewhere (properties panel, sidebar, code-block bases) the first base by path wins. The field then shows an info icon whose tooltip names the bases and their definitions; a warning is also logged to the console. The schema settings dialog points this out under the field as well ("Also defined in Meetings.base as text; 1 note is in both bases.") but never blocks saving: a field may be defined differently per base, only a note in both bases makes it a conflict. Select options, colors and icons do not count as a difference; new options are written into the base whose definition is shown.
 - Designed for a low double-digit number of schema bases (see Performance below).

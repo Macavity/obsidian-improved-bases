@@ -16,7 +16,7 @@ tags:
 
 - Construct `BaseQuery`, `SchemaRegistry`, `Membership`, `SchemaWriter` and the shared `WidgetEnv` (`{ membership, query, writer, app, overlays }`) in `onload()`.
 - Decide `widgetsSupported` via `getMetadataTypeManager()` and show one `Notice` per load when unsupported (`notifyUnsupported()` is idempotent via `notified`).
-- `applyWidgetsEnabled()`: install or uninstall the [getTypeInfo patch](../concepts/hull-widget.md) according to `settings.widgetsEnabled && widgetsSupported`. Called on load and from the settings toggle.
+- `applyWidgetsEnabled()`: `enableWidgets()` or `disableWidgets()` according to `settings.widgetsEnabled && widgetsSupported`; called on load and from the settings toggle. Enable order: `registerPluginTypes` (one `Notice` per id taken by another plugin) → [getTypeInfo patch](../concepts/hull-widget.md) → `installHeaderTypeChange` (opens schema settings via the handle `registerSchemaSettings` returns) → `refreshAssigned()` (`trigger('changed')` for fields whose global type is a registered plugin id). Disable reverses it; unregistered types make those fields render as text, values kept. A failed patch unregisters the types again and flips `widgetsSupported`.
 - Register the schema settings entry points (`registerSchemaSettings()`: command, file menu item, toolbar button) and the settings tab; start the registry scan on `workspace.onLayoutReady`.
 - Persist settings via `loadData()` / `saveData()`; `mergeSettings()` is a defensive merge that ignores unknown keys and wrongly typed values; the settings tab also writes through it (`setControlValue()`).
 
