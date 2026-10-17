@@ -14,7 +14,7 @@ const installHeader = vi.mocked(installHeaderTypeChange);
 const stub = (type: string) => ({ type, validate: () => true, render: () => undefined });
 
 function plugin(widgetsEnabled: boolean, registered: Record<string, unknown> = {}, types: Record<string, string> = {}) {
-	const mtm = { registeredTypeWidgets: { text: stub("text"), ...registered } as Record<string, unknown>, getTypeInfo: vi.fn(), trigger: vi.fn(), types };
+	const mtm = { registeredTypeWidgets: { text: stub("text"), ...registered } as Record<string, unknown>, getTypeInfo: vi.fn(), trigger: vi.fn(), assignedWidgets: Object.fromEntries(Object.entries(types).map(([name, widget]) => [name.toLowerCase(), { name, widget }])) };
 	const app = { metadataTypeManager: mtm } as unknown as App;
 	const p = new ImprovedBasesPlugin(app, { name: "Improved Bases" } as PluginManifest);
 	Object.assign(p, { app, manifest: { name: "Improved Bases" } });
@@ -65,6 +65,9 @@ describe("applyWidgetsEnabled", () => {
 		expect(mtm.registeredTypeWidgets.relation).toBeDefined();
 		expect(installHeader).toHaveBeenCalledTimes(1);
 		expect(install.mock.calls[0]![3]).toHaveProperty("pending");
+		const changedOnEnable = mtm.trigger.mock.calls.filter((c) => c[0] === "changed").map((c): unknown => c[1]);
+		expect(changedOnEnable.sort()).toEqual(["lead", "team"]);
+		mtm.trigger.mockClear();
 		p.settings.widgetsEnabled = false;
 		p.applyWidgetsEnabled();
 		expect(order).toEqual(["header", "patch"]);

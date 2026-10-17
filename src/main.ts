@@ -13,8 +13,20 @@ import { OverlayRegistry, WidgetEnv } from "./widgets/types";
 import { RelationWidget } from "./widgets/RelationWidget";
 import { SelectWidget } from "./widgets/SelectWidget";
 import { registerSchemaSettings } from "./schema-settings/schemaSettings";
-import { assignedTypes, getMetadataTypeManager } from "./internals/detect";
+import { assignedTypes, getMetadataTypeManager, type MetadataTypeManager } from "./internals/detect";
 import { ImprovedBasesSettings, ImprovedBasesSettingTab, mergeSettings } from "./settings";
+
+/** Rebuilds the widgets of every property whose global type is one of `types`. */
+function refreshAssigned(mtm: MetadataTypeManager, types: ReadonlySet<string>): void {
+	for (const [name, type] of assignedTypes(mtm)) {
+		if (!types.has(type)) continue;
+		try {
+			mtm.trigger("changed", name);
+		} catch (e) {
+			console.error("Improved Bases: refresh failed", e);
+		}
+	}
+}
 
 export default class ImprovedBasesPlugin extends Plugin {
 	settings: ImprovedBasesSettings;
@@ -96,6 +108,8 @@ export default class ImprovedBasesPlugin extends Plugin {
 			open: (base: HeaderBase, focus) => void this.schemaSettings?.open(base.basePath, base.viewName, focus),
 		});
 		this.headerTypeChange = header;
+		// Fields typed select/relation still show the default widget Obsidian picked while the ids were unknown.
+		refreshAssigned(mtm, registration.registered);
 	}
 
 	private disableWidgets() {
@@ -109,15 +123,7 @@ export default class ImprovedBasesPlugin extends Plugin {
 		registration.unregister();
 		// Fields typed select/relation fall back to text; cells and panels still hold the removed widgets.
 		const mtm = getMetadataTypeManager(this.app);
-		if (!mtm) return;
-		for (const [name, type] of assignedTypes(mtm)) {
-			if (!registration.registered.has(type as never)) continue;
-			try {
-				mtm.trigger("changed", name);
-			} catch (e) {
-				console.error("Improved Bases: refresh failed", e);
-			}
-		}
+		if (mtm) refreshAssigned(mtm, registration.registered);
 	}
 
 	async loadSettings() {

@@ -56,7 +56,13 @@ export function getMetadataTypeManager(app: App): MetadataTypeManager | null {
 
 /** Property names (as stored) with a global type in `types.json`, with that type; empty when the internals differ. */
 export function assignedTypes(mtm: MetadataTypeManager): [string, string][] {
-	const types = (mtm as { types?: unknown }).types;
-	if (typeof types !== "object" || types === null) return [];
-	return Object.entries(types).filter((e): e is [string, string] => typeof e[1] === "string");
+	// Measured (Obsidian 1.14.4): `assignedWidgets` maps the lowercase key to `{ name, widget }`.
+	const assigned = (mtm as { assignedWidgets?: unknown }).assignedWidgets;
+	if (typeof assigned !== "object" || assigned === null) return [];
+	const result: [string, string][] = [];
+	for (const entry of Object.values(assigned)) {
+		const { name, widget } = (entry ?? {}) as { name?: unknown; widget?: unknown };
+		if (typeof name === "string" && typeof widget === "string") result.push([name, widget]);
+	}
+	return result;
 }
