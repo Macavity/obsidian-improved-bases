@@ -80,7 +80,7 @@ describe("generic select widget", () => {
 		h2.commit(["x", "z"]);
 		expect(multi.onChange).toHaveBeenLastCalledWith(["x", "z"]);
 		expect(await h2.create("new")).toEqual({ value: "new", color: "grey" });
-		expect(await h2.create("__proto__")).toBeNull();
+		expect(await h2.create("constructor")).toEqual({ value: "constructor", color: "grey" });
 		expect(multi.onChange).toHaveBeenCalledTimes(1);
 	});
 	it("an empty value is multiple when the vault stores a list", () => {

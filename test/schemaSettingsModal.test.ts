@@ -650,6 +650,14 @@ describe("SchemaSettingsModal reading the notes", () => {
 		expect(el.querySelector(".improved-bases-save")).not.toBeNull();
 	});
 
+	it("does not list a focused new field twice when the notes bring it", async () => {
+		const p = pending();
+		const { el } = open({ kind: "fields", drafts: [] }, { members: p.members, focus: { name: "Status", type: "select" } });
+		p.resolve([d({ originalName: "status", name: "status" })]);
+		await tick();
+		expect(names(el)).toEqual(["Status"]);
+	});
+
 	it("says so when the notes could not be read", async () => {
 		const p = pending();
 		const { el } = open({ kind: "fields", drafts: [] }, { members: p.members });

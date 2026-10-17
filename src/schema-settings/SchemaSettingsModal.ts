@@ -250,7 +250,10 @@ export class SchemaSettingsModal extends Modal {
 
 	/** Adds the fields only the notes know, behind the known ones and before fields added in the dialog, without counting as a change. */
 	private addMemberFields(drafts: FieldDraft[]): void {
-		const known = new Set(this.initialDrafts.map((d) => (d.originalName ?? d.name).toLowerCase()));
+		const known = new Set([
+			...this.initialDrafts.map((d) => (d.originalName ?? d.name).toLowerCase()),
+			...this.drafts.filter((d) => !d.removed).map((d) => d.name.toLowerCase()),
+		]);
 		const added = drafts.filter((d) => d.originalName !== null && !known.has(d.originalName.toLowerCase()));
 		if (!added.length) return;
 		const firstNew = this.drafts.findIndex((d) => d.originalName === null);

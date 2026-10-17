@@ -121,8 +121,6 @@ export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, fiel
 
 	// A click in the field opens the picker; a click on a link keeps the link's own behavior (open, modifier = new tab).
 	// Obsidian renders wikilinks as `span.internal-link`, markdown links as `a`.
-	// A click in the field opens the picker; a click on a link keeps the link's own behavior (open, modifier = new tab).
-	// Obsidian renders wikilinks as `span.internal-link`, markdown links as `a`.
 	bindOpenTrigger(root, () => void openPicker(), "a, .internal-link");
 
 	draw();

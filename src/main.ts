@@ -43,6 +43,7 @@ export default class ImprovedBasesPlugin extends Plugin {
 	private schemaSettings: { open: (basePath: string, viewName: string | null, focus?: { name: string; type: string }) => Promise<void> } | null = null;
 	private env: WidgetEnv;
 	private notified = false;
+	private notifiedSkipped = false;
 
 	async onload() {
 		await this.loadSettings();
@@ -86,7 +87,10 @@ export default class ImprovedBasesPlugin extends Plugin {
 		const mtm = getMetadataTypeManager(this.app);
 		if (!mtm) return;
 		const registration = registerPluginTypes(mtm, { select: createGenericSelectWidget(this.env), relation: createGenericRelationWidget(this.env) });
-		for (const id of registration.skipped) new Notice(`${this.manifest.name}: property type "${id}" is already registered by another plugin`);
+		if (!this.notifiedSkipped) {
+			this.notifiedSkipped = true;
+			for (const id of registration.skipped) new Notice(`${this.manifest.name}: property type "${id}" is already registered by another plugin`);
+		}
 		this.registration = registration;
 		let header: HeaderTypeChange | null = null;
 		this.typeInfoPatch = installTypeInfoPatch(this.app, this.env, { relation: RelationWidget, select: SelectWidget }, { menuBase: () => header?.menuBase() ?? null });

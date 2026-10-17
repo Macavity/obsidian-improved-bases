@@ -114,5 +114,8 @@ describe("applyWidgetsEnabled", () => {
 		p.settings.widgetsEnabled = false;
 		p.applyWidgetsEnabled();
 		expect(mtm.registeredTypeWidgets.select).toBe(foreign);
+		p.settings.widgetsEnabled = true;
+		p.applyWidgetsEnabled();
+		expect(Notice).toHaveBeenCalledTimes(1);
 	});
 });

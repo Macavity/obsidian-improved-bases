@@ -1,6 +1,4 @@
-import { Notice } from "obsidian";
 import type { TypeWidget } from "../internals/detect";
-import { isUnsafeKey } from "../schema/keys";
 import type { SelectOption } from "../schema/types";
 import { collectValues, isMultiple, validateGeneric } from "./genericValues";
 import { bindOpenTrigger } from "./openTrigger";
@@ -50,10 +48,6 @@ export function createGenericSelectWidget(env: WidgetEnv): TypeWidget {
 						ctx.onChange(output);
 					},
 					create(created) {
-						if (isUnsafeKey(created)) {
-							new Notice("Reserved name");
-							return Promise.resolve(null);
-						}
 						return Promise.resolve({ value: created, color: "grey" });
 					},
 				};

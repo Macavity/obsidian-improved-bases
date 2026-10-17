@@ -10,7 +10,7 @@ Requires Obsidian 1.14.4 or newer. Desktop is tested; mobile is being verified.
 - **Select fields:** options with colors, picked, created, renamed, recolored and deleted from one popover in the field.
 - Field definitions live in the `.base` file itself. A field can mean something different in each base; notes outside a schema base keep Obsidian's global property types.
 - **Native property types:** Select and Relation are registered as Obsidian property types, so they appear in Obsidian's own type menus everywhere. A global type lives in `types.json`, which Obsidian writes when you pick it; the plugin itself never writes `types.json`. Without a base definition, a globally typed field gets a generic widget: select shows neutral pills with the values used in the vault as options, relation offers a picker over all notes.
-- **Type change from a column header:** right-click a column header in a base and choose a type. This changes the global type. When the choice is Select or Relation, or the base has its own definition for the field, Schema settings opens for that base with the field preselected; cancel leaves the base unchanged.
+- **Type change from a column header:** right-click a column header in a base and choose a type. This changes the global type. The menu checks the column's type from the base; clicking that checked entry still makes Obsidian write it as the global type for the whole vault. When the choice is Select or Relation, or the base has its own definition for the field, Schema settings opens for that base with the field preselected; cancel leaves the base unchanged.
 - Sorting, grouping and filtering stay native.
 
 ## Where it works
