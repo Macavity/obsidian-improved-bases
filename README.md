@@ -117,6 +117,10 @@ On disable or unload the patch is removed completely and all views are native ag
 
 Measured with `pnpm perf` (2000 notes, 10 schema bases): ready in 370 ms, first table render in 113 ms with a visible window. A hidden window is throttled and can be orders of magnitude slower. Details in `SPIKE_FINDINGS.md`, section "Performance".
 
+## Installation
+
+Until the plugin is listed in the community catalog, install it from a checkout: run `pnpm build` and then `pnpm vault:link`, which lists the vaults registered in Obsidian and copies the build output into the one you pick. Then enable it under Settings → Community plugins.
+
 ## Development
 
 Requires [Node.js](https://nodejs.org/) (LTS) and [pnpm](https://pnpm.io/).
