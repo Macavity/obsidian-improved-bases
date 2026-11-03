@@ -37,11 +37,11 @@ function setup(value: unknown, opts: { multiple?: boolean; resolved?: boolean; w
 	const handle = SelectWidget(el, value, ctx, field, env, opts.source);
 	const root = el.querySelector<HTMLElement>(".improved-bases-select") as HTMLElement;
 	const pills = () => Array.from(el.querySelectorAll(".improved-bases-pill")).map((p) => p.querySelector(".improved-bases-pill-body")?.textContent);
-	const open = (): OptionPickerHost => {
+	const open = (): Required<OptionPickerHost> => {
 		root.click();
 		const call = vi.mocked(openOptionPicker).mock.calls.at(-1);
 		if (!call) throw new Error("picker not opened");
-		return call[1];
+		return call[1] as Required<OptionPickerHost>;
 	};
 	return { el, root, handle, onChange, update, pills, open, env, processFrontMatter };
 }

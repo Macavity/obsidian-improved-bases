@@ -650,11 +650,38 @@ describe("SchemaSettingsModal reading the notes", () => {
 		expect(el.querySelector(".improved-bases-save")).not.toBeNull();
 	});
 
+	it("does not list a focused new field twice when the notes bring it", async () => {
+		const p = pending();
+		const { el } = open({ kind: "fields", drafts: [] }, { members: p.members, focus: { name: "Status", type: "select" } });
+		p.resolve([d({ originalName: "status", name: "status" })]);
+		await tick();
+		expect(names(el)).toEqual(["Status"]);
+	});
+
 	it("says so when the notes could not be read", async () => {
 		const p = pending();
 		const { el } = open({ kind: "fields", drafts: [] }, { members: p.members });
 		p.resolve(null);
 		await tick();
 		expect(loading(el)).toBe("Could not read the notes of this base, so there are no suggestions from notes.");
+	});
+
+	it("focus presets and expands the field; the dialog is dirty, Save is not called by itself", () => {
+		const scroll = vi.fn();
+		Element.prototype.scrollIntoView = scroll;
+		const lead = d({ originalName: "Lead", name: "Lead", detected: "text" });
+		const { el, q, onSave, modal } = open({ kind: "fields", drafts: [d({ originalName: "A", name: "A" }), lead] }, { focus: { name: "lead", type: "select" } });
+		expect(expanded(el)).toEqual([false, true]);
+		expect(q<HTMLSelectElement>(".improved-bases-field-row:nth-child(2) .improved-bases-field-type").value).toBe("select");
+		expect(q<HTMLButtonElement>(".improved-bases-save").disabled).toBe(false);
+		expect(scroll).toHaveBeenCalled();
+		modal.close();
+		expect(onSave).not.toHaveBeenCalled();
+		expect(lead.type).toBe("native");
+	});
+	it("focus on an unknown field adds it", () => {
+		const { el } = open({ kind: "fields", drafts: [] }, { focus: { name: "New", type: "relation" } });
+		expect(names(el)).toEqual(["New"]);
+		expect(expanded(el)).toEqual([true]);
 	});
 });

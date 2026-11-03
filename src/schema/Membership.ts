@@ -145,6 +145,11 @@ export class Membership extends Events {
 		return this.registry.schemas().find((s) => s.basePath === basePath)?.icon ?? null;
 	}
 
+	/** The own entry of a base for a field (`key` lowercase); null without one. */
+	entryOf(basePath: string, key: string): FieldSchema | null {
+		return this.registry.schemas().find((s) => s.basePath === basePath)?.fields.get(key)?.field ?? null;
+	}
+
 	knownFieldNames(): Set<string> {
 		const out = new Set<string>();
 		for (const s of this.registry.schemas()) for (const k of s.fields.keys()) out.add(k);

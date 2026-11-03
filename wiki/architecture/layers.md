@@ -70,7 +70,7 @@ flowchart LR
 
 ## Design decisions
 
-- **Schema lives in the `.base`, not in `types.json`.** A property can mean different things in different bases, and notes outside any schema base keep Obsidian's global types. This is why resolution is keyed on `(filePath, propName)` rather than on the property name alone.
+- **Schema lives in the `.base`, not in `types.json`.** A property can mean different things in different bases, and notes outside any schema base keep Obsidian's global types. The plugin registers `select`/`relation` as native property types, so a global type may name them; without a base entry the generic widgets render. Obsidian writes `types.json`, never the plugin. This is why resolution is keyed on `(filePath, propName)` rather than on the property name alone.
 - **One write path.** Widgets and the dialog never touch the `.base` text themselves; they hand a mutation `(fields: RawFields) => void` to `SchemaWriter.update()`, which applies it through `vault.process()`. Keeps YAML comments and ordering intact and makes mutations unit-testable as pure functions.
 - **Readiness is a latch, not a flag.** `Membership.ready` only flips once the registry is loaded, every schema base has produced a result, the metadata cache is resolved, and the quiet period has elapsed. Before that, `resolve()` returns `null` and the hull falls back to native rendering. See [Plugin load and ready](../flows/plugin-load-and-ready.md).
 - **Internals are isolated in `internals/`** and feature-detected at the boundary; the rest of the code depends on typed interfaces (`MetadataTypeManager`, `CliHandler`). See [Obsidian internals](./obsidian-internals.md).

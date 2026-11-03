@@ -14,6 +14,7 @@ interface FakeMtm {
 interface FakeMembership {
   knownFieldNames(): Set<string>;
   resolveWithBase(path: string, key: string, preferredBase?: string | null): Resolution | null;
+  entryOf?(basePath: string, key: string): FieldSchema | null;
   shapesFor?(name: string): Set<"list" | "scalar" | "native">;
   on(name: string, cb: (...a: unknown[]) => void): unknown;
   offref?(ref: unknown): void;
@@ -259,5 +260,46 @@ describe("typeInfoPatch", () => {
   });
   it("returns null when internals are missing", () => {
     expect(installTypeInfoPatch({ metadataTypeManager: {} } as unknown as App, {} as WidgetEnv, {} as PluginWidgets)).toBeNull();
+  });
+  describe("header menu base", () => {
+    const setup = (entry: FieldSchema | null, pendingBase: { basePath: string; viewName: string | null } | null) => {
+      const { app, text, mtm } = fakeApp();
+      const membership: FakeMembership = {
+        knownFieldNames: () => new Set(["lead"]),
+        resolveWithBase: () => null,
+        entryOf: (b, k) => (b === "D.base" && k === "lead" ? entry : null),
+        on: vi.fn(),
+      };
+      const pluginRel = { type: "relation", name: () => "Relation", icon: "lucide-link", validate: () => true, render: vi.fn() };
+      mtm.registeredTypeWidgets.relation = pluginRel;
+      mtm.registeredTypeWidgets.multitext = widget("multitext");
+      let pending = pendingBase;
+      installTypeInfoPatch(app, env(membership), widgets({}), { menuBase: () => pending });
+      return { mtm, pluginRel, text, clear: () => (pending = null) };
+    };
+    it("reports the base type as inferred/expected during the menu dispatch", () => {
+      const { mtm, pluginRel, clear } = setup({ type: "relation", base: "X.base", multiple: false }, { basePath: "D.base", viewName: null });
+      const info = mtm.getTypeInfo("Lead", undefined);
+      expect(info.inferred.type).toBe("relation");
+      expect(info.expected).toBe(info.inferred);
+      expect(info.inferred.icon).toBe(pluginRel.icon);
+      clear();
+      expect(mtm.getTypeInfo("Lead", undefined).inferred.type).toBe("text");
+    });
+    it("overrides only calls without a value, with a stable widget identity", () => {
+      const { mtm } = setup({ type: "relation", base: "X.base", multiple: false }, { basePath: "D.base", viewName: null });
+      const first = mtm.getTypeInfo("Lead", undefined).inferred;
+      expect(first.type).toBe("relation");
+      expect(mtm.getTypeInfo("lead", undefined).inferred).toBe(first);
+      expect(mtm.getTypeInfo("Lead", "x").inferred.type).toBe("text"); // a cell render keeps the hull
+    });
+    it("uses the registered native widget for native types", () => {
+      const { mtm } = setup({ type: "multitext" }, { basePath: "D.base", viewName: null });
+      expect(mtm.getTypeInfo("lead", undefined).inferred.type).toBe("multitext");
+    });
+    it("leaves other bases and unknown entries alone", () => {
+      expect(setup({ type: "relation", base: "X.base", multiple: false }, { basePath: "O.base", viewName: null }).mtm.getTypeInfo("Lead", undefined).inferred.type).toBe("text");
+      expect(setup(null, { basePath: "D.base", viewName: null }).mtm.getTypeInfo("Lead", undefined).inferred.type).toBe("text");
+    });
   });
 });

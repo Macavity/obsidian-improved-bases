@@ -55,6 +55,14 @@ afterEach(() => {
 	vi.restoreAllMocks();
 });
 
+describe("option picker without edit actions", () => {
+	it("shows no edit buttons when the host has no rename, recolor and remove", () => {
+		const { rows, popover } = setup({ recolor: undefined, rename: undefined, remove: undefined });
+		expect(rows()).toHaveLength(3);
+		expect(popover()?.querySelector(".improved-bases-picker-edit")).toBeNull();
+	});
+});
+
 describe("placePopover", () => {
 	it("places below, or above when below is too small and above is larger", () => {
 		const vp = { width: 1000, height: 800 };

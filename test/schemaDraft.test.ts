@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parse } from "yaml";
-import { applyTypeChoice, conflictHint, draftsToEdits, knownFieldDrafts, mismatchHint, optionSuggestions, removals, renameKey, renames, typeChoice, typeChoices, TYPES, validateDrafts, optionMigrations, type FieldDraft, type OptionDraft, type OtherDefinition } from "../src/schema-settings/schemaDraft";
+import { applyTypeChoice, conflictHint, draftsToEdits, focusDraft, knownFieldDrafts, mismatchHint, optionSuggestions, removals, renameKey, renames, typeChoice, typeChoices, TYPES, validateDrafts, optionMigrations, type FieldDraft, type OptionDraft, type OtherDefinition } from "../src/schema-settings/schemaDraft";
 import type { Color } from "../src/schema/types";
 import { updateSchemaSource } from "../src/schema/SchemaWriter";
 import type { BaseColumns, RawFields } from "../src/schema/baseDoc";
@@ -253,6 +253,18 @@ describe("schemaDraft", () => {
 			expect(typeChoices(d({ detected: "text", override: { type: "list" } }), types)).toEqual(["native:text", "native:multitext", "native:list", "relation", "select"]);
 			expect(typeChoices(d({ detected: "text" }), [])).toEqual(["native", "relation", "select"]);
 		});
+		it("does not offer select/relation twice and shows the global type as native", () => {
+			const withSelect: PropertyType[] = [...types, { type: "select", name: "Auswahl", icon: "lucide-list", reserved: false }, { type: "relation", name: "Bezug", icon: "lucide-link", reserved: false }];
+			const choices = typeChoices(d({ detected: "select" }), withSelect);
+			expect(choices.filter((c) => c === "select")).toHaveLength(1);
+			expect(choices).toEqual(["native", "native:text", "native:multitext", "relation", "select"]);
+			expect(typeChoices(d({ detected: "text" }), withSelect).filter((c) => c === "select")).toHaveLength(1);
+			expect(typeChoice(d({ detected: "select" }), withSelect)).toBe("native");
+			expect(typeChoice(d({ detected: "relation" }), withSelect)).toBe("native");
+			const draft = d({ detected: "select" });
+			applyTypeChoice(draft, "native");
+			expect(draft.override).toBeNull();
+		});
 		it("shows the overriding type, else Obsidian's", () => {
 			expect(typeChoice(d({ detected: "multitext" }), types)).toBe("native:multitext");
 			expect(typeChoice(d({ detected: "text", override: { type: "number" } }), types)).toBe("native:number");
@@ -301,5 +313,37 @@ describe("schemaDraft", () => {
 			mutation([draft], ["Due"])(f);
 			expect(f.Due).toEqual({ type: "date" });
 		});
+	});
+});
+
+describe("focusDraft", () => {
+	const types: PropertyType[] = [
+		{ type: "text", name: "Text", icon: "lucide-text", reserved: false },
+		{ type: "select", name: "Auswahl", icon: "lucide-list", reserved: false },
+	];
+	const draft = (p: Partial<FieldDraft>): FieldDraft => ({
+		originalName: null, originalBase: null, name: "X", type: "native", detected: null,
+		override: null, removed: false, multiple: false, options: [], ...p,
+	});
+	it("finds a draft case-insensitively and applies the choice", () => {
+		const lead = draft({ originalName: "lead", name: "lead", detected: "text" });
+		const drafts = [draft({ name: "other" }), lead];
+		expect(focusDraft(drafts, { name: "Lead", type: "select" }, types)).toBe(lead);
+		expect(lead.type).toBe("select");
+		expect(drafts).toHaveLength(2);
+	});
+	it("creates a missing field like Add field", () => {
+		const drafts: FieldDraft[] = [];
+		const created = focusDraft(drafts, { name: "Lead", type: "native:text" }, types);
+		expect(drafts).toEqual([created]);
+		expect(created).toMatchObject({ originalName: null, name: "Lead", type: "native", detected: null, override: { type: "text" } });
+	});
+	it("sets an override and leaves a draft alone that already shows the choice", () => {
+		const a = draft({ originalName: "a", name: "a", detected: "select" });
+		focusDraft([a], { name: "a", type: "native" }, types);
+		expect(a.override).toBeNull();
+		const b = draft({ originalName: "b", name: "b", detected: "number", override: { type: "text" } });
+		focusDraft([b], { name: "b", type: "native:text" }, types);
+		expect(b.override).toEqual({ type: "text" });
 	});
 });

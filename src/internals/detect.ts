@@ -42,6 +42,8 @@ export interface MetadataTypeManager {
 	registeredTypeWidgets: Record<string, TypeWidget | undefined>;
 	getTypeInfo(name: string, value: unknown): TypeInfo;
 	trigger(name: string, ...args: unknown[]): void;
+	/** Writes the global type for a property (`types.json`); absent on versions without it. */
+	setType?: (name: string, type: string) => unknown;
 }
 
 /** Returns `app.metadataTypeManager` when it has the shape the getTypeInfo patch needs, else null. */
@@ -50,4 +52,17 @@ export function getMetadataTypeManager(app: App): MetadataTypeManager | null {
 	if (!mtm || typeof mtm.getTypeInfo !== "function" || typeof mtm.trigger !== "function") return null;
 	if (typeof mtm.registeredTypeWidgets?.text?.render !== "function") return null;
 	return mtm as MetadataTypeManager;
+}
+
+/** Property names (as stored) with a global type in `types.json`, with that type; empty when the internals differ. */
+export function assignedTypes(mtm: MetadataTypeManager): [string, string][] {
+	// Measured (Obsidian 1.14.4): `assignedWidgets` maps the lowercase key to `{ name, widget }`.
+	const assigned = (mtm as { assignedWidgets?: unknown }).assignedWidgets;
+	if (typeof assigned !== "object" || assigned === null) return [];
+	const result: [string, string][] = [];
+	for (const entry of Object.values(assigned)) {
+		const { name, widget } = (entry ?? {}) as { name?: unknown; widget?: unknown };
+		if (typeof name === "string" && typeof widget === "string") result.push([name, widget]);
+	}
+	return result;
 }

@@ -50,6 +50,14 @@ function selectable(types: readonly PropertyType[], type: string | null): boolea
 	return type !== null && types.some((t) => t.type === type && !t.reserved);
 }
 
+/** Plugin types that Obsidian also registers as property types; the dropdown offers them once, as the plugin choice. */
+const PLUGIN_IDS: readonly string[] = ["select", "relation"];
+
+/** Whether a type id is its own `native:` choice: selectable and not a plugin type. */
+function nativeSelectable(types: readonly PropertyType[], type: string | null): boolean {
+	return selectable(types, type) && !PLUGIN_IDS.includes(type as string);
+}
+
 /** The override's type id, null without one. */
 export function overrideType(draft: FieldDraft): string | null {
 	const type = draft.override?.type;
@@ -58,17 +66,17 @@ export function overrideType(draft: FieldDraft): string | null {
 
 /** Obsidian's own type first unless it is selectable, every selectable registered type, the override when it is not registered, then the plugin types. */
 export function typeChoices(draft: FieldDraft, types: readonly PropertyType[]): TypeChoice[] {
-	const own: TypeChoice[] = selectable(types, draft.detected) ? [] : ["native"];
-	const registered = types.filter((t) => !t.reserved).map((t): TypeChoice => `${NATIVE_PREFIX}${t.type}`);
+	const own: TypeChoice[] = nativeSelectable(types, draft.detected) ? [] : ["native"];
+	const registered = types.filter((t) => !t.reserved && !PLUGIN_IDS.includes(t.type)).map((t): TypeChoice => `${NATIVE_PREFIX}${t.type}`);
 	const override = overrideType(draft);
-	const extra: TypeChoice[] = override !== null && !selectable(types, override) ? [`${NATIVE_PREFIX}${override}`] : [];
+	const extra: TypeChoice[] = override !== null && !nativeSelectable(types, override) ? [`${NATIVE_PREFIX}${override}`] : [];
 	return [...own, ...registered, ...extra, "relation", "select"];
 }
 
 /** The choice a draft shows: its plugin type, else the overriding type, else Obsidian's own when selectable, else `native`. */
 export function typeChoice(draft: FieldDraft, types: readonly PropertyType[]): TypeChoice {
 	if (draft.type !== "native") return draft.type;
-	const detected = selectable(types, draft.detected) ? draft.detected : null;
+	const detected = nativeSelectable(types, draft.detected) ? draft.detected : null;
 	const type = overrideType(draft) ?? detected;
 	return type === null ? "native" : `${NATIVE_PREFIX}${type}`;
 }
@@ -96,6 +104,29 @@ export function applyTypeChoice(draft: FieldDraft, choice: TypeChoice): void {
 	draft.type = "native";
 	const type = choice === "native" ? null : choice.slice(NATIVE_PREFIX.length);
 	draft.override = type === null || type === draft.detected ? null : { type };
+}
+
+/** A new, unsaved field draft, as the "Add field" button creates it. */
+export function newFieldDraft(name = ""): FieldDraft {
+	return {
+		originalName: null, originalBase: null, name, type: "native", detected: null,
+		override: null, removed: false, multiple: false, options: [],
+	};
+}
+
+/**
+ * The draft to focus: found case-insensitively by name, else created like "Add field" and appended. The choice is
+ * applied unless the draft already shows it.
+ */
+export function focusDraft(drafts: FieldDraft[], focus: { name: string; type: TypeChoice }, types: readonly PropertyType[]): FieldDraft {
+	const lower = focus.name.toLowerCase();
+	let draft = drafts.find((x) => !x.removed && x.name.toLowerCase() === lower);
+	if (!draft) {
+		draft = newFieldDraft(focus.name);
+		drafts.push(draft);
+	}
+	if (typeChoice(draft, types) !== focus.type) applyTypeChoice(draft, focus.type);
+	return draft;
 }
 
 /** Another schema base's definition of the same field name, with the number of this base's members that are also in it. */

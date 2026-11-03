@@ -51,6 +51,10 @@ Themes: `pnpm themes:smoke` checks the select cells and the schema dialog in the
 - In Claude Code, `.claude/hooks/fallow-gate.sh` runs the audit before every `git commit`/`git push` and blocks on a `fail` verdict (needs `jq`).
 - Handle findings in this order: fix the code; model an intentional exception in `.fallowrc.json` (`entry`, `usedClassMembers`, `ignoreDependencies`); only as a last resort suppress one line with `// fallow-ignore-next-line <issue> -- reason`. Never raise thresholds to hide a hotspot.
 
+## Local checks
+
+Run `pnpm check` before you push: it is the full local check and runs typecheck, lint, unit tests and the fallow quality analysis in one go. The individual steps (`pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm quality`) exist for quick iteration.
+
 ## Pull requests
 
 - Open an issue first for anything non-trivial so we can agree on direction before you spend time on it.
