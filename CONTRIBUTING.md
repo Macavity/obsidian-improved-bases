@@ -71,7 +71,7 @@ Run `pnpm check` before you push: it is the full local check and runs typecheck,
 
 ## Releases
 
-Maintainers cut releases by bumping the version in `manifest.json`, `package.json`, and `versions.json`, committing, then tagging and pushing the tag. The release workflow builds and attaches `main.js`, `manifest.json`, and `styles.css` from `dist/` with build provenance attestation.
+Maintainers cut releases with `pnpm version <patch|minor> --no-git-tag-version` (updates `manifest.json` and `package.json`; `versions.json` gains a key only when `minAppVersion` changes), commit with the release notes as the commit body, then tag with the bare version and push the tag. The release workflow builds and attaches `main.js`, `manifest.json`, and `styles.css` from `dist/` with build provenance attestation and uses the tagged commit's message as the release notes. Agents follow `.claude/skills/release/SKILL.md`.
 
 ## License
 
