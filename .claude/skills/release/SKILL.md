@@ -91,8 +91,8 @@ git diff --cached              # version lines, the CHANGELOG section, README fi
 Commit and tag:
 
 ```bash
-git commit -m "Release 0.2.0"
-git tag 0.2.0
+git commit -m "Release <version>"
+git tag <version>                # the confirmed version, identical to manifest.json
 ```
 
 Check `git show --stat HEAD` and `git tag --points-at HEAD` before pushing.
@@ -110,7 +110,7 @@ git push origin main
 ```
 
 ```bash
-git push origin 0.2.0
+git push origin <version>
 ```
 
 Then verify, do not assume:
@@ -118,7 +118,7 @@ Then verify, do not assume:
 ```bash
 gh run list --workflow=release.yml -L 1
 gh run watch                   # until the run completes
-gh release view 0.2.0          # title = version, assets main.js, manifest.json, styles.css, body = CHANGELOG section
+gh release view <version>      # title = version, assets main.js, manifest.json, styles.css, body = CHANGELOG section
 ```
 
 Workflow did not fire: follow "Pushing tags so the workflow actually fires" in `versioning-releases.md` (`gh workflow run release.yml --ref main` is the recovery path). Never create the release by hand in the UI as a first resort; that skips the build attestation.
