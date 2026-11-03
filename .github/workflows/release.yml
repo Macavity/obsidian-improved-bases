@@ -68,9 +68,9 @@ jobs:
 
       # Release notes come from CHANGELOG.md: the section headed
       # "## [<version>]" up to the next "## " heading or the link reference
-      # block at the end of the file. A missing section fails the job before
-      # anything is attested or published, so a release never goes out
-      # without notes.
+      # block at the end of the file. A missing section only warns (a hotfix
+      # may go out without an entry); the release then carries the compare
+      # link alone and the notes can be edited on GitHub afterwards.
       - name: Read release notes from CHANGELOG
         id: notes
         env:
@@ -82,8 +82,7 @@ jobs:
             found { print }
           ' CHANGELOG.md | sed -e '/./,$!d' -e :a -e '/^\n*$/{$d;N;ba' -e '}')
           if [ -z "$SECTION" ]; then
-            echo "::error::CHANGELOG.md has no section '## [$VERSION]'"
-            exit 1
+            echo "::warning::CHANGELOG.md has no section '## [$VERSION]'; release notes are the compare link only"
           fi
           {
             echo "body<<EOF"
@@ -116,7 +115,11 @@ jobs:
             else
               COMPARE="**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/commits/${VERSION}"
             fi
-            NOTES=$(printf "%s\n\n---\n\n%s\n" "$CHANGELOG_NOTES" "$COMPARE")
+            if [ -n "$CHANGELOG_NOTES" ]; then
+              NOTES=$(printf "%s\n\n---\n\n%s\n" "$CHANGELOG_NOTES" "$COMPARE")
+            else
+              NOTES="$COMPARE"
+            fi
             gh release create "$VERSION" \
               --title="$VERSION" \
               --notes "$NOTES" \

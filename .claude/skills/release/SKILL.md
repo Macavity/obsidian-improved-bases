@@ -9,7 +9,7 @@ The GitHub workflow `.github/workflows/release.yml` builds, attests and publishe
 
 Three facts drive every step. Never work around them.
 
-1. **The release notes are the `## [<version>]` section of `CHANGELOG.md`.** The workflow extracts that section and fails before publishing when it is missing. Commit messages play no role; the history is not clean enough for that.
+1. **The release notes are the `## [<version>]` section of `CHANGELOG.md`.** The workflow extracts that section; when it is missing it warns and publishes with the compare link only. Commit messages play no role; the history is not clean enough for that. A release without a section is the user's explicit choice (a quick hotfix), never a default.
 2. **The tag equals `manifest.json`'s `version`, no `v` prefix.** The workflow titles the release from the manifest.
 3. **`versions.json` gets a new key only when `minAppVersion` changed.** `version-bump.mjs` enforces this. A release whose newest key is older than the version is correct, not a bug. Do not add keys by hand.
 
@@ -129,7 +129,8 @@ Report the release URL and the asset list to the user.
 
 - "Tiny change, skip `pnpm check`." The gate runs on every release. Say out loud if you skip it, and only on the user's instruction.
 - "The Unreleased section already has entries, that's the changelog done." Check it against the diff; entries are added during feature work only sometimes.
-- "I'll write the notes into the tag or commit message instead." The workflow reads only `CHANGELOG.md` and fails without the section.
+- "I'll write the notes into the tag or commit message instead." The workflow reads only `CHANGELOG.md`; without the section the release has no notes.
+- "It's a hotfix, skip the changelog." Only when the user says so; one `### Fixed` line takes a minute.
 - "The README was touched in the PR, it's current." Read the sections named in step 4 against the change.
 - "I'll push main and the tag together to save a step." Dropped workflow, release without attestation.
 - "versions.json's newest key is stale, I'll fix it." It is correct unless `minAppVersion` changed.
