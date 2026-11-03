@@ -9,7 +9,7 @@ The GitHub workflow `.github/workflows/release.yml` builds, attests and publishe
 
 Three facts drive every step. Never work around them.
 
-1. **The release notes are the tagged commit's message.** The workflow takes `git log -1 --format=%B`. A bump commit that says only "Bump version to X" ships an empty release (0.1.0 did).
+1. **The release notes are the `## [<version>]` section of `CHANGELOG.md`.** The workflow extracts that section and fails before publishing when it is missing. Commit messages play no role; the history is not clean enough for that.
 2. **The tag equals `manifest.json`'s `version`, no `v` prefix.** The workflow titles the release from the manifest.
 3. **`versions.json` gets a new key only when `minAppVersion` changed.** `version-bump.mjs` enforces this. A release whose newest key is older than the version is correct, not a bug. Do not add keys by hand.
 
@@ -65,15 +65,17 @@ Then the automated section of `.claude/skills/obsidian-ops/references/release-re
 
 A gate failure is fixed on `main` in its own commit before the bump, or the release is called off. Never bump on top of a red gate.
 
-## 4. Draft the release notes
+## 4. CHANGELOG and README
 
-Write them for a plugin user, from the diff you read in step 2. Group as `### Breaking` (only if present), `### Features`, `### Fixes`; one line per item, present tense, no commit hashes, no internal names (spikes, review fixes, wiki stamps, tooling). No version heading: the commit subject carries it and the workflow titles the release from the tag. This format wins over the "Summarize for Release" layout in `obsidian-ops/references/summarize-commands.md`.
+**CHANGELOG.md** (Keep a Changelog format). Compare the `## [Unreleased]` section against the diff from step 2: every user-visible change since the last tag must be listed, nothing else (no spikes, review fixes, wiki stamps, tooling). Fill the gaps, written for a plugin user, present tense, no commit hashes. Then turn `## [Unreleased]` into `## [<version>] - <YYYY-MM-DD>`, add a fresh empty `## [Unreleased]` above it, and update the compare links at the bottom (`[Unreleased]: .../compare/<version>...HEAD`, `[<version>]: .../compare/<previous>...<version>`). Subsections: `### Added`, `### Changed`, `### Fixed`, `### Removed`, only those with content. This format wins over the "Summarize for Release" layout in `obsidian-ops/references/summarize-commands.md`.
 
-Show the notes to the user together with the version. They become the commit body verbatim.
+**README.md**. For each item in the new section, check that the README still describes the behaviour correctly: "What it does", "Where it works" and its Limits, "Schema format", "Commands", "Settings", "Unsupported Obsidian versions" when `minAppVersion` changed. Fix what is stale in the same commit as the bump. "The README was updated in the feature PR" is a claim to verify by reading, not an answer.
+
+Show the finished CHANGELOG section and any README diff to the user together with the version.
 
 ## 5. Bump, commit, tag
 
-Only after the user confirmed version and notes.
+Only after the user confirmed version, CHANGELOG section and README changes.
 
 ```bash
 pnpm version <patch|minor> --no-git-tag-version
@@ -82,28 +84,20 @@ pnpm version <patch|minor> --no-git-tag-version
 This writes `package.json` and `manifest.json` and stages `manifest.json` and `versions.json` only. `package.json` stays unstaged, so add it explicitly:
 
 ```bash
-git add package.json manifest.json versions.json
-git diff --cached              # exactly the version lines, nothing else
+git add package.json manifest.json versions.json CHANGELOG.md README.md
+git diff --cached              # version lines, the CHANGELOG section, README fixes, nothing else
 ```
 
-Commit with the notes as the body. Subject line `Release <version>`; the body is the markdown from step 4:
+Commit and tag:
 
 ```bash
-git commit -F- <<'MSG'
-Release 0.2.0
-
-### Features
-- ...
-
-### Fixes
-- ...
-MSG
+git commit -m "Release 0.2.0"
 git tag 0.2.0
 ```
 
 Check `git show --stat HEAD` and `git tag --points-at HEAD` before pushing.
 
-The bump commit touches no code, so the wiki refresh rule from `CLAUDE.md` does not apply to it. If the wiki is stale from earlier work, that is a separate commit before the bump.
+The release commit touches no code, so the wiki refresh rule from `CLAUDE.md` does not apply to it. If the wiki is stale from earlier work, that is a separate commit before the bump.
 
 ## 6. Push and publish
 
@@ -124,7 +118,7 @@ Then verify, do not assume:
 ```bash
 gh run list --workflow=release.yml -L 1
 gh run watch                   # until the run completes
-gh release view 0.2.0          # title = version, assets main.js, manifest.json, styles.css, body = notes
+gh release view 0.2.0          # title = version, assets main.js, manifest.json, styles.css, body = CHANGELOG section
 ```
 
 Workflow did not fire: follow "Pushing tags so the workflow actually fires" in `versioning-releases.md` (`gh workflow run release.yml --ref main` is the recovery path). Never create the release by hand in the UI as a first resort; that skips the build attestation.
@@ -134,11 +128,13 @@ Report the release URL and the asset list to the user.
 ## Rationalizations that end releases badly
 
 - "Tiny change, skip `pnpm check`." The gate runs on every release. Say out loud if you skip it, and only on the user's instruction.
-- "The commit subject is enough for the notes." It becomes the public release body. Write the notes.
+- "The Unreleased section already has entries, that's the changelog done." Check it against the diff; entries are added during feature work only sometimes.
+- "I'll write the notes into the tag or commit message instead." The workflow reads only `CHANGELOG.md` and fails without the section.
+- "The README was touched in the PR, it's current." Read the sections named in step 4 against the change.
 - "I'll push main and the tag together to save a step." Dropped workflow, release without attestation.
 - "versions.json's newest key is stale, I'll fix it." It is correct unless `minAppVersion` changed.
 - "The PR branch has everything, I'll tag here." Tags live on `main`.
-- "The user said release, that covers the push." Version and notes are confirmed first; the tag push is confirmed separately.
+- "The user said release, that covers the push." Version, CHANGELOG and README are confirmed first; the tag push is confirmed separately.
 - "CI was green on the PR." The merge commit is a different tree; run the gate on `main`.
 
 Red-flag phrases: "should be fine", "I'll just", "basically the same as the PR", "no need to wait for the run".
