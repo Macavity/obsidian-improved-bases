@@ -25,6 +25,9 @@ This skill covers:
 
 ## Bundled Resources
 
+Cutting a release of this plugin: use the `release` skill (`.claude/skills/release/SKILL.md`); it wraps the references below into the step-by-step procedure.
+
+
 - `references/build-workflow.md`: Standard build and development commands.
 - `references/release-readiness.md`: Checklist for ensuring a project is ready for release.
 - `references/scorecard-compliance.md`: Map of Obsidian community plugin scorecard signals to concrete fixes (vulnerability overrides, attestation workflow, CSS dedup, obsidianmd rules).

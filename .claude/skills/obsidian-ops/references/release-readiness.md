@@ -23,7 +23,7 @@ Use this when preparing a release or when asked "is the plugin ready for release
 ### Manifest
 
 - [ ] Passes the checklist in [manifest.md](../../obsidian-ref/references/manifest.md)
-- [ ] `version` in `manifest.json`, `package.json` and the newest key in `versions.json` match
+- [ ] `version` in `manifest.json` and `package.json` match; `versions.json` only gains a key when `minAppVersion` changes, so its newest key may be older
 - [ ] `isDesktopOnly: true` if any Node.js/Electron API is used (grep for `fs`, `path`, `electron`, `require(`)
 
 ### Code
