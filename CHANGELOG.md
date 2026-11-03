@@ -6,6 +6,8 @@ The release workflow takes the section of the released version from this file as
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-03
+
 ### Added
 
 - Select and Relation are registered as Obsidian property types and appear in Obsidian's own type menus.
@@ -27,5 +29,6 @@ The release workflow takes the section of the released version from this file as
 - Schema settings dialog per base; definitions live in the `.base` file.
 - Widgets in the Bases table view, the properties panel and the sidebar file properties.
 
-[Unreleased]: https://github.com/Macavity/obsidian-improved-bases/compare/0.1.0...HEAD
+[Unreleased]: https://github.com/Macavity/obsidian-improved-bases/compare/0.2.0...HEAD
+[0.2.0]: https://github.com/Macavity/obsidian-improved-bases/compare/0.1.0...0.2.0
 [0.1.0]: https://github.com/Macavity/obsidian-improved-bases/commits/0.1.0
