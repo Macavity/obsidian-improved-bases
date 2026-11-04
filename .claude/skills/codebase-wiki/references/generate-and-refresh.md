@@ -105,9 +105,9 @@ Atomic pages for domain terms and core abstractions (one term each): definition,
    ```
 3. **Orphans** — pages nothing links to. Adopt each by linking it from OVERVIEW or a relevant section page (or, rarely, justify it as intentionally standalone):
    ```bash
-   find wiki -name '*.md' ! -name OVERVIEW.md | while read -r f; do grep -rlF "$(basename "$f")" wiki --include='*.md' | grep -qv "^$f$" || echo "orphan: $f"; done
+   find wiki -name '*.md' ! -name OVERVIEW.md | while read -r f; do b=$(basename "$f"); [ -n "$(grep -rlF -e "/$b" -e "]($b" wiki --include='*.md' | grep -v "^$f$")" ] || echo "orphan: $f"; done
    ```
-4. **Hubs** — `grep -rlF "<file>.md" wiki | wc -l` is a page's inbound count. A concept or module page that only OVERVIEW links to has not been cross-linked yet; that count is the signal cross-linking actually happened.
+4. **Hubs** — `grep -rlF "/<file>.md" wiki | wc -l` is a page's inbound count. A concept or module page that only OVERVIEW links to has not been cross-linked yet; that count is the signal cross-linking actually happened.
 5. Tell the user the wiki is ready and point at `wiki/OVERVIEW.md`.
 
 ---
