@@ -4,13 +4,26 @@ The user wants a **wiki of this codebase**, living in their own repo. Read the s
 
 **One toolset.** Read source and write wiki pages with the native tools (`Read`/`Grep`/`Glob`/`Edit`/`Write`/`Bash`). Pages are ordinary files: no server, no generator, and nothing that checks links for you — the link audit in Phase 7 is yours to run.
 
-**Prerequisite.** The layout: `wiki/` with `architecture/ modules/ flows/ concepts/ guides/` and `wiki/OVERVIEW.md`. If `ls -A wiki` shows it missing, create the folders and a stub `OVERVIEW.md` (the frontmatter from the page skeleton in `SKILL.md`, with `profile` and an empty `source_commit`) in Phase 0 before anything else.
+**Prerequisite.** The layout: `wiki/` with `architecture/ modules/ flows/ concepts/ guides/` and `wiki/OVERVIEW.md`. Check every path, not only the directory: `ls -d wiki/architecture wiki/modules wiki/flows wiki/concepts wiki/guides wiki/OVERVIEW.md` names what is missing. In Phase 0, before anything else, create the missing folders and, when `OVERVIEW.md` is missing, this stub. Unlike a page it has no `type`; its properties are exactly these:
+
+```markdown
+---
+title: <Project> — Overview
+description: "Home page and navigation hub for the <project> codebase wiki."
+profile: internal/standard
+source_commit: ""
+tags:
+  - wiki
+  - overview
+---
+# Overview
+```
 
 ---
 
 ## The two knobs
 
-Read these from the user's natural-language request (e.g. "build the wiki, public and exhaustive"). They are not configuration anywhere else — they tune what you produce. Record the chosen profile in `wiki/OVERVIEW.md` frontmatter (`profile: <audience>/<depth>`) so refreshes stay consistent.
+Read these from the user's natural-language request (e.g. "build the wiki, public and exhaustive"). They are not configuration anywhere else — they tune what you produce. Record the chosen profile in `wiki/OVERVIEW.md` properties (`profile: <audience>/<depth>`) so refreshes stay consistent.
 
 | Knob | Values | Effect |
 |---|---|---|
@@ -33,7 +46,7 @@ Never invent paths — every source reference must point at a file you actually 
 
 ## Mode detection — generate vs. refresh
 
-Read the frontmatter of `wiki/OVERVIEW.md`:
+Read the properties of `wiki/OVERVIEW.md`:
 
 - **`source_commit` is empty / OVERVIEW is the stub** → **GENERATE** (Phases 0-7 below).
 - **`source_commit` is stamped with a commit** → **REFRESH** (jump to the *Refresh mode* section). Reuse the recorded `profile` unless the user explicitly changes a knob.
@@ -46,7 +59,7 @@ Work the phases in order. Do not skip or batch ahead of a STOP gate. Each page i
 
 ### Phase 0 — Resolve profile + scope (STOP gate 0)
 
-1. Scaffold the layout if it is missing (see Prerequisite).
+1. Scaffold whatever the Prerequisite check reports missing.
 2. Resolve `audience` + `depth` from the request (default `internal/standard`).
 3. Propose the **coverage set** (which packages/dirs the wiki will document) and **exclusions** (vendored deps, build output, generated code, fixtures — `node_modules/`, `dist/`, `build/`, `vendor/`, `third_party/`, `coverage/`, lockfiles).
 4. Present profile + coverage + exclusions to the user. **Wait for confirmation.**
@@ -77,8 +90,8 @@ Author `wiki/OVERVIEW.md` (edit the stub in place):
      Core --> Disk[(files on disk)]
    ```
    (Mermaid label text has sharp edges — keep node labels free of parentheses, quotes and pipes, or wrap the label in `["…"]`.)
-3. **Navigation** — a map that links **every section and every page you will create**, as relative links. OVERVIEW is the hub; everything must be reachable from it.
-4. **Stamp frontmatter**: set `profile: <audience>/<depth>` and `source_commit: <git rev-parse HEAD>`. `source_commit` is the freshness anchor refresh mode diffs against — get it right.
+3. **Navigation** — a map that links **every section and every page you will create**, as relative links. OVERVIEW is the hub; everything must be reachable from it. These targets do not exist yet; Phase 7 verifies them once every page is written.
+4. **Stamp the properties**: set `profile: <audience>/<depth>` and `source_commit: <git rev-parse HEAD>`. `source_commit` is the freshness anchor refresh mode diffs against — get it right.
 
 ### Phase 3 — Architecture pages
 
@@ -116,11 +129,11 @@ Atomic pages for domain terms and core abstractions (one term each): definition,
 
 Incremental by default — don't re-read the whole repo.
 
-1. Read `source_commit` + `profile` from `wiki/OVERVIEW.md` frontmatter. Reuse the profile unless the user changed a knob.
+1. Read `source_commit` + `profile` from `wiki/OVERVIEW.md` properties. Reuse the profile unless the user changed a knob.
 2. `git diff --stat <source_commit>..HEAD`. Inspect the changed paths.
 3. **Map changed code → affected pages.** For each changed package/area, update its module/architecture/flow pages (read the changed source first). Update OVERVIEW only if the structure changed (new package, removed subsystem, new top-level flow).
 4. **Full-regen fallback.** If the diff is large or structural (many packages, a restructure), or git is unavailable / `source_commit` is missing, fall back to a full GENERATE pass rather than a partial patch.
-5. **Re-stamp** `source_commit` to the new `git rev-parse HEAD` and re-run the Phase 7 link audit on the touched pages.
+5. **Re-stamp** `source_commit` to the new `git rev-parse HEAD` and re-run the whole Phase 7 link audit, not only on the touched pages: OVERVIEW coverage and orphans are global conditions, and the loops are cheap.
 
 ---
 

@@ -11,7 +11,7 @@ This project holds an **agent-authored wiki of its codebase** — DeepWiki, but 
 ```
 wiki/
   OVERVIEW.md     hub: what it is, a big-picture architecture diagram, a nav map to every section.
-                  Frontmatter carries `profile` (audience/depth) + `source_commit` (freshness anchor).
+                  Properties carry `profile` (audience/depth) + `source_commit` (freshness anchor).
   architecture/   system boundaries, layers, subsystems, cross-cutting concerns + diagrams
   modules/        one page per package / module: purpose, entry points, key files, deps
   flows/          key end-to-end flows as sequence / flow diagrams + narrative
@@ -23,11 +23,11 @@ wiki/
 
 Don't free-hand it — read **[references/generate-and-refresh.md](references/generate-and-refresh.md)** and follow the phased, STOP-gated procedure. It auto-detects mode: a stubbed `OVERVIEW.md` (empty `source_commit`) → **generate** (survey → overview → architecture → modules → flows → concepts → link audit); a stamped `source_commit` → **refresh** (diff `source_commit..HEAD`, update only affected pages, re-stamp).
 
-**Plain files, native tools.** Read source and write wiki pages with the native tools (`Read`/`Grep`/`Glob`/`Edit`/`Write`/`Bash`). Nothing checks links for you: after every write, confirm each relative link resolves from the page's own folder, and run the link audit from the reference after a generate or refresh.
+**Plain files, native tools.** Read source and write wiki pages with the native tools (`Read`/`Grep`/`Glob`/`Edit`/`Write`/`Bash`). Nothing checks links for you: a link to a source file must resolve from the page's own folder when you write it, and links between pages are verified by the link audit in the reference, run after a generate (once every page exists; until then OVERVIEW's nav links point at pages still to come) and after every refresh.
 
 ## The two knobs
 
-Two natural-language knobs, read from the user's request (e.g. "build the wiki, public and exhaustive") and recorded in `OVERVIEW.md` frontmatter (`profile: <audience>/<depth>`) so refreshes stay consistent:
+Two natural-language knobs, read from the user's request (e.g. "build the wiki, public and exhaustive") and recorded in the `OVERVIEW.md` properties (`profile: <audience>/<depth>`) so refreshes stay consistent:
 
 - **`audience`** — `internal` (default) or `public`. `public` means polished prose, no secrets / internal infra / ticket numbers, and GitHub-URL source references.
 - **`depth`** — `tour` | `standard` (default) | `exhaustive`. Scales coverage from OVERVIEW + architecture + top flows up through per-package module pages, concepts, and task guides.
@@ -55,11 +55,11 @@ The full rules — the GitHub-URL / relative fallback, the `#Lxx` caveat, and th
 
 ## Freshness discipline (MUST)
 
-`OVERVIEW.md` frontmatter carries `source_commit` — the git HEAD the wiki was last generated/refreshed against. It is the freshness anchor: refresh mode diffs `source_commit..HEAD` to update only the affected pages, then re-stamps it. **Always re-stamp `source_commit` after a generate or refresh run** — a stale anchor silently breaks incremental refresh.
+The `OVERVIEW.md` properties carry `source_commit` — the git HEAD the wiki was last generated/refreshed against. It is the freshness anchor: refresh mode diffs `source_commit..HEAD` to update only the affected pages, then re-stamps it. **Always re-stamp `source_commit` after a generate or refresh run** — a stale anchor silently breaks incremental refresh.
 
 ## Page skeleton
 
-Every page starts with this frontmatter, then an H1 equal to `title` and the folder's headings as H2:
+Every page starts with these properties, then an H1 equal to `title` and the folder's headings as H2:
 
 ```markdown
 ---
@@ -73,4 +73,4 @@ tags:
 # <Page title>
 ```
 
-`OVERVIEW.md` carries `profile` and `source_commit` instead of `type`, and the tag `overview`. Headings carry only structure; what each section is for is described above and in the reference, not repeated inside page bodies.
+`OVERVIEW.md` carries `profile` and `source_commit` instead of `type`, and the tag `overview`; its exact stub is in the reference's Prerequisite. Headings carry only structure; what each section is for is described above and in the reference, not repeated inside page bodies.
