@@ -54,9 +54,11 @@ export function evalJs(code) {
 	return obs("eval", { code }).trim().replace(/^=> ?/, ""); // eval prints "=> <result>"
 }
 
+/** Brings the Obsidian window to the front, since `dev:screenshot` hangs on a hidden window. Needs macOS and automation
+ * permission; without them the screenshot is tried anyway. */
 function focusObsidian() {
 	try {
-		execFileSync("osascript", ["-e", 'tell application "Obsidian" to activate']); // dev:screenshot hangs on a hidden window
+		execFileSync("osascript", ["-e", 'tell application "Obsidian" to activate']);
 	} catch {
 		// not macOS or no permission; screenshots may still work
 	}

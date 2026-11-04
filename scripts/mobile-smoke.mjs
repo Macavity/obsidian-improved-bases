@@ -46,6 +46,7 @@ const MEASURE = `(() => {
 const EXPANDED = `document.querySelectorAll('.improved-bases-schema-modal .improved-bases-field-row.is-expanded').length`;
 
 const failures = [];
+/** Records a failure when the element is missing or either side falls short of Obsidian's touch size (`--touch-size-s`). */
 function touchSized(name, r, touch) {
 	if (!r) failures.push(`${name}: not found`);
 	else if (r.width < touch - 0.5 || r.height < touch - 0.5) failures.push(`${name}: ${Math.round(r.width)}x${Math.round(r.height)}px, touch size is ${touch}px`);
