@@ -777,13 +777,14 @@
 }
 
 /* Mobile: the row's icon buttons grow to Obsidian's touch size (as its own icon buttons do, e.g. `.is-mobile .search-row > .clickable-icon`).
-   `button` keeps the removed row's placeholder span, which shares the disclosure class for its column, at its desktop height. */
+   `button` lifts these above the desktop rules (two classes plus the element) and keeps the removed row's placeholder
+   span, which shares the disclosure class for its column, at its desktop height. */
 .is-mobile .improved-bases-schema-modal {
 	--ib-disclosure-col: var(--touch-size-s);
 	--ib-remove-col: var(--touch-size-s);
 }
-.is-mobile .improved-bases-schema button.improved-bases-field-disclosure,
-.is-mobile .improved-bases-schema .improved-bases-field-remove {
+.is-mobile button.improved-bases-field-disclosure,
+.is-mobile button.improved-bases-field-remove {
 	width: var(--touch-size-s);
 	height: var(--touch-size-s);
 }
