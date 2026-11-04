@@ -1,11 +1,11 @@
 // Theme compatibility smoke: for the default theme and every theme in scripts/themes.json, in light and dark mode,
 // checks the select cells of Mitarbeiter.base and the schema dialog, and saves screenshots. Obsidian must be running
 // with the test vault open (`pnpm smoke` first). Output dir: $THEMES_SMOKE_OUT or <tmp>/improved-bases-themes.
-import { execFileSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { assert, ensureVault, evalJs, obs, waitFor } from "./lib/cli.mjs";
+import { assert, ensureVault, evalJs, obs, screenshot, waitFor } from "./lib/cli.mjs";
+import { squeezedIcon } from "./lib/icon-check.mjs";
 import { activateTheme, ensureTheme, THEMES } from "./lib/themes.mjs";
 
 const OUT = process.env.THEMES_SMOKE_OUT ?? join(tmpdir(), "improved-bases-themes");
@@ -17,24 +17,6 @@ const json = (code) => JSON.parse(evalJs(`JSON.stringify(${code})`));
 
 ensureVault();
 mkdirSync(OUT, { recursive: true });
-function focusObsidian() {
-	try {
-		execFileSync("osascript", ["-e", 'tell application "Obsidian" to activate']); // dev:screenshot hangs on a hidden window
-	} catch {
-		// not macOS or no permission; screenshots may still work
-	}
-}
-function screenshot(path) {
-	for (let attempt = 0; ; attempt++) {
-		focusObsidian();
-		try {
-			return obs("dev:screenshot", { path });
-		} catch (e) {
-			if (attempt >= 1) throw e;
-			console.warn(`screenshot ${path} failed once, retrying: ${e.message}`);
-		}
-	}
-}
 const originalMode = evalJs("app.vault.getConfig('theme') ?? 'obsidian'");
 obs("open", { file: "Mitarbeiter.base" });
 await waitFor(() => evalJs("document.querySelectorAll('.bases-td .improved-bases-select').length") !== "0", 15000);
@@ -50,6 +32,14 @@ const MEASURE = `(() => {
 })()`;
 const FOOTER = `(() => { const f = document.querySelector('.improved-bases-schema-modal .improved-bases-footer');
 	return f ? getComputedStyle(f).backgroundColor : null; })()`;
+// The disclosure chevron is a `clickable-icon`; a theme that pads that class with enough specificity (Cupertino 10px) squeezes
+// the icon unless the stylesheet stops it (see `squeezedIcon`).
+const CHEVRON = `(() => {
+	const b = [...document.querySelectorAll('.improved-bases-schema-modal .improved-bases-field-disclosure')].find((x) => !x.disabled);
+	if (!b) return null;
+	const svg = b.querySelector('svg')?.getBoundingClientRect(), r = b.getBoundingClientRect(), m = b.closest('.improved-bases-field-main').getBoundingClientRect();
+	return { svgWidth: svg ? svg.width : 0, svgHeight: svg ? svg.height : 0, inside: r.left >= m.left - 1 && r.right <= m.right + 1 && r.top >= m.top - 1 && r.bottom <= m.bottom + 1 };
+})()`;
 
 const failures = [];
 function check(label, m) {
@@ -75,6 +65,13 @@ try {
 			await waitFor(() => evalJs(FOOTER) !== "null", 5000);
 			const bg = evalJs(FOOTER);
 			if (bg !== "rgba(0, 0, 0, 0)") failures.push(`${label}: dialog footer paints its own background (${bg})`);
+			const chevron = json(CHEVRON);
+			if (!chevron) failures.push(`${label}: dialog has no expandable row`);
+			else {
+				const squeezed = squeezedIcon(chevron);
+				if (squeezed) failures.push(`${label}: dialog chevron ${squeezed}`);
+				if (!chevron.inside) failures.push(`${label}: dialog chevron overflows its row`);
+			}
 			screenshot(file("dialog"));
 			evalJs("document.querySelector('.improved-bases-footer-buttons .improved-bases-close')?.click()");
 			await waitFor(() => evalJs(FOOTER) === "null", 5000);

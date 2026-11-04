@@ -75,6 +75,22 @@ beforeEach(() => {
 
 describe("SchemaSettingsModal", () => {
 	const suggestions = (el: HTMLElement) => Array.from(el.querySelectorAll(".improved-bases-option-suggestion")).map((p) => p.textContent);
+	it("renders the disclosure as an Obsidian clickable icon, out of reach of mobile button padding", () => {
+		const { q } = open({ kind: "fields", drafts: [d({ name: "Team", type: "relation", base: "Teams.base" })] });
+		const disclosure = q<HTMLButtonElement>(".improved-bases-field-disclosure");
+		expect(disclosure.tagName).toBe("BUTTON");
+		expect(disclosure.classList.contains("clickable-icon")).toBe(true);
+		expect(disclosure.getAttribute("aria-label")).toBe("Show details");
+		expect(disclosure.getAttribute("data-icon")).toBe("lucide-chevron-right");
+	});
+	it("tells assistive tech whether the row is open through aria-expanded", () => {
+		const { q } = open({ kind: "fields", drafts: [d({ name: "Team", type: "relation", base: "Teams.base" })] });
+		expect(q(".improved-bases-field-disclosure").getAttribute("aria-expanded")).toBe("false");
+		q<HTMLButtonElement>(".improved-bases-field-disclosure").click();
+		expect(q(".improved-bases-field-disclosure").getAttribute("aria-expanded")).toBe("true");
+		q<HTMLButtonElement>(".improved-bases-field-disclosure").click();
+		expect(q(".improved-bases-field-disclosure").getAttribute("aria-expanded")).toBe("false");
+	});
 	it("suggests the values found in the notes as options, one by one or all at once", () => {
 		const memberValues = vi.fn((name: string) => (name === "Status" ? ["Todo", ["Open", "Done"], "Open", 3] : []));
 		const { el, q } = open({ kind: "fields", drafts: [d({ name: "Status", type: "select", options: [opt("Open", "blue")] })] }, { memberValues });

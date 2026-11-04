@@ -233,6 +233,9 @@
 
 /* Schema settings dialog: a dense field table. Only Obsidian tokens, so themes restyle it instead of breaking it. */
 .improved-bases-schema-modal {
+	/* Icon-button columns of a field row (disclosure, remove); touch size on mobile, see the `.is-mobile` block */
+	--ib-disclosure-col: var(--size-4-6);
+	--ib-remove-col: 28px;
 	--dialog-width: 860px;
 	--dialog-max-width: calc(100vw - var(--size-4-12));
 	--dialog-max-height: min(720px, calc(100vh - var(--size-4-16)));
@@ -350,7 +353,7 @@
 .improved-bases-schema .improved-bases-column-head,
 .improved-bases-schema .improved-bases-field-main {
 	display: grid;
-	grid-template-columns: var(--size-4-6) minmax(160px, 1fr) 170px minmax(140px, 0.85fr) 28px;
+	grid-template-columns: var(--ib-disclosure-col) minmax(160px, 1fr) 170px minmax(140px, 0.85fr) var(--ib-remove-col);
 	align-items: center;
 	gap: var(--size-2-2);
 }
@@ -388,23 +391,20 @@
 	background-color: rgba(var(--color-orange-rgb), 0.04);
 }
 
-/* Disclosure */
+/* Disclosure: a `clickable-icon` (Obsidian and themes exempt that class from their `button:not(.clickable-icon)` padding);
+   two plugin classes keep the padding at zero where themes pad `.clickable-icon` itself (Cupertino 10px). */
 .improved-bases-schema .improved-bases-field-disclosure {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
 	height: 28px;
 	padding: 0;
-	border: 0;
-	box-shadow: none;
-	background: transparent;
-	color: var(--text-muted);
 	--icon-size: var(--icon-s);
 }
 .improved-bases-schema .improved-bases-field-disclosure:disabled {
 	visibility: hidden;
 }
+/* Themes pad `.clickable-icon` with more specificity than two classes (Cupertino: `body:is(.mod-macos, …):not(.is-mobile) .clickable-icon`
+   10px); the icon must not shrink into the padded box, it keeps its size and centers over the column instead. */
 .improved-bases-schema .improved-bases-field-disclosure svg {
+	flex: none;
 	transition: transform 150ms ease;
 }
 .improved-bases-schema .improved-bases-field-disclosure.is-open svg {
@@ -550,7 +550,7 @@
 	display: flex;
 	align-items: center;
 	gap: var(--size-2-3);
-	margin: 0 var(--size-4-3) var(--size-2-2) 40px;
+	margin: 0 var(--size-4-3) var(--size-2-2) calc(var(--ib-disclosure-col) + var(--size-4-4));
 	padding: var(--size-2-2) var(--size-2-3);
 	border-radius: var(--radius-s);
 	font-size: var(--font-ui-smaller);
@@ -584,7 +584,7 @@
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--size-4-2) var(--size-4-4);
-	margin: 0 var(--size-4-3) var(--size-4-2) 40px;
+	margin: 0 var(--size-4-3) var(--size-4-2) calc(var(--ib-disclosure-col) + var(--size-4-4));
 	padding: var(--size-4-2) var(--size-4-3);
 	border: 1px solid var(--background-modifier-border);
 	border-radius: var(--radius-m);
@@ -776,10 +776,25 @@
 	color: var(--text-error);
 }
 
+/* Mobile: the row's icon buttons grow to Obsidian's touch size (as its own icon buttons do, e.g. `.is-mobile .search-row > .clickable-icon`).
+   `button` lifts these above the desktop rules (two classes plus the element) and keeps the removed row's placeholder
+   span, which shares the disclosure class for its column, at its desktop height. */
+.is-mobile .improved-bases-schema-modal {
+	--ib-disclosure-col: var(--touch-size-s);
+	--ib-remove-col: var(--touch-size-s);
+}
+.is-mobile button.improved-bases-field-disclosure,
+.is-mobile button.improved-bases-field-remove {
+	width: var(--touch-size-s);
+	height: var(--touch-size-s);
+}
+
 @media (max-width: 700px) {
+	/* The name column has no minimum: on phones (Obsidian: below 600px) the fixed tracks plus the touch-size columns leave it
+	   less than 100px, and a minimum would push the remove button past the modal, which clips it. */
 	.improved-bases-schema .improved-bases-column-head,
 	.improved-bases-schema .improved-bases-field-main {
-		grid-template-columns: var(--size-4-6) minmax(100px, 1fr) 130px 28px;
+		grid-template-columns: var(--ib-disclosure-col) minmax(0, 1fr) 130px var(--ib-remove-col);
 	}
 	.improved-bases-schema .improved-bases-column-head span:nth-child(4),
 	.improved-bases-schema .improved-bases-field-details {

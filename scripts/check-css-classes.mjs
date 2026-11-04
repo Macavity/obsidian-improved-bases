@@ -20,6 +20,7 @@ export const OBSIDIAN_CLASSES = [
 	{ cls: "modal-title", reason: "Modal title rendered by Obsidian" },
 	{ cls: "modal-header", reason: "Modal header rendered by Obsidian" },
 	{ cls: "menu-item", reason: "Menu items rendered by Obsidian's Menu" },
+	{ cls: "is-mobile", reason: "Obsidian body class on mobile; touch-size icon columns in the schema dialog" },
 ];
 
 export function sourceFiles(dir = join(root, "src")) {

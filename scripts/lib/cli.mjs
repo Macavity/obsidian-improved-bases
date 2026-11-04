@@ -54,6 +54,29 @@ export function evalJs(code) {
 	return obs("eval", { code }).trim().replace(/^=> ?/, ""); // eval prints "=> <result>"
 }
 
+/** Brings the Obsidian window to the front, since `dev:screenshot` hangs on a hidden window. Needs macOS and automation
+ * permission; without them the screenshot is tried anyway. */
+function focusObsidian() {
+	try {
+		execFileSync("osascript", ["-e", 'tell application "Obsidian" to activate']);
+	} catch {
+		// not macOS or no permission; screenshots may still work
+	}
+}
+
+/** Saves a screenshot of the Obsidian window to `path`: focuses the window first and retries once. */
+export function screenshot(path) {
+	for (let attempt = 0; ; attempt++) {
+		focusObsidian();
+		try {
+			return obs("dev:screenshot", { path });
+		} catch (e) {
+			if (attempt >= 1) throw e;
+			console.warn(`screenshot ${path} failed once, retrying: ${e.message}`);
+		}
+	}
+}
+
 export function assert(cond, msg) {
 	if (!cond) throw new Error(`Assertion failed: ${msg}`);
 }

@@ -458,8 +458,8 @@ export class SchemaSettingsModal extends Modal {
 	private renderRow(list: HTMLElement, draft: FieldDraft): void {
 		const row = list.createDiv({ cls: "improved-bases-field-row" });
 		const main = row.createDiv({ cls: "improved-bases-field-main" });
-		const disclosure = main.createEl("button", { cls: "improved-bases-field-disclosure", attr: { type: "button", "aria-label": "Show details" } });
-		setIcon(disclosure, "lucide-chevron-right");
+		// An Obsidian icon button: `.is-tablet button:not(.clickable-icon)` pads plain buttons to 40px and would squeeze the icon to nothing.
+		const disclosure = iconButton(main, "lucide-chevron-right", "Show details", "improved-bases-field-disclosure");
 		const name = main.createEl("input", {
 			cls: "improved-bases-field-name",
 			attr: { type: "text", placeholder: "Field name", "aria-label": "Field name" },
@@ -482,6 +482,7 @@ export class SchemaSettingsModal extends Modal {
 			const open = expandable(draft) && this.expanded.has(draft);
 			disclosure.disabled = !expandable(draft);
 			disclosure.toggleClass("is-open", open);
+			disclosure.setAttribute("aria-expanded", String(open));
 			setIcon(typeIconEl, typeIcon(draft, this.input.types));
 			this.renderDetails(details, draft);
 			this.updateHint(hint, draft);
