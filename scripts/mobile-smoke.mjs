@@ -1,8 +1,10 @@
 // Mobile smoke: switches the running Obsidian to tablet emulation (`dev:mobile on`, which reloads the app), opens the schema
 // dialog of Mitarbeiter.base and checks what only shows there: the disclosure chevron keeps its icon (Obsidian pads plain
-// buttons on tablets), the row's icon buttons are touch-sized, and a real touch tap expands the row. Saves a screenshot and
-// switches emulation off again. Obsidian must be running with the test vault open and the current build loaded
-// (`pnpm vault:link-test`, `pnpm build`, `pnpm reload`). Output dir: $MOBILE_SMOKE_OUT or <tmp>/improved-bases-mobile.
+// buttons on tablets), the row's icon buttons are touch-sized, and a real touch tap expands the row. Then narrows the viewport
+// to a phone (Obsidian: below 600px) and checks the touch-size columns do not push the row past the modal, which would clip
+// the remove button. Saves screenshots and switches emulation off again. Obsidian must be running with the test vault open and
+// the current build loaded (`pnpm vault:link-test`, `pnpm build`, `pnpm reload`). Output dir: $MOBILE_SMOKE_OUT or
+// <tmp>/improved-bases-mobile.
 import { mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,6 +12,7 @@ import { assert, ensureVault, evalJs, obs, screenshot, waitFor } from "./lib/cli
 import { squeezedIcon } from "./lib/icon-check.mjs";
 
 const OUT = process.env.MOBILE_SMOKE_OUT ?? join(tmpdir(), "improved-bases-mobile");
+const PHONE_WIDTH = 360; // a small Android phone; iPhones start at 375
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const json = (code) => JSON.parse(evalJs(`JSON.stringify(${code})`));
 const cdp = (method, params) => obs("dev:cdp", { method, params: JSON.stringify(params) });
@@ -44,6 +47,15 @@ const MEASURE = `(() => {
 	};
 })()`;
 const EXPANDED = `document.querySelectorAll('.improved-bases-schema-modal .improved-bases-field-row.is-expanded').length`;
+const IS_PHONE = `String(document.body.classList.contains('is-phone'))`;
+/** How far the first field row sticks out of the modal: its scroll overflow, or the remove button past the content's right edge. */
+const PHONE = `(() => {
+	const content = document.querySelector('.improved-bases-schema-modal .modal-content');
+	const main = document.querySelector('.improved-bases-schema-modal .improved-bases-field-main');
+	const remove = main?.querySelector('.improved-bases-field-remove');
+	if (!content || !main || !remove) return null;
+	return Math.max(main.scrollWidth - main.clientWidth, remove.getBoundingClientRect().right - content.getBoundingClientRect().right);
+})()`;
 
 const failures = [];
 /** Records a failure when the element is missing or either side falls short of Obsidian's touch size (`--touch-size-s`). */
@@ -80,6 +92,15 @@ try {
 		}
 	}
 	screenshot(join(OUT, "tablet-dialog.png"));
+
+	// Phone: the viewport override survives reloads, so the finally block clears it.
+	cdp("Emulation.setDeviceMetricsOverride", { width: PHONE_WIDTH, height: 800, deviceScaleFactor: 2, mobile: true });
+	await waitFor(() => evalJs(IS_PHONE) === "true", 5000);
+	await sleep(500);
+	const overflow = json(PHONE);
+	if (overflow === null) failures.push("phone: field row, remove button or modal content not found");
+	else if (overflow > 0.5) failures.push(`phone ${PHONE_WIDTH}px: field row overflows the modal by ${Math.round(overflow)}px, the remove button is clipped`);
+	screenshot(join(OUT, "phone-dialog.png"));
 } catch (e) {
 	failures.push(`smoke aborted: ${e.message}`);
 } finally {
@@ -89,6 +110,11 @@ try {
 		closeDialog();
 	} catch {
 		// the app may still be reloading; the reload closes the dialog anyway
+	}
+	try {
+		cdp("Emulation.clearDeviceMetricsOverride", {});
+	} catch (e) {
+		failures.push(`clearing the phone viewport failed: ${e.message}`);
 	}
 	try {
 		console.log(obs("dev:mobile", { off: true }).trim());

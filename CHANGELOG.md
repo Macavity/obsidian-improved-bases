@@ -9,6 +9,7 @@ The release workflow takes the section of the released version from this file as
 ### Fixed
 
 - Schema settings: the field disclosure chevron was invisible on tablets, where Obsidian pads plain buttons; it is an icon button now, keeps its icon under theme padding, tells assistive technology whether the row is open, and the row's icon buttons use touch size on mobile.
+- Schema settings: on narrow phones the field row could overflow the dialog and hide the remove button; the name column shrinks instead.
 
 ## [0.2.0] - 2026-11-03
 

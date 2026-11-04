@@ -790,9 +790,11 @@
 }
 
 @media (max-width: 700px) {
+	/* The name column has no minimum: on phones (Obsidian: below 600px) the fixed tracks plus the touch-size columns leave it
+	   less than 100px, and a minimum would push the remove button past the modal, which clips it. */
 	.improved-bases-schema .improved-bases-column-head,
 	.improved-bases-schema .improved-bases-field-main {
-		grid-template-columns: var(--ib-disclosure-col) minmax(100px, 1fr) 130px var(--ib-remove-col);
+		grid-template-columns: var(--ib-disclosure-col) minmax(0, 1fr) 130px var(--ib-remove-col);
 	}
 	.improved-bases-schema .improved-bases-column-head span:nth-child(4),
 	.improved-bases-schema .improved-bases-field-details {
