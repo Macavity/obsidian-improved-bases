@@ -6,6 +6,10 @@ The release workflow takes the section of the released version from this file as
 
 ## [Unreleased]
 
+### Fixed
+
+- Schema settings: the field disclosure chevron was invisible on tablets, where Obsidian pads plain buttons; it is an icon button now, keeps its icon under theme padding, and the row's icon buttons use touch size on mobile.
+
 ## [0.2.0] - 2026-11-03
 
 ### Added
