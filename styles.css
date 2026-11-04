@@ -401,7 +401,10 @@
 .improved-bases-schema .improved-bases-field-disclosure:disabled {
 	visibility: hidden;
 }
+/* Themes pad `.clickable-icon` with more specificity than two classes (Cupertino: `body:is(.mod-macos, …):not(.is-mobile) .clickable-icon`
+   10px); the icon must not shrink into the padded box, it keeps its size and centers over the column instead. */
 .improved-bases-schema .improved-bases-field-disclosure svg {
+	flex: none;
 	transition: transform 150ms ease;
 }
 .improved-bases-schema .improved-bases-field-disclosure.is-open svg {
