@@ -7,6 +7,7 @@ import { mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { assert, ensureVault, evalJs, obs, screenshot, waitFor } from "./lib/cli.mjs";
+import { squeezedIcon } from "./lib/icon-check.mjs";
 
 const OUT = process.env.MOBILE_SMOKE_OUT ?? join(tmpdir(), "improved-bases-mobile");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -62,8 +63,8 @@ try {
 	const m = json(MEASURE);
 	assert(m.mobile, "body has no is-mobile class after dev:mobile on");
 	assert(m.touch > 0, "--touch-size-s is not set");
-	// The icon is square; a width below its height means a padding rule squeezed it (Obsidian pads plain buttons on tablets).
-	if (m.svgWidth < 12 || m.svgWidth < m.svgHeight - 1) failures.push(`disclosure chevron icon squeezed (svg ${m.svgWidth}x${m.svgHeight}px)`);
+	const squeezed = squeezedIcon(m);
+	if (squeezed) failures.push(`disclosure chevron ${squeezed}`);
 	touchSized("disclosure", m.disclosure, m.touch);
 	touchSized("remove button", m.remove, m.touch);
 	if (m.disclosure) {
@@ -78,8 +79,11 @@ try {
 		}
 	}
 	screenshot(join(OUT, "tablet-dialog.png"));
+} catch (e) {
+	failures.push(`smoke aborted: ${e.message}`);
 } finally {
-	// Leave Obsidian as found even after a failure: dialog closed, desktop mode.
+	// Leave Obsidian as found even after a failure: dialog closed, desktop mode. Problems here join `failures` instead of
+	// throwing, so they never replace the failure that got us here.
 	try {
 		closeDialog();
 	} catch {
@@ -88,11 +92,15 @@ try {
 	try {
 		console.log(obs("dev:mobile", { off: true }).trim());
 	} catch (e) {
-		console.warn(`dev:mobile off failed: ${e.message}`);
+		failures.push(`dev:mobile off failed: ${e.message}`);
 	}
 	await sleep(1500);
-	await untilReady();
-	assert(evalJs("String(app.isMobile)") === "false", "Obsidian is still in mobile emulation");
+	try {
+		await untilReady();
+		if (evalJs("String(app.isMobile)") !== "false") failures.push("Obsidian is still in mobile emulation");
+	} catch (e) {
+		failures.push(`Obsidian did not answer after dev:mobile off: ${e.message}`);
+	}
 }
 console.log(`screenshot in ${OUT}`);
 if (failures.length) {

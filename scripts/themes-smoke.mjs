@@ -5,6 +5,7 @@ import { mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { assert, ensureVault, evalJs, obs, screenshot, waitFor } from "./lib/cli.mjs";
+import { squeezedIcon } from "./lib/icon-check.mjs";
 import { activateTheme, ensureTheme, THEMES } from "./lib/themes.mjs";
 
 const OUT = process.env.THEMES_SMOKE_OUT ?? join(tmpdir(), "improved-bases-themes");
@@ -32,7 +33,7 @@ const MEASURE = `(() => {
 const FOOTER = `(() => { const f = document.querySelector('.improved-bases-schema-modal .improved-bases-footer');
 	return f ? getComputedStyle(f).backgroundColor : null; })()`;
 // The disclosure chevron is a `clickable-icon`; a theme that pads that class with enough specificity (Cupertino 10px) squeezes
-// the icon unless the stylesheet stops it. The icon is square, so a width below its height means it was squeezed.
+// the icon unless the stylesheet stops it (see `squeezedIcon`).
 const CHEVRON = `(() => {
 	const b = [...document.querySelectorAll('.improved-bases-schema-modal .improved-bases-field-disclosure')].find((x) => !x.disabled);
 	if (!b) return null;
@@ -67,7 +68,8 @@ try {
 			const chevron = json(CHEVRON);
 			if (!chevron) failures.push(`${label}: dialog has no expandable row`);
 			else {
-				if (chevron.svgWidth < 12 || chevron.svgWidth < chevron.svgHeight - 1) failures.push(`${label}: dialog chevron icon squeezed (svg ${chevron.svgWidth}x${chevron.svgHeight}px)`);
+				const squeezed = squeezedIcon(chevron);
+				if (squeezed) failures.push(`${label}: dialog chevron ${squeezed}`);
 				if (!chevron.inside) failures.push(`${label}: dialog chevron overflows its row`);
 			}
 			screenshot(file("dialog"));

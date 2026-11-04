@@ -482,6 +482,7 @@ export class SchemaSettingsModal extends Modal {
 			const open = expandable(draft) && this.expanded.has(draft);
 			disclosure.disabled = !expandable(draft);
 			disclosure.toggleClass("is-open", open);
+			disclosure.setAttribute("aria-expanded", String(open));
 			setIcon(typeIconEl, typeIcon(draft, this.input.types));
 			this.renderDetails(details, draft);
 			this.updateHint(hint, draft);
