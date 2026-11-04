@@ -1,17 +1,10 @@
 ---
 name: codebase-wiki
-description: "How to work in a Codebase Wiki project (the `codebase-wiki` starter pack): an agent-authored, source-grounded wiki of the surrounding codebase. Read when the project has a `wiki/` knowledge base with `architecture/`, `modules/`, `flows/`, `concepts/`, and `guides/` sections plus `wiki/OVERVIEW.md`, or when asked to generate or refresh a wiki of this codebase. Carries the per-folder rules and freshness discipline, summarizes the audience/depth knobs and source-reference convention, and bundles the full generate/refresh procedure in `references/`. Complements the platform `open-knowledge` skill; does not replace it."
-compatibility: "Any agent host with the OpenKnowledge MCP server configured. Installed project-local by `ok seed --pack codebase-wiki`."
-metadata:
-  pack: "codebase-wiki"
-  author: "Inkeep"
-  repository: "https://github.com/inkeep/open-knowledge-skills"
+description: "How to work in this project's codebase wiki: an agent-authored, source-grounded wiki of the surrounding codebase under `wiki/`, with `architecture/`, `modules/`, `flows/`, `concepts/` and `guides/` sections plus `wiki/OVERVIEW.md`. Read when asked to generate or refresh the wiki, or before editing a wiki page. Carries the per-folder rules and page skeletons, the freshness discipline, the audience/depth knobs and the source-reference convention, and bundles the full generate/refresh procedure in `references/`."
 ---
-# Codebase Wiki pack — how to work here
+# Codebase wiki — how to work here
 
-This project holds an **agent-authored wiki of a codebase** — DeepWiki, but living in the repo. A coding agent reads the source and writes a navigable, diagram-rich, source-grounded wiki as markdown under `wiki/`. It is version-controlled and diffable, private by default, human+agent co-editable, renders in OK's live preview, and doubles as durable grounding context for future agent sessions. There is no separate Q&A surface — Q&A is "the OK-grounded agent + `search`".
-
-> This skill is pack guidance. The platform `/open-knowledge` skill (read/write/preview/linking/grounding rules) still governs every markdown operation — this layers the wiki workflow on top.
+This project holds an **agent-authored wiki of its codebase** — DeepWiki, but living in the repo. A coding agent reads the source and writes a navigable, diagram-rich, source-grounded wiki as plain markdown under `wiki/`. It is version-controlled and diffable, human+agent co-editable, and doubles as durable grounding context for future agent sessions. There is no separate Q&A surface — Q&A is "an agent that has read these pages + `grep`".
 
 ## The shape
 
@@ -28,9 +21,9 @@ wiki/
 
 ## Generating + refreshing
 
-Don't free-hand it — read **[references/generate-and-refresh.md](references/generate-and-refresh.md)** and follow the phased, STOP-gated procedure. It auto-detects mode: a stubbed `OVERVIEW.md` (empty `source_commit`) → **generate** (survey → overview → architecture → modules → flows → concepts → link-graph audit); a stamped `source_commit` → **refresh** (diff `source_commit..HEAD`, update only affected pages, re-stamp).
+Don't free-hand it — read **[references/generate-and-refresh.md](references/generate-and-refresh.md)** and follow the phased, STOP-gated procedure. It auto-detects mode: a stubbed `OVERVIEW.md` (empty `source_commit`) → **generate** (survey → overview → architecture → modules → flows → concepts → link audit); a stamped `source_commit` → **refresh** (diff `source_commit..HEAD`, update only affected pages, re-stamp).
 
-**Two toolsets.** Read source code with NATIVE tools (`Read`/`Grep`/`Glob`/`Bash`) — OK MCP does not index non-markdown source. Author and audit the wiki with OK MCP verbs (`write`/`edit` for pages, `links`/`search` for the graph). Never hand-write wiki markdown with native `Write`/`Edit`.
+**Plain files, native tools.** Read source and write wiki pages with the native tools (`Read`/`Grep`/`Glob`/`Edit`/`Write`/`Bash`). Nothing checks links for you: after every write, confirm each relative link resolves from the page's own folder, and run the link audit from the reference after a generate or refresh.
 
 ## The two knobs
 
@@ -43,27 +36,41 @@ Two natural-language knobs, read from the user's request (e.g. "build the wiki, 
 
 ## Source-reference convention
 
-- **Intra-wiki navigation** → OK doc links — they build the backlink / hub / orphan graph, so link liberally; density is how the wiki stays navigable.
-- **Code references** → relative links + symbol code-spans (`internal`) or GitHub blob URLs (`public`). Source-file links stay out of the navigation graph (`links` tracks only `.md`/`.mdx` edges, so they never show as graph dead-links or orphans) — but a wrong-depth path still surfaces in the write/edit `brokenLinks` response (`no-such-file`, or `unresolvable` if it overshoots the content root), so count the `../` hops from the page's folder. Never invent paths — reference only files you actually read.
+- **Intra-wiki navigation** → relative markdown links to the page file (`[Auth flow](../flows/auth.md)`). They are the navigation graph, so link liberally; density is how the wiki stays navigable. `grep -rl "flows/auth.md" wiki` finds a page's backlinks.
+- **Code references** → relative links + symbol code-spans (`internal`) or GitHub blob URLs (`public`). Count the `../` hops from the page's folder: a page in `wiki/modules/` reaches `src/` through `../../src/`. Nothing flags a wrong-depth path, so check that the target exists. Never invent paths — reference only files you actually read.
 
 The full rules — the GitHub-URL / relative fallback, the `#Lxx` caveat, and the exact code-span shape — live in [references/generate-and-refresh.md](references/generate-and-refresh.md).
 
 ## Per-folder rules
 
-**`architecture/`** — One page per architectural area (boundaries, layers, subsystems, cross-cutting concerns). Each: a `mermaid` system-context or component diagram, key components (with source refs), and the design decisions behind them. Uses the `architecture-page` template. At `depth: tour`, modules fold in here.
+**`architecture/`** — One page per architectural area (boundaries, layers, subsystems, cross-cutting concerns). Each: a `mermaid` system-context or component diagram, key components (with source refs), and the design decisions behind them. Headings: Summary, Diagram, Key components, Design decisions, Related. At `depth: tour`, modules fold in here.
 
-**`modules/`** — One page per package / module: purpose, responsibilities, public API / entry points, key files (linked per the convention), dependencies, and flows it participates in. Uses the `module-page` template. Skipped at `tour`; sub-module depth scales with the knob.
+**`modules/`** — One page per package / module: purpose, responsibilities, public API / entry points, key files (linked per the convention), dependencies, and flows it participates in. Headings: Summary, Responsibilities, Public API / entry points, Key files, Dependencies, Participates in, Related. Skipped at `tour`; sub-module depth scales with the knob.
 
-**`flows/`** — Key end-to-end sequences as `mermaid` sequence / flow diagrams + narrative. Uses the `flow-page` template; add a **Failure modes** section at `exhaustive`. Link every module and concept the flow crosses.
+**`flows/`** — Key end-to-end sequences as `mermaid` sequence / flow diagrams + narrative. Headings: Summary, Trigger, Sequence diagram, Steps, Failure modes (only at `exhaustive`), Related. Link every module and concept the flow crosses.
 
-**`concepts/`** — Atomic glossary pages (one term each): definition, why it matters, where it lives in the code. Uses the `concept-page` template. Keep small and densely cross-linked so each concept becomes a hub.
+**`concepts/`** — Atomic glossary pages (one term each): definition, why it matters, where it lives in the code. Headings: Definition, Why it matters, Where it lives, Related. Keep small and densely cross-linked so each concept becomes a hub.
 
-**`guides/`** — Task-oriented "how / where do I change X" walkthroughs: goal, steps, relevant code, gotchas. Uses the `guide-page` template. Populated at `standard`, rich at `exhaustive`, thin/empty at `tour`.
+**`guides/`** — Task-oriented "how / where do I change X" walkthroughs. Headings: Goal, Steps, Relevant code, Gotchas, Related. Populated at `standard`, rich at `exhaustive`, thin/empty at `tour`.
 
 ## Freshness discipline (MUST)
 
 `OVERVIEW.md` frontmatter carries `source_commit` — the git HEAD the wiki was last generated/refreshed against. It is the freshness anchor: refresh mode diffs `source_commit..HEAD` to update only the affected pages, then re-stamps it. **Always re-stamp `source_commit` after a generate or refresh run** — a stale anchor silently breaks incremental refresh.
 
-## Templates
+## Page skeleton
 
-Each folder ships a starter template (`architecture-page`, `module-page`, `flow-page`, `concept-page`, `guide-page`). Create with `write({ document: { path, template: "<name>" } })`. Templates carry only structure (headings + frontmatter scaffold); what each section is for is described above and in [references/generate-and-refresh.md](references/generate-and-refresh.md), not repeated inside document bodies.
+Every page starts with this frontmatter, then an H1 equal to `title` and the folder's headings as H2:
+
+```markdown
+---
+title: <Page title>
+description: "<one sentence on what the page covers>"
+type: <architecture | module | flow | concept | guide>
+tags:
+  - wiki
+  - <type>
+---
+# <Page title>
+```
+
+`OVERVIEW.md` carries `profile` and `source_commit` instead of `type`, and the tag `overview`. Headings carry only structure; what each section is for is described above and in the reference, not repeated inside page bodies.
