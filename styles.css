@@ -388,17 +388,11 @@
 	background-color: rgba(var(--color-orange-rgb), 0.04);
 }
 
-/* Disclosure */
+/* Disclosure: a `clickable-icon` (Obsidian and themes exempt that class from their `button:not(.clickable-icon)` padding);
+   two plugin classes keep the padding at zero where themes pad `.clickable-icon` itself (Cupertino 10px). */
 .improved-bases-schema .improved-bases-field-disclosure {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
 	height: 28px;
 	padding: 0;
-	border: 0;
-	box-shadow: none;
-	background: transparent;
-	color: var(--text-muted);
 	--icon-size: var(--icon-s);
 }
 .improved-bases-schema .improved-bases-field-disclosure:disabled {
