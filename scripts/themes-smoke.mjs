@@ -1,11 +1,10 @@
 // Theme compatibility smoke: for the default theme and every theme in scripts/themes.json, in light and dark mode,
 // checks the select cells of Mitarbeiter.base and the schema dialog, and saves screenshots. Obsidian must be running
 // with the test vault open (`pnpm smoke` first). Output dir: $THEMES_SMOKE_OUT or <tmp>/improved-bases-themes.
-import { execFileSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { assert, ensureVault, evalJs, obs, waitFor } from "./lib/cli.mjs";
+import { assert, ensureVault, evalJs, obs, screenshot, waitFor } from "./lib/cli.mjs";
 import { activateTheme, ensureTheme, THEMES } from "./lib/themes.mjs";
 
 const OUT = process.env.THEMES_SMOKE_OUT ?? join(tmpdir(), "improved-bases-themes");
@@ -17,24 +16,6 @@ const json = (code) => JSON.parse(evalJs(`JSON.stringify(${code})`));
 
 ensureVault();
 mkdirSync(OUT, { recursive: true });
-function focusObsidian() {
-	try {
-		execFileSync("osascript", ["-e", 'tell application "Obsidian" to activate']); // dev:screenshot hangs on a hidden window
-	} catch {
-		// not macOS or no permission; screenshots may still work
-	}
-}
-function screenshot(path) {
-	for (let attempt = 0; ; attempt++) {
-		focusObsidian();
-		try {
-			return obs("dev:screenshot", { path });
-		} catch (e) {
-			if (attempt >= 1) throw e;
-			console.warn(`screenshot ${path} failed once, retrying: ${e.message}`);
-		}
-	}
-}
 const originalMode = evalJs("app.vault.getConfig('theme') ?? 'obsidian'");
 obs("open", { file: "Mitarbeiter.base" });
 await waitFor(() => evalJs("document.querySelectorAll('.bases-td .improved-bases-select').length") !== "0", 15000);
