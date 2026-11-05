@@ -901,6 +901,10 @@
 	min-width: var(--ib-touch);
 	margin-inline: calc(var(--size-4-3) * -1);
 }
+/* The widened hit area would highlight across the label, so touch layouts show no hover fill. */
+.is-mobile .improved-bases-option-picker .improved-bases-chip-remove:hover {
+	background-color: transparent;
+}
 .is-mobile .improved-bases-option-editor-colors {
 	grid-template-columns: repeat(auto-fill, minmax(var(--ib-touch), 1fr));
 	justify-items: center;
