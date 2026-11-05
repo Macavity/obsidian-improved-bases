@@ -938,6 +938,8 @@
 .improved-bases-schema .improved-bases-dialog-warnings-title {
 	font-weight: var(--font-semibold);
 	margin-bottom: var(--size-2-1);
+}
+
 /* Phone: picker and editor dock to the bottom edge at full width (see dockToViewport, which also lifts them above the keyboard).
    The edit pencil has no hover on touch, so it stays visible; rows, remove buttons and swatches grow to touch size. */
 .is-mobile {
