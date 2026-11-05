@@ -80,6 +80,10 @@ export const de: Locale = {
 	"footer.pendingOptionRename_other": "{n} ausstehende Options-Umbenennungen",
 	"footer.optionRemoval_one": "1 Options-Entfernung",
 	"footer.optionRemoval_other": "{n} Options-Entfernungen",
+	"footer.removedDetail": "{name} entfernt",
+	"footer.more": "+{n} weitere",
+	"dialog.referencedWarning": " Filter oder Formeln verweisen darauf.",
+	"draft.asIs": "unverändert",
 	"footer.options_one": "1 Option",
 	"footer.options_other": "{n} Optionen",
 

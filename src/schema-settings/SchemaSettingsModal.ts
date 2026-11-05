@@ -352,7 +352,7 @@ export class SchemaSettingsModal extends Modal {
 		const removed = removals(this.drafts);
 		const options = optionMigrations(this.drafts);
 		const optionRenames = options.flatMap((m) => m.renames.map((r) => `${m.field}: ${r.from} → ${r.to}`));
-		const optionRemovals = options.flatMap((m) => m.removals.map((v) => `${m.field}: ${v} removed`));
+		const optionRemovals = options.flatMap((m) => m.removals.map((v) => `${m.field}: ${t("footer.removedDetail", { name: v })}`));
 		const total = pending.length + removed.length + optionRenames.length + optionRemovals.length;
 		if (!total) {
 			el.removeClass("has-pending");
@@ -369,9 +369,9 @@ export class SchemaSettingsModal extends Modal {
 		el.createSpan({ cls: "improved-bases-status-badge", text: String(total) });
 		const text = el.createDiv({ cls: "improved-bases-status-text" });
 		text.createEl("b", { text: parts.join(", ") });
-		const details = [...pending.map((r) => `${r.from} → ${r.to}`), ...removed.map((name) => `${name} removed`), ...optionRenames, ...optionRemovals];
+		const details = [...pending.map((r) => `${r.from} → ${r.to}`), ...removed.map((name) => t("footer.removedDetail", { name })), ...optionRenames, ...optionRemovals];
 		const shown = details.slice(0, 2);
-		if (details.length > 2) shown.push(`+${details.length - 2} more`);
+		if (details.length > 2) shown.push(t("footer.more", { n: details.length - 2 }));
 		text.createEl("p", { text: shown.join(" · ") });
 	}
 
@@ -422,7 +422,7 @@ export class SchemaSettingsModal extends Modal {
 		row.empty();
 		const confirm = row.createDiv({ cls: "improved-bases-field-confirm" });
 		setIcon(confirm.createSpan({ cls: "improved-bases-warning-icon" }), "lucide-alert-triangle");
-		const warning = referencesName(this.input.expressions, name) ? " Filters or formulas reference it." : "";
+		const warning = referencesName(this.input.expressions, name) ? t("dialog.referencedWarning") : "";
 		const text = confirm.createSpan({ text: t("dialog.removeConfirm", { name, warning }) });
 		const keep = confirm.createEl("button", { cls: "improved-bases-confirm-keep", text: t("dialog.keep"), attr: { type: "button" } });
 		const remove = confirm.createEl("button", { cls: "mod-warning improved-bases-confirm-remove", text: t("dialog.remove"), attr: { type: "button" } });

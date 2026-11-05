@@ -87,6 +87,10 @@ export const en = {
 	"footer.pendingOptionRename_other": "{n} pending option renames",
 	"footer.optionRemoval_one": "1 option removal",
 	"footer.optionRemoval_other": "{n} option removals",
+	"footer.removedDetail": "{name} removed",
+	"footer.more": "+{n} more",
+	"dialog.referencedWarning": " Filters or formulas reference it.",
+	"draft.asIs": "is",
 	"footer.options_one": "1 option",
 	"footer.options_other": "{n} options",
 

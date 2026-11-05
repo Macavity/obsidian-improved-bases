@@ -203,7 +203,7 @@ export function mismatchHint(draft: FieldDraft, types: readonly PropertyType[], 
 	if (!type?.validate) return null;
 	const count = values.filter((v) => rejects(type, v)).length;
 	if (count === 0) return null;
-	const shown = draft.detected === null ? "is" : propertyTypeOf(types, draft.detected).name;
+	const shown = draft.detected === null ? t("draft.asIs") : propertyTypeOf(types, draft.detected).name;
 	return tn("draft.mismatch", count, { name: draft.name, type: type.name, shown });
 }
 
