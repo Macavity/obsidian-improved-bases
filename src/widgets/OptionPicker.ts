@@ -184,6 +184,7 @@ export function openOptionPicker(anchor: HTMLElement, host: OptionPickerHost, ov
 		if (!recolor || !rename || !remove) return;
 		editor?.close();
 		const value = option.value;
+		let own: { close(): void } | null = null;
 		// A rejected host action closes the picker like any other picker failure instead of escaping the editor's `void` calls.
 		const done = async (ok: Promise<boolean>, apply: () => void, closeEditor: boolean): Promise<boolean> => {
 			try {
@@ -193,11 +194,12 @@ export function openOptionPicker(anchor: HTMLElement, host: OptionPickerHost, ov
 				return false;
 			}
 			apply();
-			if (closeEditor) editor?.close();
+			// Closes the editor that started the action: a later action may have opened another one meanwhile.
+			if (closeEditor) own?.close();
 			if (!closed) render();
 			return true;
 		};
-		editor = openOptionEditor(
+		own = editor = openOptionEditor(
 			anchorEl,
 			option,
 			{

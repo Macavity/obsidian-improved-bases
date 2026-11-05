@@ -333,6 +333,19 @@ describe("openOptionPicker", () => {
 			expect(editorEl()?.style.getPropertyValue("--ib-editor-top")).toBe("70px");
 			expect(editorEl()?.style.getPropertyValue("--ib-editor-left")).toBe("100px");
 		});
+		it("a late host result closes its own editor, not the one opened since", async () => {
+			let resolve: (ok: boolean) => void = () => {};
+			const remove = vi.fn(() => new Promise<boolean>((r) => (resolve = r)));
+			const { rows } = setup({ remove });
+			pencil(rows()[1]).click();
+			document.body.querySelector<HTMLElement>(".improved-bases-option-editor-delete")?.click();
+			pencil(rows()[0]).click();
+			const second = editorEl();
+			expect(second).not.toBeNull();
+			resolve(true);
+			await flush();
+			expect(document.body.contains(second)).toBe(true);
+		});
 		it("renames in list and header after success, closing the editor", async () => {
 			const { rows, labels, headerPills, host, fns } = setup({ values: ["Beta"] });
 			pencil(rows()[1]).click();
