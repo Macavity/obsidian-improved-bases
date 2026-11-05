@@ -910,3 +910,59 @@
 .is-mobile .improved-bases-option-editor-delete {
 	min-height: var(--ib-touch);
 }
+
+/* Phone schema dialog: header, toolbar and footer wrap into full-width rows instead of squeezing or clipping their controls. */
+.is-phone .improved-bases-schema-modal .modal-header {
+	flex-wrap: wrap;
+}
+.is-phone .improved-bases-schema-modal .modal-header {
+	padding-right: var(--ib-touch);
+}
+.is-phone .improved-bases-schema-modal .modal-title {
+	flex: 1 1 100%;
+}
+.is-phone .improved-bases-schema-modal .improved-bases-base-icon {
+	flex: 1 1 100%;
+	min-width: 0;
+}
+.is-phone .improved-bases-schema-modal .improved-bases-base-icon-input {
+	flex: 1 1 auto;
+	width: auto;
+	min-width: 0;
+}
+.is-phone .improved-bases-schema .improved-bases-toolbar,
+.is-phone .improved-bases-schema .improved-bases-footer {
+	flex-wrap: wrap;
+}
+.is-phone .improved-bases-schema .improved-bases-search,
+.is-phone .improved-bases-schema .improved-bases-add-view-label,
+.is-phone .improved-bases-schema .improved-bases-footer-status {
+	flex: 1 1 100%;
+}
+.is-phone .improved-bases-schema .improved-bases-add-view-label {
+	margin-left: 0;
+}
+.is-phone .improved-bases-schema .improved-bases-add-view {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+.is-phone .improved-bases-schema .improved-bases-footer-buttons {
+	flex: 1 1 100%;
+	display: flex;
+	gap: var(--size-4-2);
+}
+.is-phone .improved-bases-schema .improved-bases-footer-buttons button {
+	flex: 1 1 0;
+	min-height: var(--ib-touch);
+}
+.is-phone .improved-bases-schema .improved-bases-add-field {
+	flex: 1 1 100%;
+	justify-content: center;
+	min-height: var(--ib-touch);
+}
+.is-phone .improved-bases-schema .improved-bases-footer {
+	flex: 0 0 auto;
+}
+.is-phone .improved-bases-schema-modal {
+	--dialog-max-height: calc(100dvh - var(--size-4-12));
+}
