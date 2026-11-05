@@ -266,10 +266,11 @@ function ensureVersion(doc: Document): void {
 const sectionJson = (doc: Document): unknown => (doc.toJSON() as Record<string, unknown> | null)?.[SCHEMA_KEY] ?? null;
 
 /** A section written for a newer plugin is never changed here: the parser cannot know what it would break. */
-function assertWritable(doc: Document): void {
-	const version = sectionVersion(doc);
+function assertVersionWritable(version: number): void {
 	if (version > SCHEMA_VERSION) throw new Error(t("error.unsupportedVersion", { version }));
 }
+
+export const assertWritable = (doc: Document): void => assertVersionWritable(sectionVersion(doc));
 
 /**
  * Applies column edits (view orders, properties, summaries, sort, groupBy), the
@@ -280,11 +281,13 @@ export function updateBaseSource(source: string, edits: ColumnEdits, mutate: (fi
 	const doc = parseDocument(source);
 	const before = doc.toJSON() as unknown;
 	const sectionBefore = sectionJson(doc);
+	const versionBefore = sectionVersion(doc);
 	applyColumnEdits(doc, edits);
 	applySchemaMutation(doc, mutate);
 	if (icon !== undefined) applyIcon(doc, icon);
 	if (same(before, doc.toJSON())) return source;
-	if (!same(sectionBefore, sectionJson(doc))) assertWritable(doc);
+	// The version that counts is the one the file had: a deleted section must not read as version 1.
+	if (!same(sectionBefore, sectionJson(doc))) assertVersionWritable(versionBefore);
 	ensureVersion(doc);
 	return doc.toString();
 }

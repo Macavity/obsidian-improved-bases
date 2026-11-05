@@ -98,6 +98,9 @@ describe("schema version on write", () => {
     expect(() => updateSchemaSource(withV2, (f) => { f.B = { type: "text" }; })).toThrow(/version 2/);
     expect(() => updateBaseSource(withV2, EMPTY_EDITS, () => {}, "👥")).toThrow(/version 2/);
     expect(updateSchemaSource(withV2, () => {})).toBe(withV2);
+    // Clearing the icon of an icon-only newer section would drop the section; the version before the change counts.
+    const iconOnlyV2 = `improved-bases:\n  version: 2\n  icon: 👥\n${src}`;
+    expect(() => updateBaseSource(iconOnlyV2, EMPTY_EDITS, () => {}, "")).toThrow(/version 2/);
     // Column edits alone do not touch the section, so they are still allowed.
     const withView = `improved-bases:\n  version: 2\n  fields: {}\nviews:\n  - type: table\n    order:\n      - Role\n`;
     expect(updateBaseSource(withView, { ...EMPTY_EDITS, rename: [{ from: "Role", to: "Job" }] }, () => {})).toContain("- Job\n");
@@ -105,6 +108,10 @@ describe("schema version on write", () => {
   it("leaves the source untouched when nothing changes", () => {
     const withSection = `improved-bases:\n  fields:\n    A:\n      type: text\n${src}`;
     expect(updateSchemaSource(withSection, () => {})).toBe(withSection);
+  });
+  it("reset refuses a valid newer section but still replaces an invalid one", () => {
+    expect(() => resetSchemaSource(`improved-bases:\n  version: 2\n  fields: {}\n${src}`)).toThrow(/version 2/);
+    expect(resetSchemaSource(`improved-bases:\n  version: x\n${src}`)).toContain("version: 1");
   });
   it("reset writes version: 1 with empty fields", () => {
     const out = resetSchemaSource("improved-bases: 5\nviews: []\n");
