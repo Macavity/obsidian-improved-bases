@@ -54,3 +54,7 @@ tags:
 - [Field schema](../concepts/field-schema.md)
 - [Plugin core](./plugin-core.md) (registration)
 - [Internals](./internals.md) (toolbar button)
+
+## Phone
+
+Under `.is-phone` the dialog body scrolls as a whole (toolbar, column head and field rows together, so the fields get the screen); only the title with the default-icon line above it stays put. The footer is hidden while the drafts are not dirty (`updateStatus()` toggles `is-dirty`, and `is-error` for the error dialog, which keeps its footer); the resting text "Changes are written to the base on Save…" then shows as `.improved-bases-hint` block above the toolbar and scrolls away. A dirty footer is sticky (`position: sticky; bottom: 0`) with the full pending-changes text and Cancel/Save at touch height. The toolbar wraps (search and "Add field" in one row, the "Add new fields to" dropdown below it) and the dialog may use the full dynamic viewport height. The details column stays hidden below 700px as before; the expanded panel is single-column.

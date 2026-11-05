@@ -1,7 +1,7 @@
 import { setIcon } from "obsidian";
 import { COLORS, type Color, type SelectOption } from "../schema/types";
 import { placePopover } from "./placePopover";
-import { dismissOnOutside } from "./popover";
+import { dismissOnOutside, dockToViewport, isPhone } from "./popover";
 import type { OverlayRegistry } from "./types";
 import { t } from "../i18n";
 import { colorLabel } from "./pickers";
@@ -24,13 +24,14 @@ export function openOptionEditor(
 	handlers: OptionEditorHandlers,
 	overlays: OverlayRegistry,
 ): { close(): void } {
-	const pos = placePopover(anchor.getBoundingClientRect(), { width: window.innerWidth, height: window.innerHeight }, { width: WIDTH, height: HEIGHT }, "end");
+	const pos = placePopover(anchor.getBoundingClientRect(), { width: window.innerWidth, height: window.innerHeight }, { width: WIDTH, height: HEIGHT }, "end", isPhone());
 	const popover = document.body.createDiv({ cls: OPTION_EDITOR_CLASS });
 	popover.setCssProps({
 		"--ib-editor-left": `${pos.left}px`,
 		"--ib-editor-top": `${pos.top}px`,
 		"--ib-editor-width": `${WIDTH}px`,
 	});
+	const undock = pos.docked ? dockToViewport(popover) : null;
 	const input = popover.createEl("input", { attr: { type: "text", "aria-label": t("option.name") } });
 	input.value = option.value;
 	const remove = popover.createDiv({ cls: "improved-bases-option-editor-delete", attr: { role: "button", tabindex: "0" } });
@@ -61,6 +62,7 @@ export function openOptionEditor(
 		if (closed) return;
 		closed = true;
 		dismiss();
+		undock?.();
 		popover.remove();
 	}
 

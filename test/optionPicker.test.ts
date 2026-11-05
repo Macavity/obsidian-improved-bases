@@ -333,6 +333,19 @@ describe("openOptionPicker", () => {
 			expect(editorEl()?.style.getPropertyValue("--ib-editor-top")).toBe("70px");
 			expect(editorEl()?.style.getPropertyValue("--ib-editor-left")).toBe("100px");
 		});
+		it("a late host result closes its own editor, not the one opened since", async () => {
+			let resolve: (ok: boolean) => void = () => {};
+			const remove = vi.fn(() => new Promise<boolean>((r) => (resolve = r)));
+			const { rows } = setup({ remove });
+			pencil(rows()[1]).click();
+			document.body.querySelector<HTMLElement>(".improved-bases-option-editor-delete")?.click();
+			pencil(rows()[0]).click();
+			const second = editorEl();
+			expect(second).not.toBeNull();
+			resolve(true);
+			await flush();
+			expect(document.body.contains(second)).toBe(true);
+		});
 		it("renames in list and header after success, closing the editor", async () => {
 			const { rows, labels, headerPills, host, fns } = setup({ values: ["Beta"] });
 			pencil(rows()[1]).click();
@@ -403,5 +416,40 @@ describe("openOptionPicker", () => {
 			picker.close();
 			expect(editorEl()).toBeNull();
 		});
+	});
+});
+
+describe("option picker on a phone", () => {
+	afterEach(() => {
+		document.body.classList.remove("is-phone");
+		document.body.empty();
+	});
+
+	it("docks to the bottom edge and caps its height", () => {
+		document.body.classList.add("is-phone");
+		const { popover, picker } = setup();
+		const el = popover();
+		expect(el?.classList.contains("is-docked")).toBe(true);
+		expect(el?.style.getPropertyValue("--ib-dock-bottom")).toBe("0px");
+		expect(el?.style.getPropertyValue("--ib-dock-max-height")).toMatch(/^\d+px$/);
+		picker.close();
+		expect(popover()).toBeNull();
+	});
+
+	it("removes its visualViewport listeners on close", () => {
+		const vv = { height: 700, offsetTop: 0, addEventListener: vi.fn<(type: string, fn: () => void) => void>(), removeEventListener: vi.fn<(type: string, fn: () => void) => void>() };
+		vi.stubGlobal("visualViewport", vv);
+		document.body.classList.add("is-phone");
+		const { picker } = setup();
+		const added = vv.addEventListener.mock.calls.map(([type, fn]) => [type, fn]);
+		expect(added.map(([type]) => type)).toEqual(["resize", "scroll"]);
+		picker.close();
+		expect(vv.removeEventListener.mock.calls).toEqual(added);
+		vi.unstubAllGlobals();
+	});
+
+	it("stays at the field on wider layouts", () => {
+		const { popover } = setup();
+		expect(popover()?.classList.contains("is-docked")).toBe(false);
 	});
 });

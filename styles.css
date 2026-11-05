@@ -868,3 +868,137 @@
 .improved-bases-picker-row.is-selected .improved-bases-picker-edit {
 	visibility: visible;
 }
+
+/* Phone: picker and editor dock to the bottom edge at full width (see dockToViewport, which also lifts them above the keyboard).
+   The edit pencil has no hover on touch, so it stays visible; rows, remove buttons and swatches grow to touch size. */
+.is-mobile {
+	--ib-touch: max(44px, var(--touch-size-s));
+}
+.improved-bases-option-picker.is-docked,
+.improved-bases-option-editor.is-docked {
+	top: auto;
+	left: 0;
+	right: 0;
+	bottom: var(--ib-dock-bottom, 0);
+	width: auto;
+	border-radius: var(--radius-l) var(--radius-l) 0 0;
+	padding-bottom: env(safe-area-inset-bottom);
+}
+.improved-bases-option-picker.is-docked,
+.improved-bases-option-editor.is-docked {
+	max-height: var(--ib-dock-max-height);
+}
+.improved-bases-option-editor.is-docked {
+	overflow-y: auto;
+}
+.is-mobile .improved-bases-picker-row,
+.is-mobile .improved-bases-picker-create {
+	min-height: var(--ib-touch);
+}
+.is-mobile .improved-bases-picker-edit {
+	visibility: visible;
+	min-width: var(--ib-touch);
+	min-height: var(--ib-touch);
+}
+/* The hit area stays touch-wide, the negative margins pull the × back next to the label. */
+.is-mobile .improved-bases-option-picker .improved-bases-chip-remove {
+	min-width: var(--ib-touch);
+	min-height: var(--ib-touch);
+	margin-inline: calc(var(--size-4-3) * -1);
+}
+/* The widened hit area would highlight across the label, so touch layouts show no hover fill. */
+.is-mobile .improved-bases-option-picker .improved-bases-chip-remove:hover {
+	background-color: transparent;
+}
+.is-mobile .improved-bases-option-editor-colors {
+	grid-template-columns: repeat(auto-fill, minmax(var(--ib-touch), 1fr));
+	justify-items: center;
+	/* 32px swatches on 44px pitch: the spacing makes up the touch target. */
+	gap: var(--size-4-3);
+}
+.is-mobile .improved-bases-option-editor-colors button[data-color] {
+	width: 32px;
+	height: 32px;
+}
+.is-mobile .improved-bases-option-editor-delete {
+	min-height: var(--ib-touch);
+}
+
+/* The footer's resting text; a block above the toolbar on phones only. */
+.improved-bases-schema .improved-bases-hint {
+	display: none;
+}
+
+/* Phone schema dialog: the whole body scrolls (toolbar, column head and fields together) and only a compact footer stays put,
+   so the field list gets the screen instead of a small window between two fixed blocks. */
+.is-phone .improved-bases-schema-modal {
+	--dialog-max-height: calc(100dvh - var(--size-4-12));
+}
+.is-phone .improved-bases-schema-modal .modal-header {
+	flex-wrap: wrap;
+	gap: 0 var(--size-4-3);
+	padding-right: var(--ib-touch);
+}
+.is-phone .improved-bases-schema-modal .modal-title {
+	flex: 1 1 100%;
+}
+.is-phone .improved-bases-schema-modal .improved-bases-base-icon {
+	flex: 1 1 100%;
+	min-width: 0;
+	white-space: nowrap;
+}
+.is-phone .improved-bases-schema-modal .improved-bases-base-icon-input {
+	width: 4em;
+}
+.is-phone .modal-content.improved-bases-schema {
+	display: block;
+	overflow-y: auto;
+}
+.is-phone .improved-bases-schema .improved-bases-field-list {
+	overflow: visible;
+}
+.is-phone .improved-bases-schema .improved-bases-toolbar {
+	flex-wrap: wrap;
+}
+.is-phone .improved-bases-schema .improved-bases-search {
+	flex: 1 1 8em;
+}
+.is-phone .improved-bases-schema .improved-bases-add-view-label {
+	flex: 1 1 100%;
+	margin-left: 0;
+	order: 1;
+}
+.is-phone .improved-bases-schema .improved-bases-add-view {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+.is-phone .improved-bases-schema .improved-bases-add-field {
+	flex: 0 0 auto;
+	min-height: var(--ib-touch);
+}
+.is-phone .improved-bases-schema .improved-bases-footer {
+	position: sticky;
+	bottom: 0;
+	min-height: 0;
+	background-color: var(--background-primary);
+}
+.is-phone .improved-bases-schema .improved-bases-footer:not(.is-dirty):not(.is-error) {
+	display: none;
+}
+.is-phone .improved-bases-schema .improved-bases-hint {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--size-2-3);
+	padding: var(--size-4-2) var(--size-4-4);
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+.is-phone .improved-bases-schema .improved-bases-footer-buttons button {
+	min-height: var(--ib-touch);
+}
+
+/* Phone properties panel: many chips wrap onto further lines instead of running out of the narrow value column. */
+.is-phone .metadata-property-value .improved-bases-relation,
+.is-phone .metadata-property-value .improved-bases-select {
+	flex-wrap: wrap;
+}

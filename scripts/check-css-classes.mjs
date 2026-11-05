@@ -17,6 +17,7 @@ export const OBSIDIAN_CLASSES = [
 	{ cls: "suggestion-item", reason: "Bases layout combobox popup" },
 	{ cls: "suggestion-flair", reason: "view icon inside the combobox item" },
 	{ cls: "modal-content", reason: "Modal body rendered by Obsidian" },
+	{ cls: "metadata-property-value", reason: "Value column of the properties panel, rendered by Obsidian" },
 	{ cls: "modal-title", reason: "Modal title rendered by Obsidian" },
 	{ cls: "modal-header", reason: "Modal header rendered by Obsidian" },
 	{ cls: "menu-item", reason: "Menu items rendered by Obsidian's Menu" },
