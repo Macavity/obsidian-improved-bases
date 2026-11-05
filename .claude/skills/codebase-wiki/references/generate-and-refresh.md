@@ -129,7 +129,7 @@ Atomic pages for domain terms and core abstractions (one term each): definition,
 Incremental by default — don't re-read the whole repo.
 
 1. Read `profile` from `wiki/OVERVIEW.md` properties. Reuse the profile unless the user changed a knob. The anchor is `ANCHOR=$(git log -1 --format=%H -- wiki/)`, the last commit that touched the wiki (on a branch with the base merged in, that is the base's last refresh or your own).
-2. `git diff --stat $ANCHOR..HEAD -- . ':!wiki'`. Inspect the changed paths; uncommitted changes count too (`git diff --stat $ANCHOR -- . ':!wiki'`).
+2. `git diff --stat $ANCHOR -- . ':!wiki'` (working tree against the anchor, so uncommitted edits count) plus `git ls-files --others --exclude-standard` for files not yet staged. Inspect the changed paths. The anchor is only a valid baseline because wiki-touching commits never precede unrefreshed source commits; if `git log --oneline $ANCHOR -- . ':!wiki'` shows source commits since the previous wiki commit (`git log -2 --format=%H -- wiki/`) that the anchor commit did not cover, widen the baseline to that previous wiki commit.
 3. **Map changed code → affected pages.** For each changed package/area, update its module/architecture/flow pages (read the changed source first). Update OVERVIEW only if the structure changed (new package, removed subsystem, new top-level flow).
 4. **Full-regen fallback.** If the diff is large or structural (many packages, a restructure), or git is unavailable, fall back to a full GENERATE pass rather than a partial patch.
 5. Re-run the whole Phase 7 link audit, not only on the touched pages: OVERVIEW coverage and orphans are global conditions, and the loops are cheap.

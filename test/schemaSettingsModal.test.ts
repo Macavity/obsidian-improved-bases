@@ -743,6 +743,15 @@ describe("warnings section", () => {
 		expect(box.querySelectorAll(".improved-bases-warning")).toHaveLength(1);
 		t.modal.close();
 	});
+	it("lists the base's warnings in the error state too", () => {
+		const t = open({ kind: "error", message: "bad yaml", resettable: true }, {
+			warnings: [{ id: "event:1", kind: "event", text: "save failed", at: 2, bases: ["Teams/Mitarbeiter.base"] }],
+		});
+		const box = t.el.querySelector(".improved-bases-dialog-warnings")!;
+		expect(box.nextElementSibling?.classList.contains("improved-bases-schema-error")).toBe(true);
+		expect(box.querySelector(".improved-bases-warning-text")?.textContent).toBe("save failed");
+		t.modal.close();
+	});
 	it("renders no section without warnings", () => {
 		const t = open({ kind: "fields", drafts: [] });
 		expect(t.el.querySelector(".improved-bases-dialog-warnings")).toBeNull();

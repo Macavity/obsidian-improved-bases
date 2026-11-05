@@ -185,6 +185,7 @@ export class SchemaSettingsModal extends Modal {
 	}
 
 	private renderError(message: string, resettable: boolean): void {
+		this.renderWarnings();
 		this.contentEl.createDiv({ cls: "improved-bases-schema-error", text: message });
 		this.renderFooter(resettable ? (b) => this.resetButton(b) : null);
 	}

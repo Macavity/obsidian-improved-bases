@@ -21,7 +21,7 @@ wiki/
 
 ## Generating + refreshing
 
-Don't free-hand it — read **[references/generate-and-refresh.md](references/generate-and-refresh.md)** and follow the phased, STOP-gated procedure. It auto-detects mode: a stubbed `OVERVIEW.md` (no navigation to existing pages) → **generate** (survey → overview → architecture → modules → flows → concepts → link audit); a filled `OVERVIEW.md` → **refresh** (diff the last commit that touched `wiki/` against HEAD, update only affected pages, re-stamp).
+Don't free-hand it — read **[references/generate-and-refresh.md](references/generate-and-refresh.md)** and follow the phased, STOP-gated procedure. It auto-detects mode: a stubbed `OVERVIEW.md` (no navigation to existing pages) → **generate** (survey → overview → architecture → modules → flows → concepts → link audit); a filled `OVERVIEW.md` → **refresh** (diff the last commit that touched `wiki/` against HEAD, update only affected pages).
 
 **Plain files, native tools.** Read source and write wiki pages with the native tools (`Read`/`Grep`/`Glob`/`Edit`/`Write`/`Bash`). Nothing checks links for you: a link to a source file must resolve from the page's own folder when you write it, and links between pages are verified by the link audit in the reference, run after a generate (once every page exists; until then OVERVIEW's nav links point at pages still to come) and after every refresh.
 
