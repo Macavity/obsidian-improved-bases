@@ -84,7 +84,7 @@ export class SchemaRegistry extends Events {
 	private apply(path: string, schema: BaseSchema | null, errors: string[], silent: boolean): void {
 		const schemaChanged = replace(this.byPath, path, schema, sig);
 		const errChanged = replace(this.errs, path, errors.length ? errors : null, (e) => e.join("\n"));
-		if (errChanged && errors.length) new Notice(t("notice.schemaError", { plugin: "Improved Bases", path, error: errors[0] ?? "" }));
+		if (errChanged && errors.length) new Notice(t("notice.schemaError", { plugin: "Improved Bases", path, error: errors[0] ?? "" }) + t("notice.seeWarnings"));
 		if (!silent && (schemaChanged || errChanged)) this.trigger("changed");
 	}
 }

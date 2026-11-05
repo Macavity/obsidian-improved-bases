@@ -4,6 +4,7 @@ import { buildSchemaSettings, countNotesWithKey, migrateRenames, optionSummary, 
 import type { FieldDraft } from "../src/schema-settings/schemaDraft";
 import type { SchemaRegistry } from "../src/schema/SchemaRegistry";
 import type { WidgetEnv } from "../src/widgets/types";
+import { WarningRegistry } from "../src/warnings/WarningRegistry";
 
 const notices = vi.hoisted(() => [] as string[]);
 vi.mock("obsidian", async (importOriginal) => ({
@@ -187,8 +188,9 @@ describe("buildSchemaSettings", () => {
     // Without `queried` the query fails, so the members stay unknown.
     const query = { watch: vi.fn((_: string, cb: (files: TFile[], failed: boolean) => void) => (cb(opts.queried ?? [], !opts.queried), () => undefined)) };
     const membership = { targetEntries: () => all, baseIcon: (p: string) => (p === "M.base" ? opts.icon ?? null : p === "Z.base" ? "🏢" : null) };
-    const env = { app, writer, membership, query, overlays: {} } as unknown as WidgetEnv;
-    return { app, env, reg, writer, membership, query, processFrontMatter, viewName: opts.viewName ?? null };
+    const warnings = new WarningRegistry();
+    const env = { app, writer, membership, query, overlays: {}, warnings, prefs: () => ({ defaultIcon: "📄", conflictMarkers: true }) } as unknown as WidgetEnv;
+    return { app, env, reg, writer, membership, query, processFrontMatter, warnings, viewName: opts.viewName ?? null };
   }
   async function build(opts: Parameters<typeof setup>[0] = {}) {
     const t = setup(opts);
@@ -399,6 +401,13 @@ describe("buildSchemaSettings", () => {
     const { handlers } = await build();
     expect(await handlers.countAffected("Old")).toBe(1);
   });
+  it("pushes an event warning and points the notice at it when a note could not be written", async () => {
+    const t = await build({ queried: [Object.assign(new TFile(), { path: "n.md", extension: "md" })] });
+    t.processFrontMatter.mockRejectedValueOnce(new Error("disk"));
+    await t.handlers.onSave([d({ originalName: "Status", name: "Stand", type: "select", options: [] })], 0, "");
+    expect(lastNotice()).toMatch(/^Schema saved \(see warnings\)\n/);
+    expect(t.warnings.list()).toMatchObject([{ kind: "event", bases: ["M.base"], text: "M.base: 1 note could not be updated when saving the schema" }]);
+  });
   it("resets through the writer", async () => {
     const { handlers, writer } = await build({ error: true });
     await handlers.onReset();
@@ -422,7 +431,7 @@ describe("registerSchemaSettings", () => {
       registerEvent: vi.fn(),
       addCommand: (cmd: unknown) => { command = cmd as typeof command; return cmd; },
     } as unknown as Plugin;
-    const env = { app, writer: {}, membership: { targetEntries: () => [], baseIcon: () => null }, overlays: {} } as unknown as WidgetEnv;
+    const env = { app, writer: {}, membership: { targetEntries: () => [], baseIcon: () => null }, overlays: {}, warnings: new WarningRegistry(), prefs: () => ({ defaultIcon: "📄", conflictMarkers: true }) } as unknown as WidgetEnv;
     registerSchemaSettings(plugin, env, registry([], {}));
     const dialogs = () => document.querySelectorAll(".improved-bases-schema-modal").length;
     expect(command!.checkCallback(false)).toBe(true);
@@ -443,7 +452,7 @@ describe("registerSchemaSettings", () => {
       metadataCache: { getFileCache: () => null },
     };
     const plugin = { app, register: vi.fn(), registerEvent: vi.fn(), addCommand: vi.fn() } as unknown as Plugin;
-    const env = { app, writer: {}, membership: { targetEntries: () => [], baseIcon: () => null }, overlays: {} } as unknown as WidgetEnv;
+    const env = { app, writer: {}, membership: { targetEntries: () => [], baseIcon: () => null }, overlays: {}, warnings: new WarningRegistry(), prefs: () => ({ defaultIcon: "📄", conflictMarkers: true }) } as unknown as WidgetEnv;
     const { open } = registerSchemaSettings(plugin, env, registry([], {}));
     document.body.innerHTML = "";
     await open("M.base", null, { name: "Lead", type: "select" });
@@ -453,5 +462,28 @@ describe("registerSchemaSettings", () => {
     await open("M.base", null, { name: "Lead", type: "text" });
     expect(document.querySelectorAll(".improved-bases-schema-modal")).toHaveLength(1);
     expect(type()).toBe("native:text");
+  });
+});
+
+describe("toolbar button setting", () => {
+  it("installs and removes the toolbar button on demand and on unload", () => {
+    const cleanups: (() => unknown)[] = [];
+    const app = { workspace: { on: vi.fn(), offref: vi.fn(), iterateAllLeaves: vi.fn() }, vault: {}, metadataCache: {} };
+    const plugin = { app, register: (cb: () => unknown) => cleanups.push(cb), registerEvent: vi.fn(), addCommand: vi.fn() } as unknown as Plugin;
+    const env = { app, writer: {}, membership: {}, overlays: {}, warnings: new WarningRegistry(), prefs: () => ({ defaultIcon: "📄", conflictMarkers: true }) } as unknown as WidgetEnv;
+    const toolbar = document.body.createDiv({ cls: "bases-toolbar" });
+    const { setToolbarButton } = registerSchemaSettings(plugin, env, registry([], {}));
+    const button = () => toolbar.querySelector(".improved-bases-toolbar-item");
+    expect(button()).toBeNull();
+    setToolbarButton(true);
+    setToolbarButton(true);
+    expect(toolbar.querySelectorAll(".improved-bases-toolbar-item")).toHaveLength(1);
+    setToolbarButton(false);
+    expect(button()).toBeNull();
+    setToolbarButton(true);
+    expect(button()).not.toBeNull();
+    for (const cb of cleanups) cb();
+    expect(button()).toBeNull();
+    toolbar.remove();
   });
 });

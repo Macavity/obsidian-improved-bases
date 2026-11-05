@@ -1,5 +1,15 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { TFile } from "obsidian";
+
+let lastNotice = "";
+vi.mock("obsidian", async (orig) => ({
+	...(await orig<typeof import("obsidian")>()),
+	Notice: class {
+		constructor(message: string) {
+			lastNotice = message;
+		}
+	},
+}));
 import type { App, EventRef } from "obsidian";
 import { SchemaRegistry } from "../src/schema/SchemaRegistry";
 
@@ -87,5 +97,15 @@ describe("SchemaRegistry", () => {
 		fire("rename", renamed, "A.base");
 		await new Promise((res) => setTimeout(res, 0));
 		expect(r.schemas()).toHaveLength(0);
+	});
+});
+
+describe("schema error notice", () => {
+	it("points at the warning list", async () => {
+		const { app } = fakeApp(new Map([["Bad.base", () => Promise.resolve("improved-bases: [1]\n")]]));
+		const r = new SchemaRegistry(app);
+		await r.load();
+		expect([...r.errors().keys()]).toEqual(["Bad.base"]);
+		expect(lastNotice).toBe("Improved Bases: Bad.base: improved-bases: must be a map (see warnings)");
 	});
 });

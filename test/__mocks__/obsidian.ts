@@ -52,6 +52,9 @@ export class Plugin extends Component {
 		return cmd;
 	}
 	addSettingTab(_tab: unknown): void {}
+	addStatusBarItem(): HTMLElement {
+		return document.body.createDiv({ cls: "status-bar-item" });
+	}
 	registerBasesView(_id: string, _def: unknown): void {}
 	loadData(): Promise<unknown> {
 		return Promise.resolve(null);

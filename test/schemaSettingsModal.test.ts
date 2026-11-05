@@ -41,6 +41,9 @@ function open(state: SchemaSettingsInput["state"], { countAffected: count, ...op
 		basePath: "Teams/Mitarbeiter.base",
 		state,
 		icon: "",
+		defaultIcon: "📄",
+		warnings: [],
+		dismissWarning: vi.fn(),
 		basePaths: ["Teams.base", "Other.base"],
 		baseIcon: (path: string) => (path === "Teams.base" ? "👥" : null),
 		overlays: new OverlayRegistry(),
@@ -699,5 +702,31 @@ describe("SchemaSettingsModal reading the notes", () => {
 		const { el } = open({ kind: "fields", drafts: [] }, { focus: { name: "New", type: "relation" } });
 		expect(names(el)).toEqual(["New"]);
 		expect(expanded(el)).toEqual([true]);
+	});
+});
+
+describe("warnings section", () => {
+	it("lists the base's warnings above the fields and removes a dismissed event", () => {
+		const dismissWarning = vi.fn();
+		const t = open({ kind: "fields", drafts: [] }, {
+			warnings: [
+				{ id: "schema:x", kind: "state", text: "state text", at: 1, bases: ["Teams/Mitarbeiter.base"] },
+				{ id: "event:1", kind: "event", text: "event text", at: 2, bases: ["Teams/Mitarbeiter.base"] },
+			],
+			dismissWarning,
+		});
+		const box = t.el.querySelector(".improved-bases-dialog-warnings")!;
+		expect(box.nextElementSibling?.classList.contains("improved-bases-toolbar")).toBe(true);
+		expect(Array.from(box.querySelectorAll(".improved-bases-warning-text")).map((e) => e.textContent)).toEqual(["state text", "event text"]);
+		expect(box.querySelector(".improved-bases-warning-base")).toBeNull();
+		box.querySelector<HTMLButtonElement>(".improved-bases-warning-dismiss")!.click();
+		expect(dismissWarning).toHaveBeenCalledWith("event:1");
+		expect(box.querySelectorAll(".improved-bases-warning")).toHaveLength(1);
+		t.modal.close();
+	});
+	it("renders no section without warnings", () => {
+		const t = open({ kind: "fields", drafts: [] });
+		expect(t.el.querySelector(".improved-bases-dialog-warnings")).toBeNull();
+		t.modal.close();
 	});
 });

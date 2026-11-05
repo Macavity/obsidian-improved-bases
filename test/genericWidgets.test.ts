@@ -30,7 +30,7 @@ function setup(make: typeof createGenericSelectWidget, value: unknown) {
 		},
 		renderContext: {},
 	} as unknown as App;
-	const env = { app, overlays: new OverlayRegistry() } as unknown as WidgetEnv;
+	const env = { app, overlays: new OverlayRegistry(), prefs: () => ({ defaultIcon: "📄", conflictMarkers: true }) } as unknown as WidgetEnv;
 	const onChange = vi.fn();
 	const ctx = { app, key: "status", sourcePath: "n.md", onChange, blur: vi.fn() } as PropertyRenderContext;
 	const widget = make(env);

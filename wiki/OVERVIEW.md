@@ -2,7 +2,7 @@
 title: Improved Bases — Overview
 description: "Home page and navigation hub for the Improved Bases codebase wiki: what the plugin is, how it is layered, and where every page lives."
 profile: internal/standard
-source_commit: "f2763c0"
+source_commit: "e919c70"
 tags:
   - wiki
   - overview
@@ -42,12 +42,13 @@ Read the diagram top-down: [`SchemaRegistry`](./modules/schema.md) finds every `
 
 ### Modules
 
-- [Plugin core](./modules/plugin-core.md) — `main.ts` lifecycle and `settings.ts`.
+- [Plugin core](./modules/plugin-core.md) — `main.ts` lifecycle, settings and the warning access points (status bar, command, settings row).
 - [Schema](./modules/schema.md) — types, parser, registry, base document editor, writer, key safety.
 - [Query](./modules/query.md) — `BaseQuery` watch abstraction and the hidden collector view.
 - [Internals](./modules/internals.md) — feature detection, the `getTypeInfo` patch, the property type registry, CLI query, menu internals, the Bases toolbar button.
 - [Widgets](./modules/widgets.md) — relation and select widgets, pickers, value helpers.
 - [Schema settings](modules/schema-settings.md) — the schema settings dialog and the command, menu item and toolbar button that open it.
+- [Warnings](./modules/warnings.md) — the in-memory warning registry (state and event warnings), its sources and the list modal; access points live in plugin core.
 - [Tooling](./modules/tooling.md) — build, lint, unit tests, test vault, smoke and perf scripts.
 
 ### Flows

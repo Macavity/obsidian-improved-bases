@@ -868,3 +868,74 @@
 .improved-bases-picker-row.is-selected .improved-bases-picker-edit {
 	visibility: visible;
 }
+
+/* Warnings: status bar item, list modal and the section in the schema dialog. */
+.improved-bases-status {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--size-2-1);
+	color: var(--text-warning);
+}
+.improved-bases-status.is-hidden {
+	display: none;
+}
+.improved-bases-status .improved-bases-status-icon {
+	display: inline-flex;
+	--icon-size: var(--icon-xs);
+}
+.improved-bases-warnings-modal {
+	max-width: var(--dialog-max-width);
+}
+.improved-bases-warnings-empty {
+	color: var(--text-muted);
+	padding: var(--size-4-2) 0;
+}
+.improved-bases-warning {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--size-4-2);
+	padding: var(--size-4-2) 0;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+.improved-bases-warning:last-child {
+	border-bottom: none;
+}
+.improved-bases-warning-icon {
+	display: inline-flex;
+	flex: 0 0 auto;
+	margin-top: 2px;
+	color: var(--text-warning);
+	--icon-size: var(--icon-s);
+}
+.improved-bases-warning.is-event .improved-bases-warning-icon {
+	color: var(--text-error);
+}
+.improved-bases-warning-body {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+.improved-bases-warning-text {
+	overflow-wrap: anywhere;
+}
+.improved-bases-warning-bases {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--size-4-2);
+	margin-top: var(--size-2-1);
+	font-size: var(--font-ui-small);
+}
+.improved-bases-warning-dismiss {
+	flex: 0 0 auto;
+}
+.improved-bases-schema .improved-bases-dialog-warnings {
+	margin-bottom: var(--size-4-3);
+	padding: var(--size-4-2) var(--size-4-3);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	background: var(--background-secondary);
+	font-size: var(--font-ui-small);
+}
+.improved-bases-schema .improved-bases-dialog-warnings-title {
+	font-weight: var(--font-semibold);
+	margin-bottom: var(--size-2-1);
+}

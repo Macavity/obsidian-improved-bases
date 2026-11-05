@@ -3,6 +3,7 @@ import type { BaseQuery } from "../query/BaseQuery";
 import type { Membership } from "../schema/Membership";
 import type { SchemaWriter } from "../schema/SchemaWriter";
 import type { FieldSchema } from "../schema/types";
+import type { WarningRegistry } from "../warnings/WarningRegistry";
 
 /** Context Obsidian passes to a property widget's `render` (table cell, properties panel, sidebar). */
 export interface PropertyRenderContext {
@@ -42,12 +43,21 @@ export class OverlayRegistry {
 	}
 }
 
+/** The user settings widgets read; a function so a change in the settings tab reaches widgets rendered later. */
+export interface WidgetPrefs {
+	/** Icon of a relation entry whose note and base have none. */
+	defaultIcon: string;
+	conflictMarkers: boolean;
+}
+
 export interface WidgetEnv {
 	overlays: OverlayRegistry;
 	membership: Membership;
 	query: BaseQuery;
 	writer: SchemaWriter;
 	app: App;
+	warnings: WarningRegistry;
+	prefs: () => WidgetPrefs;
 }
 
 /** The schema base a rendered field was taken from and the field's spelling there; schema writes go to this base. */
