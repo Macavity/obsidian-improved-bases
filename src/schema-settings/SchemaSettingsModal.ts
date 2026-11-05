@@ -7,7 +7,7 @@ import { renderIcon } from "../widgets/icons";
 import type { OverlayRegistry } from "../widgets/types";
 import { propertyTypeOf, type PropertyType } from "../internals/typeRegistry";
 import { applyTypeChoice, conflictHint, focusDraft, liveOptions, mismatchHint, newFieldDraft, newOption, optionMigrations, optionSuggestions, overrideType, removals, renames, typeChoice, typeChoices, validateDrafts, type FieldDraft, type OptionDraft, type OtherDefinition, type TypeChoice } from "./schemaDraft";
-import { MEMBERS_LOADING } from "../schema/messages";
+import { t, tn } from "../i18n";
 
 export interface SchemaSettingsInput {
 	basePath: string;
@@ -51,8 +51,6 @@ export interface SchemaSettingsHandlers {
 }
 
 const MAX_SUGGESTIONS = 12;
-const IDLE_STATUS = "Changes are written to the base on Save. Renames and removals also update the member notes.";
-const ICON_HELP = "Emoji shown for this base's entries in relations, unless a note has its own icon property. The system emoji picker opens with ctrl+cmd+space on macOS and with the Windows key + period on Windows.";
 
 /** Generic icon for a base without a default entry icon. */
 const BASE_ICON = "lucide-layout-list";
@@ -73,9 +71,9 @@ function nativeTypeOf(draft: FieldDraft, types: readonly PropertyType[]): Proper
 
 /** Option label: registry names for native types ("Native" when Obsidian's type is unknown), fixed labels for plugin types. */
 function choiceText(draft: FieldDraft, choice: TypeChoice, types: readonly PropertyType[]): string {
-	if (choice === "relation") return "Relation";
-	if (choice === "select") return "Select";
-	if (choice === "native") return draft.detected === null ? "Native" : propertyTypeOf(types, draft.detected).name;
+	if (choice === "relation") return t("type.relation");
+	if (choice === "select") return t("type.select");
+	if (choice === "native") return draft.detected === null ? t("type.native") : propertyTypeOf(types, draft.detected).name;
 	return propertyTypeOf(types, choice.slice("native:".length)).name;
 }
 
@@ -96,7 +94,7 @@ function typeIcon(draft: FieldDraft, types: readonly PropertyType[]): string {
 
 /** Details text of a relation: the target base, with its view when one is set. */
 function relationTarget(draft: FieldDraft): string {
-	if (!draft.base) return "No base chosen";
+	if (!draft.base) return t("dialog.noBase");
 	return draft.view ? `${draft.base} › ${draft.view}` : draft.base;
 }
 
@@ -105,9 +103,6 @@ function expandable(draft: FieldDraft): boolean {
 	return draft.type === "relation" || draft.type === "select";
 }
 
-function plural(n: number, word: string): string {
-	return `${n} ${word}${n === 1 ? "" : "s"}`;
-}
 
 function iconButton(parent: HTMLElement, icon: string, label: string, cls: string): HTMLButtonElement {
 	const button = parent.createEl("button", { cls: `clickable-icon ${cls}`, attr: { type: "button", "aria-label": label } });
@@ -165,7 +160,7 @@ export class SchemaSettingsModal extends Modal {
 		contentEl.empty();
 		contentEl.addClass("improved-bases-schema");
 		this.modalEl.addClass("improved-bases-schema-modal");
-		this.setTitle(`Schema settings – ${basename(this.input.basePath)}`);
+		this.setTitle(t("dialog.title", { base: basename(this.input.basePath) }));
 		if (this.input.state.kind === "error") this.renderError(this.input.state.message, this.input.state.resettable);
 		else this.renderFields();
 		// Obsidian focuses the first input (the icon field); nothing in the dialog deserves the initial focus.
@@ -189,12 +184,12 @@ export class SchemaSettingsModal extends Modal {
 	/** Destructive reset that needs a second click to confirm. */
 	private resetButton(b: ButtonComponent): void {
 		let confirming = false;
-		b.setButtonText("Reset schema").setDestructive();
+		b.setButtonText(t("dialog.resetSchema")).setDestructive();
 		b.buttonEl.addClass("improved-bases-reset");
 		b.onClick(() => {
 			if (!confirming) {
 				confirming = true;
-				b.setButtonText("Confirm reset");
+				b.setButtonText(t("dialog.confirmReset"));
 				return;
 			}
 			b.setDisabled(true);
@@ -214,12 +209,12 @@ export class SchemaSettingsModal extends Modal {
 		this.renderToolbar();
 		const table = contentEl.createDiv({ cls: "improved-bases-table" });
 		const head = table.createDiv({ cls: "improved-bases-column-head" });
-		for (const label of ["", "Field name", "Type", "Details", ""]) head.createSpan({ text: label });
+		for (const label of ["", t("dialog.column.name"), t("dialog.column.type"), t("dialog.column.details"), ""]) head.createSpan({ text: label });
 		this.listEl = table.createDiv({ cls: "improved-bases-field-list" });
 		this.renderList();
 		this.awaitMembers(table);
 		this.renderFooter((b) => {
-			b.setButtonText("Save").setCta();
+			b.setButtonText(t("dialog.save")).setCta();
 			b.buttonEl.addClass("improved-bases-save");
 			b.onClick(() => void this.save(b));
 		});
@@ -232,14 +227,14 @@ export class SchemaSettingsModal extends Modal {
 		const line = this.contentEl.createDiv({ cls: "improved-bases-members-loading" });
 		table.before(line);
 		setIcon(line.createSpan({ cls: "improved-bases-members-loading-icon" }), "lucide-loader-2");
-		line.createSpan({ text: `Reading the notes of ${basename(this.input.basePath)}… Suggestions from notes appear when done.` });
+		line.createSpan({ text: t("dialog.readingNotes", { base: basename(this.input.basePath) }) });
 		void pending.then((drafts) => {
 			if (this.closed) return;
 			if (drafts === null) {
 				line.addClass("is-failed");
 				line.empty();
 				setIcon(line.createSpan({ cls: "improved-bases-members-loading-icon" }), "lucide-alert-triangle");
-				line.createSpan({ text: "Could not read the notes of this base, so there are no suggestions from notes." });
+				line.createSpan({ text: t("dialog.readingFailed") });
 				return;
 			}
 			line.remove();
@@ -265,11 +260,11 @@ export class SchemaSettingsModal extends Modal {
 	/** The base's default entry icon, next to the modal title. */
 	private renderHeader(): void {
 		const header = this.titleEl.parentElement ?? this.contentEl;
-		const field = header.createEl("label", { cls: "improved-bases-base-icon", attr: { title: ICON_HELP } });
-		field.createSpan({ text: "Default entry icon" });
+		const field = header.createEl("label", { cls: "improved-bases-base-icon", attr: { title: t("dialog.iconHelp") } });
+		field.createSpan({ text: t("dialog.defaultIcon") });
 		const input = field.createEl("input", {
 			cls: "improved-bases-base-icon-input",
-			attr: { type: "text", placeholder: "📄", "aria-label": "Default entry icon" },
+			attr: { type: "text", placeholder: "📄", "aria-label": t("dialog.defaultIcon") },
 		});
 		input.value = this.icon;
 		input.addEventListener("input", () => {
@@ -282,7 +277,7 @@ export class SchemaSettingsModal extends Modal {
 	private renderToolbar(): void {
 		const bar = this.contentEl.createDiv({ cls: "improved-bases-toolbar" });
 		const search = bar.createDiv({ cls: "search-input-container improved-bases-search" });
-		const input = search.createEl("input", { attr: { type: "search", placeholder: "Find a field…", "aria-label": "Find a field" } });
+		const input = search.createEl("input", { attr: { type: "search", placeholder: t("dialog.findField.placeholder"), "aria-label": t("dialog.findField") } });
 		this.searchEl = input;
 		input.addEventListener("input", () => {
 			this.query = input.value.trim().toLowerCase();
@@ -291,7 +286,7 @@ export class SchemaSettingsModal extends Modal {
 		this.renderViewPicker(bar);
 		const add = bar.createEl("button", { cls: "mod-cta improved-bases-add-field", attr: { type: "button" } });
 		setIcon(add.createSpan({ cls: "improved-bases-add-field-icon" }), "lucide-plus");
-		add.createSpan({ text: "Add field" });
+		add.createSpan({ text: t("dialog.addField") });
 		add.addEventListener("click", () => {
 			const draft = newFieldDraft();
 			this.drafts.push(draft);
@@ -306,7 +301,7 @@ export class SchemaSettingsModal extends Modal {
 		const { views } = this.input;
 		if (views.length <= 1) return;
 		const label = bar.createEl("label", { cls: "improved-bases-add-view-label" });
-		label.createSpan({ text: "Add new fields to" });
+		label.createSpan({ text: t("dialog.addFieldsTo") });
 		const select = label.createEl("select", { cls: "dropdown improved-bases-add-view" });
 		for (const [i, view] of views.entries()) select.createEl("option", { text: view, attr: { value: String(i) } });
 		select.value = String(this.addView);
@@ -335,15 +330,15 @@ export class SchemaSettingsModal extends Modal {
 		el.dataset.dirty = String(dirty);
 		el.empty();
 		if (this.input.state.kind === "error") {
-			new ButtonComponent(el).setButtonText("Close").onClick(() => this.close()).buttonEl.addClass("improved-bases-close");
+			new ButtonComponent(el).setButtonText(t("dialog.close")).onClick(() => this.close()).buttonEl.addClass("improved-bases-close");
 			if (this.primary) this.primary(new ButtonComponent(el));
 			return;
 		}
 		if (!dirty) {
-			new ButtonComponent(el).setButtonText("Close").onClick(() => this.close()).buttonEl.addClass("improved-bases-close");
+			new ButtonComponent(el).setButtonText(t("dialog.close")).onClick(() => this.close()).buttonEl.addClass("improved-bases-close");
 			return;
 		}
-		new ButtonComponent(el).setButtonText("Cancel").onClick(() => this.close()).buttonEl.addClass("improved-bases-cancel");
+		new ButtonComponent(el).setButtonText(t("dialog.cancel")).onClick(() => this.close()).buttonEl.addClass("improved-bases-cancel");
 		if (this.primary) this.primary(new ButtonComponent(el));
 	}
 
@@ -362,15 +357,15 @@ export class SchemaSettingsModal extends Modal {
 		if (!total) {
 			el.removeClass("has-pending");
 			setIcon(el.createSpan({ cls: "improved-bases-status-icon" }), "lucide-info");
-			el.createSpan({ text: IDLE_STATUS });
+			el.createSpan({ text: t("dialog.idleStatus") });
 			return;
 		}
 		el.addClass("has-pending");
 		const parts = [];
-		if (pending.length) parts.push(plural(pending.length, "pending rename"));
-		if (removed.length) parts.push(plural(removed.length, "removal"));
-		if (optionRenames.length) parts.push(plural(optionRenames.length, "pending option rename"));
-		if (optionRemovals.length) parts.push(plural(optionRemovals.length, "option removal"));
+		if (pending.length) parts.push(tn("footer.pendingRename", pending.length));
+		if (removed.length) parts.push(tn("footer.removal", removed.length));
+		if (optionRenames.length) parts.push(tn("footer.pendingOptionRename", optionRenames.length));
+		if (optionRemovals.length) parts.push(tn("footer.optionRemoval", optionRemovals.length));
 		el.createSpan({ cls: "improved-bases-status-badge", text: String(total) });
 		const text = el.createDiv({ cls: "improved-bases-status-text" });
 		text.createEl("b", { text: parts.join(", ") });
@@ -390,7 +385,7 @@ export class SchemaSettingsModal extends Modal {
 			if (draft.removed) this.renderRemovedRow(list, draft);
 			else this.renderRow(list, draft);
 		}
-		if (!shown.length) list.createDiv({ cls: "improved-bases-field-empty", text: this.drafts.length ? "No field matches the search" : "No fields yet" });
+		if (!shown.length) list.createDiv({ cls: "improved-bases-field-empty", text: this.drafts.length ? t("dialog.noMatch") : t("dialog.noFields") });
 		this.updateStatus();
 	}
 
@@ -398,9 +393,9 @@ export class SchemaSettingsModal extends Modal {
 		const row = list.createDiv({ cls: "improved-bases-field-row improved-bases-field-removed" });
 		const main = row.createDiv({ cls: "improved-bases-field-main" });
 		main.createSpan({ cls: "improved-bases-field-disclosure" });
-		main.createSpan({ cls: "improved-bases-field-removed-name", text: draft.name.trim() || "Unnamed field" });
-		main.createSpan({ cls: "improved-bases-field-details", text: "Removed on save" });
-		const undo = main.createEl("button", { cls: "improved-bases-undo", text: "Undo", attr: { type: "button" } });
+		main.createSpan({ cls: "improved-bases-field-removed-name", text: draft.name.trim() || t("dialog.unnamedField") });
+		main.createSpan({ cls: "improved-bases-field-details", text: t("dialog.removedOnSave") });
+		const undo = main.createEl("button", { cls: "improved-bases-undo", text: t("dialog.undo"), attr: { type: "button" } });
 		undo.addEventListener("click", () => {
 			draft.removed = false;
 			this.renderList();
@@ -417,7 +412,7 @@ export class SchemaSettingsModal extends Modal {
 			return;
 		}
 		if (!this.input.membersKnown()) {
-			this.errorEl?.setText(MEMBERS_LOADING);
+			this.errorEl?.setText(t("notice.membersLoading"));
 			return;
 		}
 		this.renderConfirm(row, draft, name);
@@ -428,9 +423,9 @@ export class SchemaSettingsModal extends Modal {
 		const confirm = row.createDiv({ cls: "improved-bases-field-confirm" });
 		setIcon(confirm.createSpan({ cls: "improved-bases-warning-icon" }), "lucide-alert-triangle");
 		const warning = referencesName(this.input.expressions, name) ? " Filters or formulas reference it." : "";
-		const text = confirm.createSpan({ text: `Remove '${name}' and its value from the notes?${warning}` });
-		const keep = confirm.createEl("button", { cls: "improved-bases-confirm-keep", text: "Keep", attr: { type: "button" } });
-		const remove = confirm.createEl("button", { cls: "mod-warning improved-bases-confirm-remove", text: "Remove", attr: { type: "button" } });
+		const text = confirm.createSpan({ text: t("dialog.removeConfirm", { name, warning }) });
+		const keep = confirm.createEl("button", { cls: "improved-bases-confirm-keep", text: t("dialog.keep"), attr: { type: "button" } });
+		const remove = confirm.createEl("button", { cls: "mod-warning improved-bases-confirm-remove", text: t("dialog.remove"), attr: { type: "button" } });
 		remove.disabled = true;
 		remove.addEventListener("click", () => {
 			draft.removed = true;
@@ -443,7 +438,7 @@ export class SchemaSettingsModal extends Modal {
 		void this.handlers.countAffected(name).then(
 			(count) => {
 				if (stale()) return;
-				text.setText(`Remove '${name}' and its value from ${count} ${count === 1 ? "note" : "notes"}?${warning}`);
+				text.setText(tn("dialog.removeConfirmCount", count, { name, warning }));
 				remove.disabled = false;
 			},
 			(e: unknown) => {
@@ -459,20 +454,20 @@ export class SchemaSettingsModal extends Modal {
 		const row = list.createDiv({ cls: "improved-bases-field-row" });
 		const main = row.createDiv({ cls: "improved-bases-field-main" });
 		// An Obsidian icon button: `.is-tablet button:not(.clickable-icon)` pads plain buttons to 40px and would squeeze the icon to nothing.
-		const disclosure = iconButton(main, "lucide-chevron-right", "Show details", "improved-bases-field-disclosure");
+		const disclosure = iconButton(main, "lucide-chevron-right", t("dialog.showDetails"), "improved-bases-field-disclosure");
 		const name = main.createEl("input", {
 			cls: "improved-bases-field-name",
-			attr: { type: "text", placeholder: "Field name", "aria-label": "Field name" },
+			attr: { type: "text", placeholder: t("dialog.fieldName"), "aria-label": t("dialog.fieldName") },
 		});
 		name.value = draft.name;
 		const typeWrap = main.createDiv({ cls: "improved-bases-type-select" });
 		const typeIconEl = typeWrap.createSpan({ cls: "improved-bases-type-icon" });
-		const type = typeWrap.createEl("select", { cls: "improved-bases-field-type", attr: { "aria-label": "Field type" } });
+		const type = typeWrap.createEl("select", { cls: "improved-bases-field-type", attr: { "aria-label": t("dialog.fieldType") } });
 		for (const choice of typeChoices(draft, this.input.types)) type.createEl("option", { text: choiceText(draft, choice, this.input.types), attr: { value: choice } });
 		type.value = typeChoice(draft, this.input.types);
 		setIcon(typeWrap.createSpan({ cls: "improved-bases-type-chevron" }), "lucide-chevron-down");
 		const details = main.createDiv({ cls: "improved-bases-field-details" });
-		const trash = iconButton(main, "lucide-trash-2", "Remove field", "improved-bases-field-remove");
+		const trash = iconButton(main, "lucide-trash-2", t("dialog.removeField"), "improved-bases-field-remove");
 		const hint = row.createDiv({ cls: "improved-bases-field-hint" });
 		const conflict = row.createDiv({ cls: "improved-bases-field-hint improved-bases-field-conflict" });
 		const mismatch = row.createDiv({ cls: "improved-bases-field-hint improved-bases-field-mismatch" });
@@ -529,16 +524,16 @@ export class SchemaSettingsModal extends Modal {
 		if (draft.type === "select") {
 			const options = liveOptions(draft.options);
 			for (const option of options.slice(0, 3)) el.createSpan({ cls: "improved-bases-color-dot", attr: { "data-color": option.color } });
-			el.createSpan({ text: plural(options.length, "option") });
+			el.createSpan({ text: tn("footer.options", options.length) });
 		} else if (draft.type === "relation") {
 			if (draft.base) this.renderBaseIcon(el.createSpan({ cls: "improved-bases-details-icon" }), draft.base);
 			el.createSpan({ cls: "improved-bases-details-target", text: relationTarget(draft) });
 		} else {
-			if (draft.override) el.createEl("em", { cls: "improved-bases-details-tag", text: "Type override" });
+			if (draft.override) el.createEl("em", { cls: "improved-bases-details-tag", text: t("dialog.typeOverride") });
 			else el.createSpan({ cls: "improved-bases-details-muted", text: "—" });
 			return;
 		}
-		if (draft.multiple) el.createEl("em", { cls: "improved-bases-details-tag", text: "Multiple" });
+		if (draft.multiple) el.createEl("em", { cls: "improved-bases-details-tag", text: t("dialog.multiple") });
 	}
 
 	/** Advises about other bases defining this field differently; saving stays possible. */
@@ -550,7 +545,7 @@ export class SchemaSettingsModal extends Modal {
 	private updateHint(hint: HTMLElement, draft: FieldDraft): void {
 		const from = draft.originalName;
 		const show = from !== null && draft.name !== from && referencesName(this.input.expressions, from);
-		this.setHint(hint, show ? `Filters or formulas reference '${from}', update them manually after saving` : null);
+		this.setHint(hint, show ? t("dialog.referencedHint", { name: from }) : null);
 	}
 
 	private setHint(hint: HTMLElement, text: string | null): void {
@@ -573,11 +568,11 @@ export class SchemaSettingsModal extends Modal {
 	private renderEditor(el: HTMLElement, draft: FieldDraft, refresh: () => void): void {
 		if (draft.type === "relation") {
 			const target = el.createDiv({ cls: "improved-bases-editor-field" });
-			target.createSpan({ text: "Related base" });
+			target.createSpan({ text: t("dialog.relatedBase") });
 			const box = target.createDiv({ cls: "improved-bases-type-select improved-bases-base-select" });
 			const icon = box.createSpan({ cls: "improved-bases-type-icon" });
-			const select = box.createEl("select", { cls: "improved-bases-field-base", attr: { "aria-label": "Related base" } });
-			if (!draft.base) select.createEl("option", { text: "Choose base", attr: { value: "", disabled: "" } });
+			const select = box.createEl("select", { cls: "improved-bases-field-base", attr: { "aria-label": t("dialog.relatedBase") } });
+			if (!draft.base) select.createEl("option", { text: t("dialog.chooseBase"), attr: { value: "", disabled: "" } });
 			const paths = draft.base && !this.input.basePaths.includes(draft.base) ? [draft.base, ...this.input.basePaths] : this.input.basePaths;
 			for (const path of paths) select.createEl("option", { text: path, attr: { value: path } });
 			select.value = draft.base ?? "";
@@ -602,10 +597,10 @@ export class SchemaSettingsModal extends Modal {
 				void this.input.viewNames(base).then((names) => {
 					if (run !== loading || draft.base !== base || !viewField.isConnected) return;
 					viewField.hidden = false;
-					viewField.createSpan({ text: "View" });
+					viewField.createSpan({ text: t("dialog.view") });
 					const viewBox = viewField.createDiv({ cls: "improved-bases-type-select improved-bases-base-select" });
-					const viewSelect = viewBox.createEl("select", { cls: "improved-bases-field-view", attr: { "aria-label": "View" } });
-					viewSelect.createEl("option", { text: "All entries", attr: { value: "" } });
+					const viewSelect = viewBox.createEl("select", { cls: "improved-bases-field-view", attr: { "aria-label": t("dialog.view") } });
+					viewSelect.createEl("option", { text: t("dialog.allEntries"), attr: { value: "" } });
 					const list = names ?? [];
 					const all = draft.view && !list.includes(draft.view) ? [draft.view, ...list] : list;
 					for (const name of all) viewSelect.createEl("option", { text: name, attr: { value: name } });
@@ -629,7 +624,7 @@ export class SchemaSettingsModal extends Modal {
 		}
 		if (draft.type === "select") this.renderOptions(el.createDiv({ cls: "improved-bases-options" }), draft, refresh);
 		const toggle = el.createEl("label", { cls: "improved-bases-editor-field improved-bases-toggle" });
-		toggle.createSpan({ text: "Allow multiple" });
+		toggle.createSpan({ text: t("dialog.allowMultiple") });
 		new ToggleComponent(toggle).setValue(draft.multiple).onChange((v) => {
 			draft.multiple = v;
 			refresh();
@@ -657,9 +652,9 @@ export class SchemaSettingsModal extends Modal {
 			if (!live.some((o) => o.value === value)) draft.options.push(newOption(value, nextOptionColor(live.length)));
 		};
 		const row = el.createDiv({ cls: "improved-bases-option-suggestions" });
-		row.createSpan({ cls: "improved-bases-suggestions-label", text: "In notes:" });
+		row.createSpan({ cls: "improved-bases-suggestions-label", text: t("dialog.inNotes") });
 		for (const { value, count } of suggestions.slice(0, MAX_SUGGESTIONS)) {
-			const chip = row.createEl("button", { cls: "improved-bases-option-suggestion", attr: { type: "button", "aria-label": `Add option ${value}` } });
+			const chip = row.createEl("button", { cls: "improved-bases-option-suggestion", attr: { type: "button", "aria-label": t("dialog.addOptionValue", { value }) } });
 			setIcon(chip.createSpan(), "lucide-plus");
 			chip.createSpan({ text: value });
 			chip.createSpan({ cls: "improved-bases-suggestion-count", text: ` · ${count}` });
@@ -669,7 +664,7 @@ export class SchemaSettingsModal extends Modal {
 			});
 		}
 		if (suggestions.length > 1) {
-			const all = row.createEl("button", { cls: "improved-bases-suggestions-all", attr: { type: "button" }, text: `Add all (${suggestions.length})` });
+			const all = row.createEl("button", { cls: "improved-bases-suggestions-all", attr: { type: "button" }, text: t("dialog.addAll", { n: suggestions.length }) });
 			all.addEventListener("click", () => {
 				for (const { value } of suggestions) add(value);
 				rerender();
@@ -679,13 +674,13 @@ export class SchemaSettingsModal extends Modal {
 
 	/** "+ Option" turns into an input; Enter adds and keeps it open, an empty blur or Escape turns it back. */
 	private renderAddOption(container: HTMLElement, list: HTMLElement, draft: FieldDraft, rerender: () => void): void {
-		const button = list.createEl("button", { cls: "improved-bases-option-add-button", attr: { type: "button", "aria-label": "Add option" } });
+		const button = list.createEl("button", { cls: "improved-bases-option-add-button", attr: { type: "button", "aria-label": t("dialog.addOption") } });
 		setIcon(button.createSpan(), "lucide-plus");
-		button.createSpan({ text: "Option" });
+		button.createSpan({ text: t("dialog.option") });
 		button.addEventListener("click", () => {
 			const input = createEl("input", {
 				cls: "improved-bases-option-new",
-				attr: { type: "text", placeholder: "New option", "aria-label": "New option" },
+				attr: { type: "text", placeholder: t("dialog.newOption"), "aria-label": t("dialog.newOption") },
 			});
 			let done = false;
 			// The rerender detaches the focused input and the browser then fires blur; `done` keeps that from adding twice.
@@ -718,11 +713,11 @@ export class SchemaSettingsModal extends Modal {
 
 	/** A chip with the color dot and the value; a click opens the menu with rename, remove and the colors. */
 	private renderOption(list: HTMLElement, draft: FieldDraft, option: OptionDraft, rerender: () => void): void {
-		const chip = list.createEl("button", { cls: "improved-bases-option-chip", attr: { type: "button", "aria-label": `Edit option ${option.value}`, "data-color": option.color } });
+		const chip = list.createEl("button", { cls: "improved-bases-option-chip", attr: { type: "button", "aria-label": t("dialog.editOption", { value: option.value }), "data-color": option.color } });
 		chip.createSpan({ cls: "improved-bases-color-dot" });
 		chip.createSpan({ cls: "improved-bases-option-value", text: option.value });
 		const rename = (): void => {
-			const input = createEl("input", { cls: "improved-bases-option-input", attr: { type: "text", "aria-label": "Option value" } });
+			const input = createEl("input", { cls: "improved-bases-option-input", attr: { type: "text", "aria-label": t("dialog.optionValue") } });
 			input.value = option.value;
 			let done = false;
 			const commit = (): void => {
@@ -769,7 +764,7 @@ export class SchemaSettingsModal extends Modal {
 		for (const draft of this.drafts) draft.name = draft.name.trim();
 		const errors = validateDrafts(this.drafts, this.input.basePaths);
 		const migrates = renames(this.drafts).length > 0 || removals(this.drafts).length > 0 || optionMigrations(this.drafts).length > 0;
-		if (migrates && !this.input.membersKnown()) errors.push(MEMBERS_LOADING);
+		if (migrates && !this.input.membersKnown()) errors.push(t("notice.membersLoading"));
 		if (errors.length) {
 			this.errorEl?.setText(errors.join(". "));
 			return;

@@ -1,4 +1,5 @@
 import type { MetadataTypeManager, TypeWidget } from "./detect";
+import { t } from "../i18n";
 
 /** One property type as Obsidian registers it: id, localized name and icon; reserved types are bound to fixed keys (tags, aliases, …). */
 export interface PropertyType {
@@ -46,5 +47,5 @@ export function listPropertyTypes(mtm: MetadataTypeManager | null): PropertyType
 
 /** The registered type with this id, or a placeholder naming it as not registered. */
 export function propertyTypeOf(types: readonly PropertyType[], type: string): PropertyType {
-	return types.find((t) => t.type === type) ?? { type, name: `${type} (not registered)`, icon: DEFAULT_ICON, reserved: false };
+	return types.find((t) => t.type === type) ?? { type, name: t("type.notRegistered", { type }), icon: DEFAULT_ICON, reserved: false };
 }

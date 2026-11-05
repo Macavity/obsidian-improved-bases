@@ -3,6 +3,8 @@ import { COLORS, type Color, type SelectOption } from "../schema/types";
 import { placePopover } from "./placePopover";
 import { dismissOnOutside } from "./popover";
 import type { OverlayRegistry } from "./types";
+import { t } from "../i18n";
+import { colorLabel } from "./pickers";
 
 export const OPTION_EDITOR_CLASS = "improved-bases-option-editor";
 
@@ -29,14 +31,14 @@ export function openOptionEditor(
 		"--ib-editor-top": `${pos.top}px`,
 		"--ib-editor-width": `${WIDTH}px`,
 	});
-	const input = popover.createEl("input", { attr: { type: "text", "aria-label": "Option name" } });
+	const input = popover.createEl("input", { attr: { type: "text", "aria-label": t("option.name") } });
 	input.value = option.value;
 	const remove = popover.createDiv({ cls: "improved-bases-option-editor-delete", attr: { role: "button", tabindex: "0" } });
 	setIcon(remove.createSpan({ cls: "improved-bases-option-editor-icon" }), "lucide-trash-2");
-	remove.createSpan({ text: "Delete" });
+	remove.createSpan({ text: t("option.delete") });
 	const grid = popover.createDiv({ cls: "improved-bases-option-editor-colors" });
 	for (const color of COLORS) {
-		const swatch = grid.createEl("button", { attr: { type: "button", "data-color": color, "aria-label": color } });
+		const swatch = grid.createEl("button", { attr: { type: "button", "data-color": color, "aria-label": colorLabel(color) } });
 		swatch.toggleClass("is-active", color === option.color);
 		swatch.addEventListener("click", () => {
 			void handlers.recolor(color).then((ok) => {

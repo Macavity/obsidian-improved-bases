@@ -1,5 +1,6 @@
 import { App, PluginSettingTab, SettingDefinitionItem } from "obsidian";
 import type ImprovedBasesPlugin from "./main";
+import { t } from "./i18n";
 
 export interface ImprovedBasesSettings {
 	widgetsEnabled: boolean;
@@ -33,10 +34,10 @@ export class ImprovedBasesSettingTab extends PluginSettingTab {
 		const plugin = this.plugin;
 		return [
 			{
-				name: "Enable widgets",
+				name: t("settings.widgets.name"),
 				desc: (plugin.widgetsSupported
-					? "Show relation and select widgets in tables and the properties panel."
-					: "This Obsidian version is not supported; widgets are unavailable. Commands still work."),
+					? t("settings.widgets.desc")
+					: t("settings.widgets.unsupported")),
 				control: { type: "toggle", key: "widgetsEnabled", defaultValue: true, disabled: () => !plugin.widgetsSupported },
 			},
 		];

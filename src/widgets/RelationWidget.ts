@@ -8,8 +8,7 @@ import { bindOpenTrigger } from "./openTrigger";
 import { EntryPicker, type PickerItem } from "./pickers";
 import type { PluginWidget } from "./types";
 import { linkTarget, relationOutput, toList } from "./values";
-
-const NOT_IN_TARGET = "Not in target base";
+import { t } from "../i18n";
 
 /** Link chips; clicking the field opens a checkbox picker over the target base entries. */
 export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, field, env) => {
@@ -75,7 +74,7 @@ export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, fiel
 	const openPicker = async (): Promise<void> => {
 		if (opening) return;
 		if (!(app.vault.getAbstractFileByPath(field.base) instanceof TFile)) {
-			new Notice(`Target base not found: ${field.base}`);
+			new Notice(t("relation.targetMissing", { base: field.base }));
 			return;
 		}
 		if (field.view !== undefined) {
@@ -83,7 +82,7 @@ export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, fiel
 			const found = (await baseViewNames(app, field.base))?.includes(field.view);
 			opening = false;
 			if (!found) {
-				new Notice(`View "${field.view}" not found in ${field.base}`);
+				new Notice(t("relation.viewMissing", { view: field.view, base: field.base }));
 				return;
 			}
 		}
@@ -109,7 +108,7 @@ export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, fiel
 			const dest = resolve(raw);
 			if (isForeign(inTarget, dest)) {
 				chip.addClass("is-foreign");
-				chip.setAttribute("title", NOT_IN_TARGET);
+				chip.setAttribute("title", t("picker.notInTarget"));
 			}
 			renderIcon(chip.createSpan(), entryIcon(app, dest, membership.baseIcon(field.base)));
 			const link = LinkValue.parseFromString(app, raw, ctx.sourcePath);

@@ -69,6 +69,10 @@ Run `pnpm check` before you push: it is the full local check and runs typecheck,
 - Prefer Obsidian's API (`Vault`, `MetadataCache`, `Workspace`) over Node `fs` for vault access.
 - No network requests from the plugin runtime.
 
+## Add a language
+
+User-visible text lives in `src/i18n/`. `en.ts` is the source of truth; every other locale is typed as `Locale`, so a missing key fails `pnpm typecheck`, and `test/i18n.test.ts` checks that every locale keeps the `{placeholders}` of the English string and that `_one`/`_other` keys come in pairs. To add a language, copy `de.ts` to `<code>.ts` (Obsidian's language code, as `getLanguage()` returns it, e.g. `fr`, `zh-TW`), translate the values, and register the file in `locales` in `src/i18n/index.ts`. Code calls `t(key, params)` and `tn(key, count, params)`; `test/i18nLiterals.test.ts` fails on a UI literal outside `src/i18n/`. Log output (`console.*`), `.base` schema keys, type ids and parse diagnostics stay English.
+
 ## Releases
 
 Maintainers cut releases with `pnpm version <patch|minor> --no-git-tag-version` (updates `manifest.json` and `package.json`; `versions.json` gains a key only when `minAppVersion` changes), move the `Unreleased` section of `CHANGELOG.md` under the new version, check the README, commit, then tag with the bare version and push the tag. The release workflow builds and attaches `main.js`, `manifest.json`, and `styles.css` from `dist/` with build provenance attestation and uses the version's `CHANGELOG.md` section as the release notes; without that section the release only carries the compare link. Agents follow `.claude/skills/release/SKILL.md`.

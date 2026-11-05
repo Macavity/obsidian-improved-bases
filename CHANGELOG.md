@@ -6,6 +6,10 @@ The release workflow takes the section of the released version from this file as
 
 ## [Unreleased]
 
+### Added
+
+- The plugin's texts follow Obsidian's interface language. English and German are included; other languages can be added under `src/i18n/`.
+
 ### Fixed
 
 - Schema settings: the field disclosure chevron was invisible on tablets, where Obsidian pads plain buttons; it is an icon button now, keeps its icon under theme padding, tells assistive technology whether the row is open, and the row's icon buttons use touch size on mobile.

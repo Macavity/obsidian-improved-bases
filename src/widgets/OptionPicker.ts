@@ -6,6 +6,7 @@ import { placePopover } from "./placePopover";
 import { dismissOnOutside } from "./popover";
 import { renameInList } from "../schema/optionMigration";
 import { colorOf } from "./values";
+import { t } from "../i18n";
 
 /** What the picker needs from the widget; the picker keeps working on its own copies after the cell re-renders. */
 export interface OptionPickerHost {
@@ -71,7 +72,7 @@ export function openOptionPicker(anchor: HTMLElement, host: OptionPickerHost, ov
 	});
 	const header = popover.createDiv({ cls: "improved-bases-picker-header" });
 	const pills = header.createDiv({ cls: "improved-bases-picker-values" });
-	const input = header.createEl("input", { attr: { type: "text", placeholder: "Search or create", "aria-label": "Search or create" } });
+	const input = header.createEl("input", { attr: { type: "text", placeholder: t("picker.searchOrCreate"), "aria-label": t("picker.searchOrCreate") } });
 	const list = popover.createDiv({ cls: "improved-bases-picker-list" });
 
 	let rows: Row[] = [];
@@ -104,7 +105,7 @@ export function openOptionPicker(anchor: HTMLElement, host: OptionPickerHost, ov
 
 	const pill = (parent: HTMLElement, value: string): HTMLElement => {
 		const el = parent.createSpan({ cls: "improved-bases-pill", attr: { "data-color": colorOf(field(), value) } });
-		if (!host.options.some((o) => o.value === value)) el.setAttribute("title", "Not in options");
+		if (!host.options.some((o) => o.value === value)) el.setAttribute("title", t("picker.notInOptions"));
 		el.createSpan({ cls: "improved-bases-pill-body", text: value });
 		return el;
 	};
@@ -115,7 +116,7 @@ export function openOptionPicker(anchor: HTMLElement, host: OptionPickerHost, ov
 			const remove = pill(pills, value).createEl("button", {
 				cls: "improved-bases-chip-remove",
 				text: "×",
-				attr: { type: "button", "aria-label": `Remove ${value}` },
+				attr: { type: "button", "aria-label": t("picker.removeValue", { value }) },
 			});
 			onPress(remove, () => {
 				setValues(host.values.filter((_, i) => i !== index));
@@ -132,7 +133,7 @@ export function openOptionPicker(anchor: HTMLElement, host: OptionPickerHost, ov
 
 	const renderRow = (row: Row, index: number): void => {
 		if (row.create !== undefined) {
-			const el = list.createDiv({ cls: "improved-bases-picker-create", text: `Create "${row.create}"` });
+			const el = list.createDiv({ cls: "improved-bases-picker-create", text: t("picker.create", { value: row.create }) });
 			el.toggleClass("is-selected", index === selected);
 			el.addEventListener("mouseenter", () => highlight(index));
 			rowEls.push(el);
@@ -147,7 +148,7 @@ export function openOptionPicker(anchor: HTMLElement, host: OptionPickerHost, ov
 		rowEls.push(el);
 		pill(el, row.option.value);
 		const edit = editable()
-			? el.createEl("button", { cls: "improved-bases-picker-edit", attr: { type: "button", "aria-label": `Edit option ${row.option.value}` } })
+			? el.createEl("button", { cls: "improved-bases-picker-edit", attr: { type: "button", "aria-label": t("picker.editOption", { value: row.option.value }) } })
 			: null;
 		if (edit) setIcon(edit, "lucide-pencil");
 		// The slot keeps its width without a check, so the pencils line up.
@@ -161,7 +162,7 @@ export function openOptionPicker(anchor: HTMLElement, host: OptionPickerHost, ov
 		rowEls = [];
 		rows = rowsFor(host.options, input.value);
 		selected = Math.min(selected, Math.max(0, rows.length - 1));
-		if (!host.options.length && !input.value.trim()) list.createDiv({ cls: "improved-bases-picker-hint", text: "Type to create an option" });
+		if (!host.options.length && !input.value.trim()) list.createDiv({ cls: "improved-bases-picker-hint", text: t("picker.typeToCreate") });
 		rows.forEach(renderRow);
 	};
 

@@ -3,6 +3,7 @@ import { findOwnKey, isUnsafeKey, setOption } from "../schema/keys";
 import type { BaseColumns, ColumnEdits, RawFields } from "../schema/baseDoc";
 import { toList } from "../widgets/values";
 import { propertyTypeOf, type PropertyType } from "../internals/typeRegistry";
+import { t, tn } from "../i18n";
 
 /** Field kinds in the dialog: native (Obsidian's own type), or a plugin customization. */
 export type DraftType = "native" | "relation" | "select";
@@ -150,8 +151,16 @@ function fieldShape(field: FieldSchema): Shape {
 
 function describe(field: FieldSchema, label: (type: string) => string): string {
 	const shape = fieldShape(field);
-	const parts = [shape.type === "relation" ? `relation to ${shape.base}${shape.view === null ? "" : ` (view ${shape.view})`}` : shape.type === "select" ? "select" : label(shape.type)];
-	if (shape.multiple) parts.push("(multiple)");
+	const parts = [
+		shape.type === "relation"
+			? shape.view === null
+				? t("draft.describe.relation", { base: shape.base ?? "" })
+				: t("draft.describe.relationView", { base: shape.base ?? "", view: shape.view })
+			: shape.type === "select"
+				? t("draft.describe.select")
+				: label(shape.type),
+	];
+	if (shape.multiple) parts.push(t("draft.describe.multiple"));
 	return parts.join(" ");
 }
 
@@ -169,8 +178,8 @@ export function conflictHint(draft: FieldDraft, others: OtherDefinition[], label
 		return theirs.view !== mine.view && o.shared > 0;
 	});
 	if (!conflicts.length) return null;
-	const overlap = (n: number): string => (n === 0 ? "no note is in both bases yet" : n === 1 ? "1 note is in both bases" : `${n} notes are in both bases`);
-	return conflicts.map((o) => `Also defined in ${o.basePath} as ${describe(o.field, label)}; ${overlap(o.shared)}.`).join(" ");
+	const overlap = (n: number): string => (n === 0 ? t("draft.overlap_zero") : tn("draft.overlap", n));
+	return conflicts.map((o) => t("draft.conflict", { base: o.basePath, definition: describe(o.field, label), overlap: overlap(o.shared) })).join(" ");
 }
 
 const isEmpty = (value: unknown): boolean => value === null || value === undefined || value === "";
@@ -195,9 +204,7 @@ export function mismatchHint(draft: FieldDraft, types: readonly PropertyType[], 
 	const count = values.filter((v) => rejects(type, v)).length;
 	if (count === 0) return null;
 	const shown = draft.detected === null ? "is" : propertyTypeOf(types, draft.detected).name;
-	return count === 1
-		? `1 note has a ${draft.name} that is not a valid ${type.name}; it keeps its value and shows as ${shown}`
-		: `${count} notes have a ${draft.name} that is not a valid ${type.name}; they keep their value and show as ${shown}`;
+	return tn("draft.mismatch", count, { name: draft.name, type: type.name, shown });
 }
 
 export interface KnownFieldsInput {
@@ -266,14 +273,14 @@ const isNewName = (x: FieldDraft): boolean => x.originalName === null || x.origi
 function validateName(draft: FieldDraft, sets: NameSets): string[] {
 	const name = draft.name;
 	const errors: string[] = [];
-	if (name !== name.trim()) errors.push(`Field name '${name}' has surrounding whitespace`);
-	if (isNewName(draft) && isUnsafeKey(name)) errors.push(`Field name '${name}' is reserved`);
+	if (name !== name.trim()) errors.push(t("draft.whitespace", { name }));
+	if (isNewName(draft) && isUnsafeKey(name)) errors.push(t("draft.reserved", { name }));
 	const lower = name.toLowerCase();
-	if (sets.seen.has(lower)) errors.push(`Duplicate field '${name}'`);
+	if (sets.seen.has(lower)) errors.push(t("draft.duplicate", { name }));
 	sets.seen.add(lower);
-	if (isRenamed(draft) && sets.vacated.has(lower)) errors.push(`Field '${name}': another field is renamed from this name`);
+	if (isRenamed(draft) && sets.vacated.has(lower)) errors.push(t("draft.vacated", { name }));
 	// Saving would rename/add into this name and then strip it as part of the removal.
-	if (sets.removed.has(lower)) errors.push(`Field '${name}': a removed field has this name, save the removal first`);
+	if (sets.removed.has(lower)) errors.push(t("draft.removedName", { name }));
 	return errors;
 }
 
@@ -281,11 +288,11 @@ function validateOptions(name: string, options: OptionDraft[]): string[] {
 	const errors: string[] = [];
 	const values = new Set<string>();
 	for (const o of options) {
-		if (!o.value.trim()) errors.push(`Field '${name}': option value is empty`);
-		else if (isUnsafeKey(o.value)) errors.push(`Field '${name}': option '${o.value}' is reserved`);
-		else if (values.has(o.value)) errors.push(`Field '${name}': duplicate option '${o.value}'`);
+		if (!o.value.trim()) errors.push(t("draft.optionEmpty", { name }));
+		else if (isUnsafeKey(o.value)) errors.push(t("draft.optionReserved", { name, value: o.value }));
+		else if (values.has(o.value)) errors.push(t("draft.optionDuplicate", { name, value: o.value }));
 		values.add(o.value);
-		if (!isColor(o.color)) errors.push(`Field '${name}': invalid color for option '${o.value}'`);
+		if (!isColor(o.color)) errors.push(t("draft.optionColor", { name, value: o.value }));
 	}
 	return errors;
 }
@@ -302,15 +309,15 @@ export function validateDrafts(drafts: FieldDraft[], basePaths: string[]): strin
 	for (const draft of drafts.filter((x) => !x.removed)) {
 		const name = draft.name;
 		if (!name.trim()) {
-			errors.push("Field name is empty");
+			errors.push(t("draft.nameEmpty"));
 			continue;
 		}
 		errors.push(...validateName(draft, sets));
 		if (!TYPES.includes(draft.type)) {
-			errors.push(`Field '${name}': unknown type '${String(draft.type)}'`);
+			errors.push(t("draft.unknownType", { name, type: String(draft.type) }));
 		} else if (draft.type === "relation" && !(draft.base && (basePaths.includes(draft.base) || draft.base === draft.originalBase))) {
 			// A saved target stays valid even when its file is gone, so unrelated edits can still be saved.
-			errors.push(`Field '${name}': choose a valid base`);
+			errors.push(t("draft.chooseBase", { name }));
 		} else if (draft.type === "select") {
 			errors.push(...validateOptions(name, liveOptions(draft.options)));
 		}

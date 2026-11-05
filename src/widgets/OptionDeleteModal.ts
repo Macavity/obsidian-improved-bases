@@ -1,5 +1,6 @@
 import { Modal, type App } from "obsidian";
 import type { OverlayRegistry } from "./types";
+import { t, tn } from "../i18n";
 
 /** "notes": remove the value from the notes too; "schema": only the option; null: cancel. */
 export type DeleteChoice = "notes" | "schema" | null;
@@ -11,8 +12,8 @@ export function confirmOptionDelete(app: App, value: string, count: number, over
 		let unregister = (): void => {};
 		const modal = new (class extends Modal {
 			onOpen(): void {
-				this.setTitle("Delete option");
-				this.contentEl.createEl("p", { text: `"${value}" is set in ${count} ${count === 1 ? "note" : "notes"} of this base.` });
+				this.setTitle(t("option.delete.title"));
+				this.contentEl.createEl("p", { text: tn("option.delete.inUse", count, { value }) });
 				const buttons = this.contentEl.createDiv({ cls: "modal-button-container" });
 				const add = (text: string, next: DeleteChoice, cls?: string): void => {
 					const button = buttons.createEl("button", { text, cls });
@@ -21,9 +22,9 @@ export function confirmOptionDelete(app: App, value: string, count: number, over
 						this.close();
 					});
 				};
-				add("Remove from notes", "notes", "mod-warning");
-				add("Only remove from schema", "schema");
-				add("Cancel", null);
+				add(t("option.delete.fromNotes"), "notes", "mod-warning");
+				add(t("option.delete.schemaOnly"), "schema");
+				add(t("option.delete.cancel"), null);
 			}
 			onClose(): void {
 				unregister();

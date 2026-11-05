@@ -1,5 +1,6 @@
 import { Notice, setIcon, type App, type EventRef } from "obsidian";
 import { baseContextOf } from "./baseContext";
+import { t } from "../i18n";
 
 const ITEM_CLASS = "improved-bases-toolbar-item";
 const SELECTOR = ".bases-toolbar";
@@ -24,11 +25,11 @@ export function installSchemaButton(app: App, onOpen: (basePath: string, viewNam
 		const item = toolbar.createDiv({ cls: `bases-toolbar-item ${ITEM_CLASS}` });
 		const button = item.createDiv({ cls: "text-icon-button tappable", attr: { role: "button", tabindex: "0" } });
 		setIcon(button.createSpan({ cls: "text-button-icon" }), "lucide-shapes");
-		button.createSpan({ cls: "text-button-label", text: "Schema" });
+		button.createSpan({ cls: "text-button-label", text: t("toolbar.schema") });
 		const open = (): void => {
 			const base = resolveBase(app, toolbar);
 			if (base) onOpen(base.path, base.viewName);
-			else new Notice("Could not determine the base file");
+			else new Notice(t("notice.baseUnknown"));
 		};
 		button.addEventListener("click", open);
 		button.addEventListener("keydown", (e) => {
