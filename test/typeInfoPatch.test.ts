@@ -36,7 +36,7 @@ function fakeApp() {
 }
 const ctx = (sourcePath: string, key = "Team") =>
   ({ sourcePath, key, onChange: vi.fn(), blur: vi.fn() }) as unknown as PropertyRenderContext;
-const env = (membership: FakeMembership) => ({ membership, overlays: new OverlayRegistry() }) as unknown as WidgetEnv;
+const env = (membership: FakeMembership, conflictMarkers = true) => ({ membership, overlays: new OverlayRegistry(), prefs: () => ({ defaultIcon: "📄", conflictMarkers }) }) as unknown as WidgetEnv;
 const widgets = (w: Partial<Record<"relation" | "select", unknown>>) =>
   ({ relation: vi.fn(), select: vi.fn(), ...w }) as unknown as PluginWidgets;
 const div = () => document.createElement("div");

@@ -303,3 +303,25 @@ describe("Membership", () => {
 		expect(cb).toHaveBeenCalledWith("Teams.base");
 	});
 });
+
+describe("Membership.conflicts", () => {
+	it("is empty before the latch and groups by field and base set after it", () => {
+		const { m, push, setSchemas, s } = setup();
+		setSchemas([
+			s("A.base", { Team: { type: "text" }, Role: { type: "text" } }),
+			s("B.base", { team: { type: "select" } }),
+			s("C.base", { Team: { type: "text" } }),
+		]);
+		push("A.base", ["x.md", "y.md", "z.md"]);
+		push("B.base", ["x.md", "y.md"]);
+		push("C.base", ["x.md"]);
+		expect(m.conflicts()).toEqual([]);
+		settle();
+		expect(m.conflicts()).toEqual([
+			{ name: "Team", bases: ["A.base", "B.base"], files: 1 },
+			{ name: "Team", bases: ["A.base", "B.base", "C.base"], files: 1 },
+		]);
+		push("B.base", []);
+		expect(m.conflicts()).toEqual([{ name: "Team", bases: ["A.base", "C.base"], files: 1 }]);
+	});
+});

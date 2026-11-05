@@ -11,7 +11,7 @@ import { linkTarget, relationOutput, toList } from "./values";
 import { t } from "../i18n";
 
 /** Link chips; clicking the field opens a checkbox picker over the target base entries. */
-export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, field, env) => {
+export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, field, env, source) => {
 	const { app, membership } = env;
 	const key = targetKey({ base: field.base, view: field.view });
 	let links = toList(value);
@@ -70,11 +70,18 @@ export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, fiel
 		commit(wasActive ? [] : [item.raw]);
 	};
 
+	// A missing target is a state warning of the defining base (when known); it heals once the picker opens again.
+	const warningId = `relation:${source?.basePath ?? ""}:${ctx.key.toLowerCase()}`;
+	const warn = (text: string): void => {
+		new Notice(text + t("notice.seeWarnings"));
+		env.warnings.report(warningId, { text, bases: source ? [source.basePath] : [] });
+	};
+
 	let opening = false;
 	const openPicker = async (): Promise<void> => {
 		if (opening) return;
 		if (!(app.vault.getAbstractFileByPath(field.base) instanceof TFile)) {
-			new Notice(t("relation.targetMissing", { base: field.base }));
+			warn(t("relation.targetMissing", { base: field.base }));
 			return;
 		}
 		if (field.view !== undefined) {
@@ -82,12 +89,13 @@ export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, fiel
 			const found = (await baseViewNames(app, field.base))?.includes(field.view);
 			opening = false;
 			if (!found) {
-				new Notice(t("relation.viewMissing", { view: field.view, base: field.base }));
+				warn(t("relation.viewMissing", { view: field.view, base: field.base }));
 				return;
 			}
 		}
+		env.warnings.resolve(warningId);
 		const items = buildItems();
-		new EntryPicker(app, items, (i) => entryIcon(app, i.file, membership.baseIcon(field.base)), (i) => toggle(items, i), env.overlays).open();
+		new EntryPicker(app, items, (i) => entryIcon(app, i.file, membership.baseIcon(field.base), env.prefs().defaultIcon), (i) => toggle(items, i), env.overlays).open();
 	};
 
 	const draw = (): void => {
@@ -110,7 +118,7 @@ export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, fiel
 				chip.addClass("is-foreign");
 				chip.setAttribute("title", t("picker.notInTarget"));
 			}
-			renderIcon(chip.createSpan(), entryIcon(app, dest, membership.baseIcon(field.base)));
+			renderIcon(chip.createSpan(), entryIcon(app, dest, membership.baseIcon(field.base), env.prefs().defaultIcon));
 			const link = LinkValue.parseFromString(app, raw, ctx.sourcePath);
 			const body = chip.createSpan({ cls: "improved-bases-chip-body" });
 			if (link) link.renderTo(body, app.renderContext);

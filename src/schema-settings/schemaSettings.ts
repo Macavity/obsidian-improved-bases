@@ -291,6 +291,9 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 		otherDefinitions: (name) => otherDefinitions(registry, env.membership, basePath, name),
 		memberValues: (name) => values.get(name.toLowerCase()) ?? [],
 		types: listPropertyTypes(getMetadataTypeManager(app)),
+		defaultIcon: env.prefs().defaultIcon,
+		warnings: env.warnings.forBase(basePath),
+		dismissWarning: (id) => env.warnings.dismiss(id),
 		views,
 		defaultViewIndex,
 		expressions,
@@ -308,12 +311,17 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 		}
 		const current = currentMembers();
 		const conflicts: RenameConflicts = new Map();
-		let renameText = renameSummary(pairs, current && pairs.length ? await migrateRenames(app, current, pairs, conflicts) : null);
+		const renameCounts = current && pairs.length ? await migrateRenames(app, current, pairs, conflicts) : null;
+		let renameText = renameSummary(pairs, renameCounts);
 		const removed = current && removedNames.length ? await removeProperties(app, current, removedNames) : [];
 		if (!current && removedNames.length) renameText = [renameText, t("save.notRemoved")].filter(Boolean).join("\n");
-		const optionText = options.length ? optionSummary(current ? await migrateOptions(app, current, options, pairs, conflicts) : null) : "";
+		const optionCounts = current && options.length ? await migrateOptions(app, current, options, pairs, conflicts) : null;
+		const optionText = options.length ? optionSummary(optionCounts) : "";
 		const referenced = [...pairs.map((p) => p.from), ...removedNames].filter((n) => referencesName(expressions, n));
-		new Notice(`${t("save.done")}\n${saveSummary({ renames: renameText, removed, referenced, options: optionText })}`);
+		// A note that could not be written is worth more than a notice: an event warning until the user dismisses it.
+		const failed = (renameCounts?.failed ?? 0) + (optionCounts?.failed ?? 0) + removed.reduce((n, r) => n + r.failed, 0);
+		if (failed > 0) env.warnings.push({ text: tn("warning.saveFailed", failed, { base: basePath }), bases: [basePath] });
+		new Notice(`${t("save.done")}${failed > 0 ? t("notice.seeWarnings") : ""}\n${saveSummary({ renames: renameText, removed, referenced, options: optionText })}`);
 	};
 	const onReset = (): Promise<void> => env.writer.reset(basePath);
 	const countAffected = async (name: string): Promise<number> => {
@@ -328,7 +336,13 @@ function choiceOf(type: string): TypeChoice {
 	return type === "select" || type === "relation" ? type : `native:${type}`;
 }
 
-export function registerSchemaSettings(plugin: Plugin, env: WidgetEnv, registry: SchemaRegistry): { open: (basePath: string, viewName: string | null, focus?: { name: string; type: string }) => Promise<void> } {
+export interface SchemaSettingsHandle {
+	open: (basePath: string, viewName: string | null, focus?: { name: string; type: string }) => Promise<void>;
+	/** Adds or removes the "Schema" button in every Bases toolbar (a setting). */
+	setToolbarButton: (visible: boolean) => void;
+}
+
+export function registerSchemaSettings(plugin: Plugin, env: WidgetEnv, registry: SchemaRegistry): SchemaSettingsHandle {
 	let modal: SchemaSettingsModal | null = null;
 	// An open dialog belongs to this plugin instance; a reload must not leave it behind with stale handlers.
 	plugin.register(() => modal?.close());
@@ -359,6 +373,16 @@ export function registerSchemaSettings(plugin: Plugin, env: WidgetEnv, registry:
 			menu.addItem((item) => item.setSection("action").setTitle(t("menu.schemaSettings")).setIcon("lucide-shapes").onClick(() => void open(file.path, null)));
 		}),
 	);
-	plugin.register(installSchemaButton(plugin.app, (path, view) => void open(path, view)));
-	return { open };
+	let removeButton: (() => void) | null = null;
+	const setToolbarButton = (visible: boolean): void => {
+		if (visible === (removeButton !== null)) return;
+		if (visible) {
+			removeButton = installSchemaButton(plugin.app, (path, view) => void open(path, view));
+		} else {
+			removeButton?.();
+			removeButton = null;
+		}
+	};
+	plugin.register(() => setToolbarButton(false));
+	return { open, setToolbarButton };
 }

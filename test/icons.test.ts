@@ -1,18 +1,18 @@
 import { describe, it, expect } from "vitest";
 import { TFile, type App } from "obsidian";
 import { KNOWN_ICONS } from "./__mocks__/obsidian";
-import { DEFAULT_ICON, entryIcon, renderIcon } from "../src/widgets/icons";
+import { entryIcon, renderIcon } from "../src/widgets/icons";
 
 const appWith = (fm: Record<string, unknown> | undefined) =>
   ({ metadataCache: { getFileCache: () => (fm ? { frontmatter: fm } : null) } }) as unknown as App;
 describe("entryIcon", () => {
-  it("prefers the file property, then the base default, then 📄", () => {
+  it("prefers the file property, then the base default, then the fallback", () => {
     const f = new TFile();
-    expect(entryIcon(appWith({ icon: "👤" }), f, "👥")).toBe("👤");
-    expect(entryIcon(appWith({ icon: "  " }), f, "👥")).toBe("👥");
-    expect(entryIcon(appWith({ icon: ["x"] }), f, null)).toBe(DEFAULT_ICON);
-    expect(entryIcon(appWith({ icon: ["x"] }), f, " ")).toBe(DEFAULT_ICON);
-    expect(entryIcon(appWith(undefined), null, null)).toBe(DEFAULT_ICON);
+    expect(entryIcon(appWith({ icon: "👤" }), f, "👥", "📄")).toBe("👤");
+    expect(entryIcon(appWith({ icon: "  " }), f, "👥", "📄")).toBe("👥");
+    expect(entryIcon(appWith({ icon: ["x"] }), f, null, "📄")).toBe("📄");
+    expect(entryIcon(appWith({ icon: ["x"] }), f, " ", "📁")).toBe("📁");
+    expect(entryIcon(appWith(undefined), null, null, "📁")).toBe("📁");
   });
 });
 describe("renderIcon", () => {

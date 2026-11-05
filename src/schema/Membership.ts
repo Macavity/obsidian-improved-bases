@@ -11,6 +11,12 @@ const QUIET_MS = 300;
 
 const relationTarget = (f: RelationField): QueryTarget => (f.view === undefined ? { base: f.base } : { base: f.base, view: f.view });
 
+function addDefinition(fields: Map<string, { name: string; bases: string[] }>, key: string, name: string, basePath: string): void {
+	const entry = fields.get(key);
+	if (entry) entry.bases.push(basePath);
+	else fields.set(key, { name, bases: [basePath] });
+}
+
 /** Field names (lowercase) of relations pointing at the base `basePath` (any view); their widgets show its default icon. */
 function relationsTargeting(schemas: BaseSchema[], basePath: string): string[] {
 	const out: string[] = [];
@@ -34,6 +40,13 @@ export interface Resolution {
 	basePath: string;
 	name: string;
 	others: { basePath: string; field: FieldSchema }[];
+}
+
+/** A field several schema bases define for the same notes: the name (schema spelling of the first base), the bases by path, the note count. */
+export interface Conflict {
+	name: string;
+	bases: string[];
+	files: number;
 }
 
 export interface MembershipDeps {
@@ -133,6 +146,38 @@ export class Membership extends Events {
 			}
 		}
 		return { field: winner.field, basePath: winner.basePath, name: winner.name, others };
+	}
+
+	/** Every field conflict among the current members, grouped by field and set of bases; empty before the latch. */
+	conflicts(): Conflict[] {
+		if (!this.latched) return [];
+		const groups = new Map<string, Conflict>();
+		for (const fields of this.definitionsByFile().values()) {
+			for (const [key, { name, bases }] of fields) {
+				if (bases.length < 2) continue;
+				const id = `${key}\0${bases.join("\0")}`;
+				const group = groups.get(id);
+				if (group) group.files++;
+				else groups.set(id, { name, bases: [...bases], files: 1 });
+			}
+		}
+		return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name) || a.bases.join().localeCompare(b.bases.join()));
+	}
+
+	/** Per member file: field key -> the schema bases (sorted by path) defining it, with the first base's spelling. */
+	private definitionsByFile(): Map<string, Map<string, { name: string; bases: string[] }>> {
+		const byFile = new Map<string, Map<string, { name: string; bases: string[] }>>();
+		for (const schema of this.registry.schemas()) {
+			for (const file of this.members.get(schema.basePath) ?? []) {
+				let fields = byFile.get(file);
+				if (!fields) {
+					fields = new Map<string, { name: string; bases: string[] }>();
+					byFile.set(file, fields);
+				}
+				for (const [key, { name }] of schema.fields) addDefinition(fields, key, name, schema.basePath);
+			}
+		}
+		return byFile;
 	}
 
 	/** Query result of a target by `targetKey` (= the path for a schema base); null while unknown. */
