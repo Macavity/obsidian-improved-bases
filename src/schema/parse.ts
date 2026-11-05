@@ -85,8 +85,8 @@ function parseFields(rawFields: Record<string, unknown>, errors: string[]): Base
 	return fields;
 }
 
-/** A missing `version` is 1; anything but a positive integer is an error. */
-function parseVersion(raw: unknown): number | null {
+/** A missing `version` is 1; anything but a positive integer is an error (`null`). */
+export function parseVersion(raw: unknown): number | null {
 	if (raw === undefined) return SCHEMA_VERSION;
 	return typeof raw === "number" && Number.isInteger(raw) && raw >= 1 ? raw : null;
 }

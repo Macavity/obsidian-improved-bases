@@ -1,6 +1,7 @@
 import { type Document, isMap, isScalar, isSeq, parseDocument, type Pair, type YAMLMap } from "yaml";
 import { SCHEMA_KEY, SCHEMA_VERSION } from "./types";
 import { t } from "../i18n";
+import { parseVersion } from "./parse";
 
 export type RawFields = Record<string, Record<string, unknown>>;
 
@@ -250,10 +251,16 @@ function applyIcon(doc: Document, icon: string): void {
 	}
 }
 
-/** The section's declared format version; 1 when the key is missing or not a number. */
+const sectionJson = (doc: Document): unknown => (doc.toJSON() as Record<string, unknown> | null)?.[SCHEMA_KEY] ?? null;
+
+/**
+ * The section's declared format version, read from the resolved document so aliases count; an
+ * invalid value is treated as 1, because the parser rejects such a base and the dialog offers a reset.
+ */
 function sectionVersion(doc: Document): number {
-	const raw = doc.getIn([SCHEMA_KEY, "version"]);
-	return typeof raw === "number" ? raw : SCHEMA_VERSION;
+	const section = sectionJson(doc);
+	const raw = typeof section === "object" && section !== null ? (section as Record<string, unknown>).version : undefined;
+	return parseVersion(raw) ?? SCHEMA_VERSION;
 }
 
 /** Every written section declares its format version; an existing version is kept. */
@@ -263,14 +270,11 @@ function ensureVersion(doc: Document): void {
 	section.items.unshift(doc.createPair("version", SCHEMA_VERSION));
 }
 
-const sectionJson = (doc: Document): unknown => (doc.toJSON() as Record<string, unknown> | null)?.[SCHEMA_KEY] ?? null;
-
-/** A section written for a newer plugin is never changed here: the parser cannot know what it would break. */
-function assertVersionWritable(version: number): void {
+/** A base whose section was written for a newer plugin is never written here, not even a no-op: a stale dialog save would migrate notes afterwards. */
+export function assertWritable(doc: Document): void {
+	const version = sectionVersion(doc);
 	if (version > SCHEMA_VERSION) throw new Error(t("error.unsupportedVersion", { version }));
 }
-
-export const assertWritable = (doc: Document): void => assertVersionWritable(sectionVersion(doc));
 
 /**
  * Applies column edits (view orders, properties, summaries, sort, groupBy), the
@@ -279,15 +283,12 @@ export const assertWritable = (doc: Document): void => assertVersionWritable(sec
  */
 export function updateBaseSource(source: string, edits: ColumnEdits, mutate: (fields: RawFields) => void, icon?: string): string {
 	const doc = parseDocument(source);
+	assertWritable(doc);
 	const before = doc.toJSON() as unknown;
-	const sectionBefore = sectionJson(doc);
-	const versionBefore = sectionVersion(doc);
 	applyColumnEdits(doc, edits);
 	applySchemaMutation(doc, mutate);
 	if (icon !== undefined) applyIcon(doc, icon);
 	if (same(before, doc.toJSON())) return source;
-	// The version that counts is the one the file had: a deleted section must not read as version 1.
-	if (!same(sectionBefore, sectionJson(doc))) assertVersionWritable(versionBefore);
 	ensureVersion(doc);
 	return doc.toString();
 }
