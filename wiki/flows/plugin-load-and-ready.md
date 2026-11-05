@@ -32,7 +32,7 @@ sequenceDiagram
   P->>R: new SchemaRegistry(app)
   P->>M: new Membership(registry, query, { cache })
   M->>R: on("changed")
-  P->>T: applyWidgetsEnabled() -> installTypeInfoPatch()
+  P->>T: enableWidgets() -> installTypeInfoPatch()
   T->>M: on("changed"), on("targets-changed")
   P->>O: registerSchemaSettings, addSettingTab
   O-->>P: workspace.onLayoutReady
@@ -52,8 +52,8 @@ sequenceDiagram
 1. `loadSettings()` merges `data.json` into `DEFAULT_SETTINGS` ([Plugin core](../modules/plugin-core.md)).
 2. `createBaseQuery(this)` registers the `improved-bases-collector` Bases view and icon ([Query](../modules/query.md)); no query runs yet.
 3. `new Membership(...)` subscribes to registry `changed` and to `metadataCache.resolved`; `resolved` is pre-set if `resolvedLinks` already has entries. Its first `sync()` finds no schemas, so nothing is watched.
-4. `widgetsSupported = getMetadataTypeManager(app) !== null`; if false, one `Notice`. `applyWidgetsEnabled()` installs the patch when enabled and supported. The patch's install-time `refresh()` is a no-op because `knownFieldNames()` is empty.
-5. `registerSchemaSettings()` (command, file menu item, toolbar button) and the settings tab are registered.
+4. `widgetsSupported = getMetadataTypeManager(app) !== null`; if false, one `Notice` plus a state warning. `enableWidgets()` installs the patch when supported. The patch's install-time `refresh()` is a no-op because `knownFieldNames()` is empty.
+5. `registerSchemaSettings()` (command, file menu item; the toolbar button per `settings.showToolbarButton` via `applySettings()`), the warning access points (command, status bar item) and the settings tab are registered.
 6. On `workspace.onLayoutReady`, `registry.load()` reads every `.base` (silent refreshes), sets `loaded = true`, triggers `changed`.
 7. `Membership.sync()` computes the wanted set (every schema base plus every relation target base) and calls `query.watch()` for each. Field names of all changed schemas are collected as `affected`.
 8. `BaseQuery` mounts each entry: CLI first scan if available, then the collector ([Base query watch](./base-query-watch.md)). Each result lands in `Membership.onResult()`, which re-arms the quiet timer.
@@ -62,7 +62,7 @@ sequenceDiagram
 
 ## Failure modes
 
-- Internals missing: `installTypeInfoPatch()` returns `null`; `widgetsSupported` becomes `false`, the settings toggle is disabled, commands keep working ([Obsidian internals](../architecture/obsidian-internals.md)).
+- Internals missing: `installTypeInfoPatch()` returns `null`; `widgetsSupported` becomes `false`, a state warning is listed, commands keep working ([Obsidian internals](../architecture/obsidian-internals.md)).
 - No schema bases in the vault: `scanned` stays `false` (requires `schemas.length > 0`), the latch never flips, nothing is patched in practice.
 - Between `registry.load()` and the latch `getTypeInfo` already returns hulls (field names are known), but `resolveWithBase` returns `null` while not latched, so the hull falls back to the original widget. The patch is installed at `onload`; the latch, not the install, is the gate. Expected, not a defect.
 - Hidden window: the collector can stall, so the CLI result (desktop) carries the first scan; on mobile the latch waits for the collector. See the performance notes in the [README](../../README.md#performance).

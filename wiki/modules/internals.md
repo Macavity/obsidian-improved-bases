@@ -68,5 +68,5 @@ tags:
 
 - [Obsidian internals](../architecture/obsidian-internals.md)
 - [Hull widget](../concepts/hull-widget.md)
-- [Plugin core](./plugin-core.md) (install/uninstall via `applyWidgetsEnabled`)
+- [Plugin core](./plugin-core.md) (install/uninstall via `enableWidgets` / `disableWidgets`)
 - [Widgets](./widgets.md) (generic select/relation registered as property types)

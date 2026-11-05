@@ -88,7 +88,7 @@ export class SchemaRegistry extends Events {
 			new Notice(t("notice.unsupportedVersion", { plugin: "Improved Bases", path, version: schema.unsupportedVersion }));
 		}
 		const errChanged = replace(this.errs, path, errors.length ? errors : null, (e) => e.join("\n"));
-		if (errChanged && errors.length) new Notice(t("notice.schemaError", { plugin: "Improved Bases", path, error: errors[0] ?? "" }));
+		if (errChanged && errors.length) new Notice(t("notice.schemaError", { plugin: "Improved Bases", path, error: errors[0] ?? "" }) + t("notice.seeWarnings"));
 		if (!silent && (schemaChanged || errChanged)) this.trigger("changed");
 	}
 }

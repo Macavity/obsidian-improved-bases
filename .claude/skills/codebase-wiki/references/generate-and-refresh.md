@@ -11,7 +11,6 @@ The user wants a **wiki of this codebase**, living in their own repo. Read the s
 title: <Project> — Overview
 description: "Home page and navigation hub for the <project> codebase wiki."
 profile: internal/standard
-source_commit: ""
 tags:
   - wiki
   - overview
@@ -48,8 +47,8 @@ Never invent paths — every source reference must point at a file you actually 
 
 Read the properties of `wiki/OVERVIEW.md`:
 
-- **`source_commit` is empty / OVERVIEW is the stub** → **GENERATE** (Phases 0-7 below).
-- **`source_commit` is stamped with a commit** → **REFRESH** (jump to the *Refresh mode* section). Reuse the recorded `profile` unless the user explicitly changes a knob.
+- **OVERVIEW is the stub** (no Navigation section, or its links point at pages that do not exist yet) → **GENERATE** (Phases 0-7 below).
+- **OVERVIEW has a Navigation section whose pages exist** → **REFRESH** (jump to the *Refresh mode* section). Reuse the recorded `profile` unless the user explicitly changes a knob.
 
 ---
 
@@ -91,7 +90,7 @@ Author `wiki/OVERVIEW.md` (edit the stub in place):
    ```
    (Mermaid label text has sharp edges — keep node labels free of parentheses, quotes and pipes, or wrap the label in `["…"]`.)
 3. **Navigation** — a map that links **every section and every page you will create**, as relative links. OVERVIEW is the hub; everything must be reachable from it. These targets do not exist yet; Phase 7 verifies them once every page is written.
-4. **Stamp the properties**: set `profile: <audience>/<depth>` and `source_commit: <git rev-parse HEAD>`. `source_commit` is the freshness anchor refresh mode diffs against — get it right.
+4. **Set the properties**: `profile: <audience>/<depth>`. There is no commit stamp: the freshness anchor is the last commit that touched `wiki/`, so commit the generated wiki together with the code state it describes.
 
 ### Phase 3 — Architecture pages
 
@@ -129,11 +128,11 @@ Atomic pages for domain terms and core abstractions (one term each): definition,
 
 Incremental by default — don't re-read the whole repo.
 
-1. Read `source_commit` + `profile` from `wiki/OVERVIEW.md` properties. Reuse the profile unless the user changed a knob.
-2. `git diff --stat <source_commit>..HEAD`. Inspect the changed paths.
+1. Read `profile` from `wiki/OVERVIEW.md` properties. Reuse the profile unless the user changed a knob. The anchor is `ANCHOR=$(git log -1 --format=%H -- wiki/)`, the last commit that touched the wiki (on a branch with the base merged in, that is the base's last refresh or your own).
+2. `git diff --stat $ANCHOR -- . ':!wiki'` (working tree against the anchor, so uncommitted edits count) plus `git ls-files --others --exclude-standard` for files not yet staged. Inspect the changed paths. The anchor is only a valid baseline because wiki-touching commits never precede unrefreshed source commits; with `PREVIOUS=$(git log -2 --format=%H -- wiki/ | tail -1)` (the wiki commit before the anchor; skip this check when there is only one), `git log --oneline "$PREVIOUS..$ANCHOR" -- . ':!wiki'` lists source commits the anchor commit was supposed to cover; if the anchor commit itself changed no source (a wiki-only commit) and that list is not empty, widen the baseline to `$PREVIOUS`.
 3. **Map changed code → affected pages.** For each changed package/area, update its module/architecture/flow pages (read the changed source first). Update OVERVIEW only if the structure changed (new package, removed subsystem, new top-level flow).
-4. **Full-regen fallback.** If the diff is large or structural (many packages, a restructure), or git is unavailable / `source_commit` is missing, fall back to a full GENERATE pass rather than a partial patch.
-5. **Re-stamp** `source_commit` to the new `git rev-parse HEAD` and re-run the whole Phase 7 link audit, not only on the touched pages: OVERVIEW coverage and orphans are global conditions, and the loops are cheap.
+4. **Full-regen fallback.** If the diff is large or structural (many packages, a restructure), or git is unavailable, fall back to a full GENERATE pass rather than a partial patch.
+5. Re-run the whole Phase 7 link audit, not only on the touched pages: OVERVIEW coverage and orphans are global conditions, and the loops are cheap.
 
 ---
 
@@ -146,7 +145,7 @@ Incremental by default — don't re-read the whole repo.
 - **OVERVIEW is the hub** — every page must be reachable from it. Don't leave orphans (Phase 7 catches them).
 - **Scaffold a missing layout first** (Phase 0) and keep every page inside the five folders.
 - **Scale to `depth`** — don't write `guides/` or per-flow failure modes at `tour`; don't fold modules into architecture at `exhaustive`.
-- **Refresh is incremental** — diff `source_commit..HEAD` and touch only affected pages; full-regen only on large/structural diffs or when git is unavailable.
+- **Refresh is incremental** — diff the last wiki commit against the working tree (it runs before the final commit) and touch only affected pages; full-regen only on large/structural diffs or when git is unavailable.
 
 ---
 

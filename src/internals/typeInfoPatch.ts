@@ -92,7 +92,8 @@ export function installTypeInfoPatch(app: App, env: WidgetEnv, widgets: PluginWi
 		if (!res) return undefined;
 		let handle = renderField(el, value, ctx, res, mtm, info);
 		if (handle === undefined) return undefined;
-		if (res.others.length) renderConflictMarker(el, res, res.name, context);
+		const markers = env.prefs().conflictMarkers;
+		if (markers && res.others.length) renderConflictMarker(el, res, res.name, context);
 		if (!el.isConnected && res.others.length) {
 			window.setTimeout(() => {
 				if (!el.isConnected || !active) return;
@@ -108,7 +109,7 @@ export function installTypeInfoPatch(app: App, env: WidgetEnv, widgets: PluginWi
 				} else {
 					el.querySelector(".improved-bases-conflict")?.remove();
 				}
-				if (next.others.length) renderConflictMarker(el, next, next.name, late);
+				if (markers && next.others.length) renderConflictMarker(el, next, next.name, late);
 			}, 0);
 		}
 		// The handle Bases keeps must follow a re-render, so it delegates to the latest widget.

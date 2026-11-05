@@ -5,9 +5,35 @@
  */
 export const en = {
 	// Settings tab
-	"settings.widgets.name": "Enable widgets",
-	"settings.widgets.desc": "Show relation and select widgets in tables and the properties panel.",
-	"settings.widgets.unsupported": "This Obsidian version is not supported; widgets are unavailable. Commands still work.",
+	"settings.defaultIcon.name": "Default entry icon",
+	"settings.defaultIcon.desc": "Shown for a relation entry whose note has no icon property and whose base has no default icon.",
+	"settings.toolbar.name": "Schema button in the Bases toolbar",
+	"settings.toolbar.desc": "Schema settings stay reachable from the command, the file menu and the column type menu.",
+	"settings.conflictMarkers.name": "Conflict markers",
+	"settings.conflictMarkers.desc": "Info icon on a field that several schema bases define for the same note. The warning list shows conflicts either way.",
+	"settings.warnings.name": "Current warnings",
+	"settings.warnings.desc": "Schema errors, conflicts, missing relation targets and failed migrations. Also in the status bar and via the command \"Show warnings\".",
+	"settings.warnings.count_one": "1 current warning",
+	"settings.warnings.count_other": "{n} current warnings",
+	"settings.warnings.show": "Show",
+
+	// Warnings
+	"command.showWarnings": "Show warnings",
+	"warnings.title": "Warnings",
+	"warnings.empty": "No warnings",
+	"warnings.dismiss": "Dismiss",
+	"warnings.openSchema": "Open schema settings of {base}",
+	"warnings.status_one": "1 warning",
+	"warnings.status_other": "{n} warnings",
+	"warnings.forBase": "Warnings for this base",
+	"notice.seeWarnings": " (see warnings)",
+	"warning.schemaError": "{path}: {error}",
+	"warning.conflict_one": "\"{name}\" is defined in {bases}; 1 note is in all of them",
+	"warning.conflict_other": "\"{name}\" is defined in {bases}; {n} notes are in all of them",
+	"warning.saveFailed_one": "{base}: 1 note could not be updated when saving the schema",
+	"warning.saveFailed_other": "{base}: {n} notes could not be updated when saving the schema",
+	"warning.optionFailed_one": "{field}: option values in 1 note could not be updated",
+	"warning.optionFailed_other": "{field}: option values in {n} notes could not be updated",
 
 	// Plugin notices
 	"notice.unsupported": "{plugin}: this Obsidian version is not supported",

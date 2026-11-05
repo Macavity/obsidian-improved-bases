@@ -2,7 +2,7 @@ import { Notice, type TFile } from "obsidian";
 import { migrateOptionValues, optionValueEdit, renameInList } from "../schema/optionMigration";
 import { t, tn } from "../i18n";
 
-const failedSuffix = (failed: number): string => (failed > 0 ? t("option.failedSuffix", { n: failed }) : "");
+const failedSuffix = (failed: number): string => (failed > 0 ? t("option.failedSuffix", { n: failed }) + t("notice.seeWarnings") : "");
 const notesCount = (n: number): string => tn("option.notes", n);
 import type { Color, SelectField, SelectOption } from "../schema/types";
 import { findOwnKey, isUnsafeKey } from "../schema/keys";
@@ -52,6 +52,11 @@ export const SelectWidget: PluginWidget<SelectField> = (el, value, ctx, field, e
 		return isUnsafeKey(name);
 	};
 
+	/** A note that could not be migrated: an event warning until the user dismisses it. */
+	const reportFailed = (src: SchemaSource, failed: number): void => {
+		if (failed > 0) env.warnings.push({ text: tn("warning.optionFailed", failed, { field: src.name }), bases: [src.basePath] });
+	};
+
 	/** The field's value in a member note's properties (case-insensitive key). */
 	const valueIn = (file: TFile, name: string): unknown => {
 		const fm = env.app.metadataCache.getFileCache(file)?.frontmatter;
@@ -71,6 +76,7 @@ export const SelectWidget: PluginWidget<SelectField> = (el, value, ctx, field, e
 		if (choice === "notes") {
 			const { changed, failed } = await migrateOptionValues(env.app, files, src.name, optionValueEdit([], [value]));
 			new Notice(tn("option.removed", changed) + failedSuffix(failed));
+			reportFailed(src, failed);
 			values = values.filter((v) => v !== value);
 			h.values = h.values.filter((v) => v !== value);
 		}
@@ -118,6 +124,7 @@ export const SelectWidget: PluginWidget<SelectField> = (el, value, ctx, field, e
 				if (!src || !files || !(await writeSchema(renameOptionMutation(src.name, from, to)))) return false;
 				const { changed, failed } = await migrateOptionValues(env.app, files, src.name, optionValueEdit([{ from, to }], []));
 				new Notice(t("option.renamed", { n: notesCount(changed) }) + failedSuffix(failed));
+				reportFailed(src, failed);
 				for (const o of options) if (o.value === from) o.value = to;
 				values = renameInList(values, from, to);
 				draw();

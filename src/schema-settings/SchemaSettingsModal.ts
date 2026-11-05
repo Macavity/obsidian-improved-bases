@@ -7,13 +7,20 @@ import { renderIcon } from "../widgets/icons";
 import type { OverlayRegistry } from "../widgets/types";
 import { propertyTypeOf, type PropertyType } from "../internals/typeRegistry";
 import { applyTypeChoice, conflictHint, focusDraft, liveOptions, mismatchHint, newFieldDraft, newOption, optionMigrations, optionSuggestions, overrideType, removals, renames, typeChoice, typeChoices, validateDrafts, type FieldDraft, type OptionDraft, type OtherDefinition, type TypeChoice } from "./schemaDraft";
+import { renderWarningRow } from "../warnings/render";
+import type { Warning } from "../warnings/WarningRegistry";
 import { t, tn } from "../i18n";
 
 export interface SchemaSettingsInput {
 	basePath: string;
 	state: { kind: "fields"; drafts: FieldDraft[] } | { kind: "error"; message: string; resettable: boolean };
-	/** Default icon of this base's entries in relations; "" = none (📄). */
+	/** Default icon of this base's entries in relations; "" = none (the plugin's `defaultIcon`). */
 	icon: string;
+	/** The plugin-wide default entry icon (a setting), shown as the placeholder. */
+	defaultIcon: string;
+	/** Current warnings of this base, shown above the fields; an event warning can be dismissed here. */
+	warnings: Warning[];
+	dismissWarning: (id: string) => void;
 	/** Target base candidates (a base may relate to itself). */
 	basePaths: string[];
 	/** Default entry icon of a base, for the target box and the details column; null without one. */
@@ -178,6 +185,7 @@ export class SchemaSettingsModal extends Modal {
 	}
 
 	private renderError(message: string, resettable: boolean): void {
+		this.renderWarnings();
 		this.contentEl.createDiv({ cls: "improved-bases-schema-error", text: message });
 		this.renderFooter(resettable ? (b) => this.resetButton(b) : null);
 	}
@@ -211,6 +219,7 @@ export class SchemaSettingsModal extends Modal {
 		const hint = contentEl.createDiv({ cls: "improved-bases-hint" });
 		setIcon(hint.createSpan({ cls: "improved-bases-status-icon" }), "lucide-info");
 		hint.createSpan({ text: t("dialog.idleStatus") });
+		this.renderWarnings();
 		this.renderToolbar();
 		const table = contentEl.createDiv({ cls: "improved-bases-table" });
 		const head = table.createDiv({ cls: "improved-bases-column-head" });
@@ -269,13 +278,29 @@ export class SchemaSettingsModal extends Modal {
 		field.createSpan({ text: t("dialog.defaultIcon") });
 		const input = field.createEl("input", {
 			cls: "improved-bases-base-icon-input",
-			attr: { type: "text", placeholder: "📄", "aria-label": t("dialog.defaultIcon") },
+			attr: { type: "text", placeholder: this.input.defaultIcon, "aria-label": t("dialog.defaultIcon") },
 		});
 		input.value = this.icon;
 		input.addEventListener("input", () => {
 			this.icon = input.value;
 			this.updateStatus();
 		});
+	}
+
+	/** The base's current warnings above the fields; dismissing an event warning removes its row. */
+	private renderWarnings(): void {
+		if (!this.input.warnings.length) return;
+		const box = this.contentEl.createDiv({ cls: "improved-bases-dialog-warnings", attr: { role: "region", "aria-label": t("warnings.forBase") } });
+		box.createDiv({ cls: "improved-bases-dialog-warnings-title", text: t("warnings.forBase") });
+		for (const w of this.input.warnings) {
+			const row = renderWarningRow(box, w, {
+				dismiss: (id) => {
+					this.input.dismissWarning(id);
+					row.remove();
+					if (!box.querySelector(".improved-bases-warning")) box.remove();
+				},
+			});
+		}
 	}
 
 	/** Search, the target view for new columns (only offered when there is a choice) and the add button. */

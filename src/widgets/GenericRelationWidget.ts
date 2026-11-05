@@ -34,7 +34,7 @@ export function createGenericRelationWidget(env: WidgetEnv): TypeWidget {
 				root.empty();
 				for (const raw of toList(current)) {
 					const chip = root.createSpan({ cls: "improved-bases-chip" });
-					renderIcon(chip.createSpan(), entryIcon(app, resolve(raw), null));
+					renderIcon(chip.createSpan(), entryIcon(app, resolve(raw), null, env.prefs().defaultIcon));
 					const body = chip.createSpan({ cls: "improved-bases-chip-body" });
 					const link = LinkValue.parseFromString(app, raw, ctx.sourcePath);
 					if (link) link.renderTo(body, app.renderContext);
@@ -65,7 +65,7 @@ export function createGenericRelationWidget(env: WidgetEnv): TypeWidget {
 					draw();
 					ctx.onChange(current);
 				};
-				new EntryPicker(app, items, (i) => entryIcon(app, i.file, null), toggle, env.overlays).open();
+				new EntryPicker(app, items, (i) => entryIcon(app, i.file, null, env.prefs().defaultIcon), toggle, env.overlays).open();
 			};
 
 			bindOpenTrigger(root, openPicker, "a, .internal-link");

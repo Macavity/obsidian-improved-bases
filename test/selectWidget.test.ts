@@ -7,6 +7,7 @@ import type { SelectField } from "../src/schema/types";
 import { confirmOptionDelete } from "../src/widgets/OptionDeleteModal";
 import { t } from "../src/i18n";
 const MEMBERS_LOADING = t("notice.membersLoading");
+import { WarningRegistry } from "../src/warnings/WarningRegistry";
 import { OverlayRegistry, type PropertyRenderContext, type WidgetEnv } from "../src/widgets/types";
 
 vi.mock("obsidian", async (orig) => {
@@ -30,6 +31,7 @@ function setup(value: unknown, opts: { multiple?: boolean; resolved?: boolean; w
 			targetEntries: () => (opts.files === null ? null : (opts.files ?? [new TFile(), new TFile()] as TFile[])),
 		},
 		overlays: new OverlayRegistry(),
+		warnings: new WarningRegistry(),
 	} as unknown as WidgetEnv;
 	const onChange = vi.fn();
 	const ctx = { app: env.app, key: "status", sourcePath: "n.md", onChange, blur: vi.fn() } as PropertyRenderContext;
@@ -206,7 +208,8 @@ describe("SelectWidget", () => {
 			const bad = setup(["A"], { used: "A" });
 			bad.processFrontMatter.mockRejectedValueOnce(new Error("x"));
 			await bad.open().rename("A", "Z");
-			expect(lastNotice()).toBe("Renamed in 1 note, 1 failed");
+			expect(lastNotice()).toBe("Renamed in 1 note, 1 failed (see warnings)");
+			expect(bad.env.warnings.list().map((w) => w.text)).toEqual(["Status: option values in 1 note could not be updated"]);
 		});
 	});
 	describe("remove", () => {
@@ -246,7 +249,8 @@ describe("SelectWidget", () => {
 			const bad = setup(["A"], { used: "A", files: [new TFile()] });
 			bad.processFrontMatter.mockRejectedValueOnce(new Error("x"));
 			await bad.open().remove("A");
-			expect(lastNotice()).toBe("Removed from 0 notes, 1 failed");
+			expect(lastNotice()).toBe("Removed from 0 notes, 1 failed (see warnings)");
+			expect(bad.env.warnings.list().map((w) => w.bases)).toEqual([["M.base"]]);
 			const one = setup(["A"], { used: "A", files: [new TFile()] });
 			await one.open().remove("A");
 			expect(lastNotice()).toBe("Removed from 1 note");

@@ -5,6 +5,7 @@ import { EntryPicker } from "../src/widgets/pickers";
 import type { PickerItem } from "../src/widgets/pickers";
 import type { RelationField } from "../src/schema/types";
 import { baseViewNames } from "../src/schema/baseViews";
+import { WarningRegistry } from "../src/warnings/WarningRegistry";
 import { OverlayRegistry, type PropertyRenderContext, type WidgetEnv } from "../src/widgets/types";
 
 const notices: string[] = [];
@@ -39,7 +40,7 @@ function setup(value: unknown, opts: { multiple?: boolean; members?: TFile[] | n
 		renderContext: {},
 	} as unknown as App;
 	const baseIcon = vi.fn((p: string) => (p === "Teams.base" ? opts.icon ?? null : null));
-	const env = { app, membership: { targetEntries: (k: string) => (opts.byKey ? opts.byKey[k] ?? null : members), baseIcon }, overlays: new OverlayRegistry(), writer: {} } as unknown as WidgetEnv;
+	const env = { app, membership: { targetEntries: (k: string) => (opts.byKey ? opts.byKey[k] ?? null : members), baseIcon }, overlays: new OverlayRegistry(), writer: {}, warnings: new WarningRegistry(), prefs: () => ({ defaultIcon: "📄", conflictMarkers: true }) } as unknown as WidgetEnv;
 	const onChange = vi.fn();
 	const ctx = { app, key: "lead", sourcePath: "n.md", onChange, blur: vi.fn() } as PropertyRenderContext;
 	const field: RelationField = { type: "relation", base: "Teams.base", multiple: opts.multiple ?? true, ...(opts.view === undefined ? {} : { view: opts.view }) };
@@ -155,7 +156,7 @@ describe("RelationWidget", () => {
 		vi.mocked(baseViewNames).mockResolvedValue(["Alle"]);
 		const { el } = setup([], { view: "FKs" });
 		el.querySelector<HTMLElement>(".improved-bases-relation")?.click();
-		await vi.waitFor(() => expect(notices).toEqual(['View "FKs" not found in Teams.base']));
+		await vi.waitFor(() => expect(notices).toEqual(['View "FKs" not found in Teams.base (see warnings)']));
 		expect(EntryPicker).not.toHaveBeenCalled();
 	});
 	it("does not mark chips foreign while the view result is unknown", () => {
