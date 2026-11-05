@@ -868,3 +868,45 @@
 .improved-bases-picker-row.is-selected .improved-bases-picker-edit {
 	visibility: visible;
 }
+
+/* Phone: picker and editor dock to the bottom edge at full width (see dockToViewport, which also lifts them above the keyboard).
+   The edit pencil has no hover on touch, so it stays visible; rows, remove buttons and swatches grow to touch size. */
+.is-mobile {
+	--ib-touch: max(44px, var(--touch-size-s));
+}
+.improved-bases-option-picker.is-docked,
+.improved-bases-option-editor.is-docked {
+	top: auto;
+	left: 0;
+	right: 0;
+	bottom: var(--ib-dock-bottom, 0);
+	width: auto;
+	border-radius: var(--radius-l) var(--radius-l) 0 0;
+	padding-bottom: env(safe-area-inset-bottom);
+}
+.improved-bases-option-picker.is-docked {
+	max-height: var(--ib-dock-max-height);
+}
+.is-mobile .improved-bases-picker-row,
+.is-mobile .improved-bases-picker-create {
+	min-height: var(--ib-touch);
+}
+.is-mobile .improved-bases-picker-edit {
+	visibility: visible;
+	min-width: var(--ib-touch);
+	min-height: var(--ib-touch);
+}
+.is-mobile .improved-bases-option-picker .improved-bases-chip-remove {
+	min-width: var(--ib-touch);
+}
+.is-mobile .improved-bases-option-editor-colors {
+	grid-template-columns: repeat(auto-fill, minmax(var(--ib-touch), 1fr));
+	justify-items: center;
+}
+.is-mobile .improved-bases-option-editor-colors button[data-color] {
+	width: 32px;
+	height: 32px;
+}
+.is-mobile .improved-bases-option-editor-delete {
+	min-height: var(--ib-touch);
+}

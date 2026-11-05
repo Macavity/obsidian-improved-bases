@@ -14,3 +14,26 @@ export function dismissOnOutside(isInside: (target: Element) => boolean, close: 
 		unregister();
 	};
 }
+
+/** Obsidian marks narrow mobile layouts with `.is-phone` on the body. */
+export function isPhone(): boolean {
+	return document.body.classList.contains("is-phone");
+}
+
+/** Pins a popover to the bottom edge of the visual viewport (above the on-screen keyboard) and caps its height at 60% of it. Returns the cleanup. */
+export function dockToViewport(popover: HTMLElement): () => void {
+	const vv = window.visualViewport;
+	const update = (): void => {
+		const height = vv?.height ?? window.innerHeight;
+		const keyboard = vv ? Math.max(0, window.innerHeight - vv.offsetTop - vv.height) : 0;
+		popover.setCssProps({ "--ib-dock-bottom": `${keyboard}px`, "--ib-dock-max-height": `${Math.round(height * 0.6)}px` });
+	};
+	popover.addClass("is-docked");
+	update();
+	vv?.addEventListener("resize", update);
+	vv?.addEventListener("scroll", update);
+	return () => {
+		vv?.removeEventListener("resize", update);
+		vv?.removeEventListener("scroll", update);
+	};
+}

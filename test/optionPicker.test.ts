@@ -405,3 +405,26 @@ describe("openOptionPicker", () => {
 		});
 	});
 });
+
+describe("option picker on a phone", () => {
+	afterEach(() => {
+		document.body.classList.remove("is-phone");
+		document.body.empty();
+	});
+
+	it("docks to the bottom edge and caps its height", () => {
+		document.body.classList.add("is-phone");
+		const { popover, picker } = setup();
+		const el = popover();
+		expect(el?.classList.contains("is-docked")).toBe(true);
+		expect(el?.style.getPropertyValue("--ib-dock-bottom")).toBe("0px");
+		expect(el?.style.getPropertyValue("--ib-dock-max-height")).toMatch(/^\d+px$/);
+		picker.close();
+		expect(popover()).toBeNull();
+	});
+
+	it("stays at the field on wider layouts", () => {
+		const { popover } = setup();
+		expect(popover()?.classList.contains("is-docked")).toBe(false);
+	});
+});

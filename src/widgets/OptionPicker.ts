@@ -3,7 +3,7 @@ import type { Color, SelectOption } from "../schema/types";
 import type { OverlayRegistry } from "./types";
 import { openOptionEditor, OPTION_EDITOR_CLASS } from "./OptionEditor";
 import { placePopover } from "./placePopover";
-import { dismissOnOutside } from "./popover";
+import { dismissOnOutside, dockToViewport, isPhone } from "./popover";
 import { renameInList } from "../schema/optionMigration";
 import { colorOf } from "./values";
 import { t } from "../i18n";
@@ -59,7 +59,7 @@ function onPress(el: HTMLElement, action: () => void): void {
 /** Popover at `document.body` below (or above) the field: active values, a filter/create input and the option list. */
 export function openOptionPicker(anchor: HTMLElement, host: OptionPickerHost, overlays: OverlayRegistry): { close(): void } {
 	const rect = anchor.getBoundingClientRect();
-	const pos = placePopover(rect, { width: window.innerWidth, height: window.innerHeight }, { width: MIN_WIDTH, height: MAX_HEIGHT });
+	const pos = placePopover(rect, { width: window.innerWidth, height: window.innerHeight }, { width: MIN_WIDTH, height: MAX_HEIGHT }, "start", isPhone());
 	const popover = document.body.createDiv({ cls: "improved-bases-option-picker" });
 	popover.toggleClass("is-above", pos.above);
 	popover.setCssProps({
@@ -70,6 +70,7 @@ export function openOptionPicker(anchor: HTMLElement, host: OptionPickerHost, ov
 		"--ib-picker-top": pos.above ? "auto" : `${pos.top}px`,
 		"--ib-picker-bottom": pos.above ? `${Math.max(0, window.innerHeight - rect.top)}px` : "auto",
 	});
+	const undock = pos.docked ? dockToViewport(popover) : null;
 	const header = popover.createDiv({ cls: "improved-bases-picker-header" });
 	const pills = header.createDiv({ cls: "improved-bases-picker-values" });
 	const input = header.createEl("input", { attr: { type: "text", placeholder: t("picker.searchOrCreate"), "aria-label": t("picker.searchOrCreate") } });
@@ -88,6 +89,7 @@ export function openOptionPicker(anchor: HTMLElement, host: OptionPickerHost, ov
 		closed = true;
 		editor?.close();
 		dismiss();
+		undock?.();
 		popover.remove();
 	}
 
