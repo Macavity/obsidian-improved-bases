@@ -54,3 +54,7 @@ tags:
 - [Field schema](../concepts/field-schema.md)
 - [Plugin core](./plugin-core.md) (registration)
 - [Internals](./internals.md) (toolbar button)
+
+## Phone
+
+Under `.is-phone` the header (title, then the default-icon field on its own line), the toolbar (search, "Add new fields to", "Add field") and the footer (status text, then full-width buttons) wrap into full-width rows; the footer never shrinks, so the field list scrolls above it, and the dialog may use the full dynamic viewport height. Buttons use `--ib-touch` height. The details column stays hidden below 700px as before; the expanded panel is single-column.
