@@ -103,12 +103,13 @@ export function parseSchema(basePath: string, raw: unknown): { schema: BaseSchem
 	if (!isRecord(section)) return { schema: null, errors: [`${SCHEMA_KEY}: must be a map`] };
 	const version = parseVersion(section.version);
 	if (version === null) return { schema: null, errors: [`${SCHEMA_KEY}.version: must be a positive integer`] };
+	const unsupported = version > SCHEMA_VERSION;
 	const rawFields = section.fields ?? {};
-	if (!isRecord(rawFields)) return { schema: null, errors: [`${SCHEMA_KEY}.fields: must be a map`] };
+	// A newer format may store fields in another shape; that is not an error, just nothing this parser can read.
+	if (!isRecord(rawFields) && !unsupported) return { schema: null, errors: [`${SCHEMA_KEY}.fields: must be a map`] };
 
 	const errors: string[] = [];
-	const fields = parseFields(rawFields, errors);
-	const unsupported = version > SCHEMA_VERSION;
+	const fields = parseFields(isRecord(rawFields) ? rawFields : {}, errors);
 	if (errors.length && !unsupported) return { schema: null, errors };
 	const schema: BaseSchema = { basePath, fields };
 	// The icon is cosmetic: a blank, null or non-string value means "no default icon", never an invalid schema.

@@ -93,11 +93,14 @@ describe("schema version on write", () => {
     expect(out).toMatch(/^improved-bases:\n {2}version: 1\n {2}icon: 👥\n {2}fields:\n {4}A:/);
     expect(out).toContain("    B:\n      type: text\n");
   });
-  it("never downgrades a higher version", () => {
+  it("refuses to write a section with a newer version, but a no-op stays a no-op", () => {
     const withV2 = `improved-bases:\n  version: 2\n  fields: {}\n${src}`;
-    const out = updateSchemaSource(withV2, (f) => { f.B = { type: "text" }; });
-    expect(out).toContain("version: 2");
-    expect(out).not.toContain("version: 1");
+    expect(() => updateSchemaSource(withV2, (f) => { f.B = { type: "text" }; })).toThrow(/version 2/);
+    expect(() => updateBaseSource(withV2, EMPTY_EDITS, () => {}, "👥")).toThrow(/version 2/);
+    expect(updateSchemaSource(withV2, () => {})).toBe(withV2);
+    // Column edits alone do not touch the section, so they are still allowed.
+    const withView = `improved-bases:\n  version: 2\n  fields: {}\nviews:\n  - type: table\n    order:\n      - Role\n`;
+    expect(updateBaseSource(withView, { ...EMPTY_EDITS, rename: [{ from: "Role", to: "Job" }] }, () => {})).toContain("- Job\n");
   });
   it("leaves the source untouched when nothing changes", () => {
     const withSection = `improved-bases:\n  fields:\n    A:\n      type: text\n${src}`;

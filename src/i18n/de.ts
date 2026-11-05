@@ -12,6 +12,7 @@ export const de: Locale = {
 	"notice.membersLoading": "Die Einträge der Base werden noch geladen, bitte gleich noch einmal versuchen",
 	"notice.baseUnknown": "Die Base-Datei konnte nicht ermittelt werden",
 	"notice.unsupportedVersion": "{plugin}: {path}: Schema-Version {version} ist neuer, als dieses Plugin unterstützt; das Schema ist schreibgeschützt",
+	"error.unsupportedVersion": "Schema-Version {version} ist neuer, als dieses Plugin unterstützt; die Base wurde nicht geändert",
 
 	"type.relation": "Relation",
 	"type.select": "Auswahl",

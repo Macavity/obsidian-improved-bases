@@ -16,6 +16,7 @@ export const en = {
 	"notice.membersLoading": "Base members are still loading, try again in a moment",
 	"notice.baseUnknown": "Could not determine the base file",
 	"notice.unsupportedVersion": "{plugin}: {path}: schema version {version} is newer than this plugin supports; the schema is read-only",
+	"error.unsupportedVersion": "Schema version {version} is newer than this plugin supports; the base was not changed",
 
 	// Property types and view names
 	"type.relation": "Relation",

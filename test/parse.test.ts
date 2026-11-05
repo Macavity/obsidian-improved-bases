@@ -126,6 +126,16 @@ describe("parseSchema version", () => {
     expect(schema?.fields.get("weird")?.field).toEqual({ type: "hologram" });
     expect(schema?.fields.has("bad")).toBe(false);
   });
+  it("keeps the unsupported flag when a newer format stores fields differently", () => {
+    for (const fields of [["Team"], "Team", 5]) {
+      const { schema, errors } = parseSchema("A.base", { "improved-bases": { version: 2, icon: "👥", fields } });
+      expect(errors).toEqual([]);
+      expect(schema?.unsupportedVersion).toBe(2);
+      expect(schema?.icon).toBe("👥");
+      expect(schema?.fields.size).toBe(0);
+    }
+    expect(parseSchema("A.base", { "improved-bases": { version: 1, fields: ["Team"] } }).schema).toBeNull();
+  });
   it.each([0, -1, 1.5, "1", null, true, {}])("rejects version %j", (version) => {
     const r = parseSchema("A.base", { "improved-bases": { version, fields } });
     expect(r.schema).toBeNull();

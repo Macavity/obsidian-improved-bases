@@ -250,11 +250,25 @@ function applyIcon(doc: Document, icon: string): void {
 	}
 }
 
-/** Every written section declares its format version; an existing (possibly newer) version is kept. */
+/** The section's declared format version; 1 when the key is missing or not a number. */
+function sectionVersion(doc: Document): number {
+	const raw = doc.getIn([SCHEMA_KEY, "version"]);
+	return typeof raw === "number" ? raw : SCHEMA_VERSION;
+}
+
+/** Every written section declares its format version; an existing version is kept. */
 function ensureVersion(doc: Document): void {
 	const section = doc.get(SCHEMA_KEY, true);
 	if (!isMap(section) || section.has("version")) return;
 	section.items.unshift(doc.createPair("version", SCHEMA_VERSION));
+}
+
+const sectionJson = (doc: Document): unknown => (doc.toJSON() as Record<string, unknown> | null)?.[SCHEMA_KEY] ?? null;
+
+/** A section written for a newer plugin is never changed here: the parser cannot know what it would break. */
+function assertWritable(doc: Document): void {
+	const version = sectionVersion(doc);
+	if (version > SCHEMA_VERSION) throw new Error(t("error.unsupportedVersion", { version }));
 }
 
 /**
@@ -265,10 +279,12 @@ function ensureVersion(doc: Document): void {
 export function updateBaseSource(source: string, edits: ColumnEdits, mutate: (fields: RawFields) => void, icon?: string): string {
 	const doc = parseDocument(source);
 	const before = doc.toJSON() as unknown;
+	const sectionBefore = sectionJson(doc);
 	applyColumnEdits(doc, edits);
 	applySchemaMutation(doc, mutate);
 	if (icon !== undefined) applyIcon(doc, icon);
 	if (same(before, doc.toJSON())) return source;
+	if (!same(sectionBefore, sectionJson(doc))) assertWritable(doc);
 	ensureVersion(doc);
 	return doc.toString();
 }
