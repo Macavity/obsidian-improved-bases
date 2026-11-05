@@ -433,6 +433,25 @@ describe("SchemaSettingsModal", () => {
 		expect(document.body.contains(modal.modalEl)).toBe(false);
 	});
 
+	it("marks the footer dirty once something changed and repeats the hint above the toolbar", () => {
+		const { el, q } = open({ kind: "fields", drafts: [d({ originalName: "A", name: "A" })] });
+		const footer = q<HTMLElement>(".improved-bases-footer");
+		expect(footer.classList.contains("is-dirty")).toBe(false);
+		expect(q<HTMLElement>(".improved-bases-hint").textContent).toContain("Changes are written to the base on Save");
+		const name = q<HTMLInputElement>(".improved-bases-field-name");
+		name.value = "B";
+		name.dispatchEvent(new Event("input"));
+		expect(footer.classList.contains("is-dirty")).toBe(true);
+		name.value = "A";
+		name.dispatchEvent(new Event("input"));
+		expect(el.querySelector(".improved-bases-footer.is-dirty")).toBeNull();
+	});
+
+	it("keeps the footer of an error dialog visible", () => {
+		const { q } = open({ kind: "error", message: "bad yaml", resettable: true });
+		expect(q<HTMLElement>(".improved-bases-footer").classList.contains("is-error")).toBe(true);
+	});
+
 	it("shows the view dropdown only for several views and passes the choice to save", async () => {
 		const one = open({ kind: "fields", drafts: [] }, { views: ["A"] });
 		expect(one.el.querySelector(".improved-bases-add-view")).toBeNull();

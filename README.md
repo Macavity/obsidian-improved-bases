@@ -2,7 +2,7 @@
 
 Typed relations and colored select options for [Obsidian](https://obsidian.md) Bases, defined per base.
 
-Requires Obsidian 1.14.4 or newer. Desktop is tested; mobile is being verified.
+Requires Obsidian 1.14.4 or newer. Desktop, tablet and phone are tested.
 
 ## What it does
 

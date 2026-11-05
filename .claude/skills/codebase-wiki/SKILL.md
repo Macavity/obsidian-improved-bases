@@ -11,7 +11,7 @@ This project holds an **agent-authored wiki of its codebase** — DeepWiki, but 
 ```
 wiki/
   OVERVIEW.md     hub: what it is, a big-picture architecture diagram, a nav map to every section.
-                  Properties carry `profile` (audience/depth) + `source_commit` (freshness anchor).
+                  Properties carry `profile` (audience/depth).
   architecture/   system boundaries, layers, subsystems, cross-cutting concerns + diagrams
   modules/        one page per package / module: purpose, entry points, key files, deps
   flows/          key end-to-end flows as sequence / flow diagrams + narrative
@@ -21,7 +21,7 @@ wiki/
 
 ## Generating + refreshing
 
-Don't free-hand it — read **[references/generate-and-refresh.md](references/generate-and-refresh.md)** and follow the phased, STOP-gated procedure. It auto-detects mode: a stubbed `OVERVIEW.md` (empty `source_commit`) → **generate** (survey → overview → architecture → modules → flows → concepts → link audit); a stamped `source_commit` → **refresh** (diff `source_commit..HEAD`, update only affected pages, re-stamp).
+Don't free-hand it — read **[references/generate-and-refresh.md](references/generate-and-refresh.md)** and follow the phased, STOP-gated procedure. It auto-detects mode: a stubbed `OVERVIEW.md` (no navigation to existing pages) → **generate** (survey → overview → architecture → modules → flows → concepts → link audit); a filled `OVERVIEW.md` → **refresh** (diff the last commit that touched `wiki/` against HEAD, update only affected pages, re-stamp).
 
 **Plain files, native tools.** Read source and write wiki pages with the native tools (`Read`/`Grep`/`Glob`/`Edit`/`Write`/`Bash`). Nothing checks links for you: a link to a source file must resolve from the page's own folder when you write it, and links between pages are verified by the link audit in the reference, run after a generate (once every page exists; until then OVERVIEW's nav links point at pages still to come) and after every refresh.
 
@@ -55,7 +55,7 @@ The full rules — the GitHub-URL / relative fallback, the `#Lxx` caveat, and th
 
 ## Freshness discipline (MUST)
 
-The `OVERVIEW.md` properties carry `source_commit` — the git HEAD the wiki was last generated/refreshed against. It is the freshness anchor: refresh mode diffs `source_commit..HEAD` to update only the affected pages, then re-stamps it. **Always re-stamp `source_commit` after a generate or refresh run** — a stale anchor silently breaks incremental refresh.
+The freshness anchor is derived from git, not stored in a page: the last commit that touched `wiki/` (`git log -1 --format=%H -- wiki/`) is the state the wiki was last refreshed against, and refresh mode diffs it against HEAD to update only the affected pages. This holds because every code change lands with its wiki refresh in the same PR (CLAUDE.md); a wiki-only commit moves the anchor, so never commit wiki edits for code that has not been refreshed. A stamp in `OVERVIEW.md` was dropped: parallel branches collided on it in every merge.
 
 ## Page skeleton
 
@@ -73,4 +73,4 @@ tags:
 # <Page title>
 ```
 
-`OVERVIEW.md` carries `profile` and `source_commit` instead of `type`, and the tag `overview`; its exact stub is in the reference's Prerequisite. Headings carry only structure; what each section is for is described above and in the reference, not repeated inside page bodies.
+`OVERVIEW.md` carries `profile` instead of `type`, and the tag `overview`; its exact stub is in the reference's Prerequisite. Headings carry only structure; what each section is for is described above and in the reference, not repeated inside page bodies.

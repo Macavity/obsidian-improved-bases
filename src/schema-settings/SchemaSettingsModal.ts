@@ -124,6 +124,7 @@ export class SchemaSettingsModal extends Modal {
 	private listEl: HTMLElement | null = null;
 	private errorEl: HTMLElement | null = null;
 	private statusEl: HTMLElement | null = null;
+	private footerEl: HTMLElement | null = null;
 	private buttonsEl: HTMLElement | null = null;
 	private primary: ((b: ButtonComponent) => void) | null = null;
 	/** The drafts as opened, extended by the notes' fields once read; `initial` is their snapshot. */
@@ -213,6 +214,10 @@ export class SchemaSettingsModal extends Modal {
 	private renderFields(): void {
 		const { contentEl } = this;
 		this.renderHeader();
+		// The footer's resting text as a block that scrolls away; shown on phones only, where the footer hides while the drafts are not dirty.
+		const hint = contentEl.createDiv({ cls: "improved-bases-hint" });
+		setIcon(hint.createSpan({ cls: "improved-bases-status-icon" }), "lucide-info");
+		hint.createSpan({ text: t("dialog.idleStatus") });
 		this.renderWarnings();
 		this.renderToolbar();
 		const table = contentEl.createDiv({ cls: "improved-bases-table" });
@@ -337,6 +342,7 @@ export class SchemaSettingsModal extends Modal {
 	/** Status line (pending renames and removals, or the last error) plus the buttons. */
 	private renderFooter(primary: ((b: ButtonComponent) => void) | null): void {
 		const footer = this.contentEl.createDiv({ cls: "improved-bases-footer" });
+		this.footerEl = footer;
 		const status = footer.createDiv({ cls: "improved-bases-footer-status" });
 		this.statusEl = status.createDiv({ cls: "improved-bases-rename-status" });
 		this.errorEl = status.createDiv({ cls: "improved-bases-form-error" });
@@ -369,6 +375,9 @@ export class SchemaSettingsModal extends Modal {
 	/** Pending renames and removals, as a reminder that Save migrates the notes. */
 	private updateStatus(): void {
 		this.renderButtons();
+		// Phones hide a footer that is neither dirty nor in the error state (see `.is-dirty` in styles.css).
+		this.footerEl?.toggleClass("is-dirty", this.dirty());
+		this.footerEl?.toggleClass("is-error", this.input.state.kind === "error");
 		const el = this.statusEl;
 		if (!el || this.input.state.kind !== "fields") return;
 		el.empty();
