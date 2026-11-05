@@ -49,10 +49,16 @@ Use this when preparing a release or when asked "is the plugin ready for release
 
 ## Interactive Checks (ask the user)
 
+Before the release:
+
 - [ ] Tested on Windows / macOS / Linux as applicable
-- [ ] Tested on Android / iOS (or `isDesktopOnly: true`)
 - [ ] Tested with a large vault and with other plugins disabled
+- [ ] Mobile layout covered by desktop emulation (`pnpm mobile:smoke`), or `isDesktopOnly: true`
+
+After the release (a mobile device installs plugins only from a published release, through BRAT or the directory, so this cannot be a precondition):
+
 - [ ] Release created with tag = version, assets `main.js`, `manifest.json`, `styles.css` attached individually
+- [ ] Tested on Android / iOS from that release; a regression found there gets a patch release
 
 ## Agent workflow
 

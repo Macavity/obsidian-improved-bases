@@ -61,7 +61,7 @@ pnpm check                    # typecheck + lint + test (coverage) + fallow
 pnpm build
 ```
 
-Then the automated section of `.claude/skills/obsidian-ops/references/release-readiness.md`: files at root, manifest consistent (`package.json` and `manifest.json` versions equal after the bump), no stray console output, README disclosures. Report each item as pass or fail with a concrete fix. The interactive section (platform and mobile testing) is a question to the user, answered by them, not assumed.
+Then the automated section of `.claude/skills/obsidian-ops/references/release-readiness.md`: files at root, manifest consistent (`package.json` and `manifest.json` versions equal after the bump), no stray console output, README disclosures. Report each item as pass or fail with a concrete fix. The interactive section's pre-release items (desktop platforms, large vault, mobile emulation) are a question to the user, answered by them, not assumed. Real-device mobile testing comes after the release: a phone installs the plugin only from a published release, so never ask for it as a precondition.
 
 A gate failure is fixed on `main` in its own commit before the bump, or the release is called off. Never bump on top of a red gate.
 
