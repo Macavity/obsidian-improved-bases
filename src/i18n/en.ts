@@ -41,6 +41,8 @@ export const en = {
 	"notice.schemaError": "{plugin}: {path}: {error}",
 	"notice.membersLoading": "Base members are still loading, try again in a moment",
 	"notice.baseUnknown": "Could not determine the base file",
+	"notice.unsupportedVersion": "{plugin}: {path}: schema version {version} is newer than this plugin supports; the schema is read-only",
+	"error.unsupportedVersion": "Schema version {version} is newer than this plugin supports; the base was not changed",
 
 	// Property types and view names
 	"type.relation": "Relation",
@@ -61,6 +63,7 @@ export const en = {
 	"dialog.iconHelp": "Emoji shown for this base's entries in relations, unless a note has its own icon property. The system emoji picker opens with ctrl+cmd+space on macOS and with the Windows key + period on Windows.",
 	"dialog.resetSchema": "Reset schema",
 	"dialog.confirmReset": "Confirm reset",
+	"dialog.unsupportedVersion": "This schema uses format version {version}, which this plugin version cannot edit. Update the plugin to change it.",
 	"dialog.column.name": "Field name",
 	"dialog.column.type": "Type",
 	"dialog.column.details": "Details",

@@ -24,8 +24,11 @@ type State = SchemaSettingsInput["state"];
 export function schemaState(registry: SchemaRegistry, basePath: string, columns: BaseColumns, memberKeys: string[], detected: (name: string) => string | null, currentView: number): State {
 	const errors = registry.errors().get(basePath);
 	if (errors) return { kind: "error", message: errors.join("; "), resettable: true };
-	const schemaFields = registry.schemas().find((s) => s.basePath === basePath)?.fields ?? null;
-	return { kind: "fields", drafts: knownFieldDrafts({ columns, schemaFields, memberKeys, detected, currentView }) };
+	const schema = registry.schemas().find((s) => s.basePath === basePath) ?? null;
+	if (schema?.unsupportedVersion !== undefined) {
+		return { kind: "error", message: t("dialog.unsupportedVersion", { version: schema.unsupportedVersion }), resettable: false };
+	}
+	return { kind: "fields", drafts: knownFieldDrafts({ columns, schemaFields: schema?.fields ?? null, memberKeys, detected, currentView }) };
 }
 
 type KeyMatch = (fm: object, name: string) => boolean;
