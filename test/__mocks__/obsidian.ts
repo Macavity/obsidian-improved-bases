@@ -156,6 +156,15 @@ export class PluginSettingTab {
 	hide(): void {}
 }
 
+/** Language Obsidian reports; tests set it through `setMockLanguage`. */
+let mockLanguage = "en";
+export function getLanguage(): string {
+	return mockLanguage;
+}
+export function setMockLanguage(code: string): void {
+	mockLanguage = code;
+}
+
 export const Platform = {
 	isDesktop: true,
 	isMobile: false,

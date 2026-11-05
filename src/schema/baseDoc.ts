@@ -1,5 +1,6 @@
 import { type Document, isMap, isScalar, isSeq, parseDocument, type Pair, type YAMLMap } from "yaml";
 import { SCHEMA_KEY } from "./types";
+import { t } from "../i18n";
 
 export type RawFields = Record<string, Record<string, unknown>>;
 
@@ -55,7 +56,7 @@ function viewColumns(view: Obj): string[] {
 }
 
 function viewName(view: Obj, i: number): string {
-	return typeof view.name === "string" && view.name !== "" ? view.name : `View ${i + 1}`;
+	return typeof view.name === "string" && view.name !== "" ? view.name : t("view.unnamed", { n: i + 1 });
 }
 
 function configuredNames(properties: unknown): string[] {

@@ -5,7 +5,8 @@ import { openOptionPicker, type OptionPickerHost } from "../src/widgets/OptionPi
 import { addOptionMutation, nextOptionColor } from "../src/widgets/values";
 import type { SelectField } from "../src/schema/types";
 import { confirmOptionDelete } from "../src/widgets/OptionDeleteModal";
-import { MEMBERS_LOADING } from "../src/schema/messages";
+import { t } from "../src/i18n";
+const MEMBERS_LOADING = t("notice.membersLoading");
 import { OverlayRegistry, type PropertyRenderContext, type WidgetEnv } from "../src/widgets/types";
 
 vi.mock("obsidian", async (orig) => {

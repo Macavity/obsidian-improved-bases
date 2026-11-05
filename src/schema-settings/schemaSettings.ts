@@ -12,6 +12,7 @@ import { getMetadataTypeManager } from "../internals/detect";
 import { listPropertyTypes } from "../internals/typeRegistry";
 import { findOwnKey } from "../schema/keys";
 import { baseViewNames } from "../schema/baseViews";
+import { t, tn } from "../i18n";
 
 type Pairs = { from: string; to: string }[];
 type Counts = { renamed: number; conflict: number; failed: number };
@@ -92,11 +93,11 @@ export async function migrateRenames(app: App, files: TFile[], pairs: Pairs, con
 /** Notice text for a rename; `counts` is null when the base members were unknown. */
 export function renameSummary(pairs: Pairs, counts: Counts | null): string {
 	if (!pairs.length) return "";
-	if (counts === null) return "Properties not renamed: base members unknown";
+	if (counts === null) return t("save.notRenamed");
 	const label = pairs.map((p) => `${p.from} → ${p.to}`).join(", ");
-	const parts = [`Renamed ${label} in ${counts.renamed} ${counts.renamed === 1 ? "note" : "notes"}`];
-	if (counts.conflict > 0) parts.push(`${counts.conflict} skipped (both keys present)`);
-	if (counts.failed > 0) parts.push(`${counts.failed} failed`);
+	const parts = [tn("save.renamed", counts.renamed, { label })];
+	if (counts.conflict > 0) parts.push(t("save.skippedBothKeys", { n: counts.conflict }));
+	if (counts.failed > 0) parts.push(t("save.failed", { n: counts.failed }));
 	return parts.join(", ");
 }
 
@@ -170,14 +171,12 @@ async function migrateOptions(app: App, files: TFile[], migrations: OptionMigrat
 	return counts;
 }
 
-const notes = (n: number): string => `${n} ${n === 1 ? "note" : "notes"}`;
-
 /** Notice line for option migrations; `counts` is null when the base members were unknown. */
 export function optionSummary(counts: OptionCounts | null): string {
-	if (counts === null) return "Option values not migrated: base members unknown";
-	const parts = [`Option values updated in ${notes(counts.changed)}`];
-	if (counts.failed > 0) parts.push(`${counts.failed} failed`);
-	if (counts.conflict > 0) parts.push(`${counts.conflict} skipped (field rename conflict)`);
+	if (counts === null) return t("save.notMigrated");
+	const parts = [tn("save.optionsUpdated", counts.changed)];
+	if (counts.failed > 0) parts.push(t("save.failed", { n: counts.failed }));
+	if (counts.conflict > 0) parts.push(t("save.skippedRename", { n: counts.conflict }));
 	return parts.join(", ");
 }
 
@@ -186,8 +185,8 @@ export function saveSummary(parts: { renames: string; removed: Removal[]; refere
 	const lines: string[] = [];
 	if (parts.renames) lines.push(parts.renames);
 	if (parts.options) lines.push(parts.options);
-	for (const r of parts.removed) lines.push(`Removed '${r.name}' from ${r.removed} ${r.removed === 1 ? "note" : "notes"}${r.failed > 0 ? `, ${r.failed} failed` : ""}`);
-	for (const name of parts.referenced) lines.push(`Filters or formulas still reference '${name}', update them manually`);
+	for (const r of parts.removed) lines.push(tn("save.removed", r.removed, { name: r.name }) + (r.failed > 0 ? t("option.failedSuffix", { n: r.failed }) : ""));
+	for (const name of parts.referenced) lines.push(t("save.stillReferenced", { name }));
 	return lines.join("\n");
 }
 
@@ -304,17 +303,17 @@ export async function buildSchemaSettings(plugin: Plugin, env: WidgetEnv, regist
 		const removedNames = removals(drafts);
 		const options = optionMigrations(drafts);
 		if (!pairs.length && !removedNames.length && !options.length) {
-			new Notice("Schema saved");
+			new Notice(t("save.done"));
 			return;
 		}
 		const current = currentMembers();
 		const conflicts: RenameConflicts = new Map();
 		let renameText = renameSummary(pairs, current && pairs.length ? await migrateRenames(app, current, pairs, conflicts) : null);
 		const removed = current && removedNames.length ? await removeProperties(app, current, removedNames) : [];
-		if (!current && removedNames.length) renameText = [renameText, "Properties not removed: base members unknown"].filter(Boolean).join("\n");
+		if (!current && removedNames.length) renameText = [renameText, t("save.notRemoved")].filter(Boolean).join("\n");
 		const optionText = options.length ? optionSummary(current ? await migrateOptions(app, current, options, pairs, conflicts) : null) : "";
 		const referenced = [...pairs.map((p) => p.from), ...removedNames].filter((n) => referencesName(expressions, n));
-		new Notice(`Schema saved\n${saveSummary({ renames: renameText, removed, referenced, options: optionText })}`);
+		new Notice(`${t("save.done")}\n${saveSummary({ renames: renameText, removed, referenced, options: optionText })}`);
 	};
 	const onReset = (): Promise<void> => env.writer.reset(basePath);
 	const countAffected = async (name: string): Promise<number> => {
@@ -340,12 +339,12 @@ export function registerSchemaSettings(plugin: Plugin, env: WidgetEnv, registry:
 			modal = new SchemaSettingsModal(plugin.app, input, handlers);
 			modal.open();
 		} catch (e) {
-			new Notice(`Could not open schema settings: ${message(e)}`);
+			new Notice(t("notice.openFailed", { error: message(e) }));
 		}
 	};
 	plugin.addCommand({
 		id: "open-schema-settings",
-		name: "Open schema settings",
+		name: t("command.openSchemaSettings"),
 		checkCallback: (checking) => {
 			const file = plugin.app.workspace.getActiveFile();
 			if (!(file instanceof TFile) || file.extension !== "base") return false;
@@ -357,7 +356,7 @@ export function registerSchemaSettings(plugin: Plugin, env: WidgetEnv, registry:
 		plugin.app.workspace.on("file-menu", (menu, file, source) => {
 			if (!["tab-header", "more-options", "file-explorer-context-menu"].includes(source)) return;
 			if (!(file instanceof TFile) || file.extension !== "base") return;
-			menu.addItem((item) => item.setSection("action").setTitle("Schema settings").setIcon("lucide-shapes").onClick(() => void open(file.path, null)));
+			menu.addItem((item) => item.setSection("action").setTitle(t("menu.schemaSettings")).setIcon("lucide-shapes").onClick(() => void open(file.path, null)));
 		}),
 	);
 	plugin.register(installSchemaButton(plugin.app, (path, view) => void open(path, view)));

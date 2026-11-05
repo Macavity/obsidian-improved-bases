@@ -2,6 +2,7 @@ import { App, Events, Notice, TAbstractFile, TFile, parseYaml } from "obsidian";
 import type { EventRef } from "obsidian";
 import { parseSchema } from "./parse";
 import type { BaseSchema } from "./types";
+import { t } from "../i18n";
 
 const sig = (s: BaseSchema): string => JSON.stringify([s.basePath, s.icon ?? null, [...s.fields]]);
 
@@ -83,7 +84,7 @@ export class SchemaRegistry extends Events {
 	private apply(path: string, schema: BaseSchema | null, errors: string[], silent: boolean): void {
 		const schemaChanged = replace(this.byPath, path, schema, sig);
 		const errChanged = replace(this.errs, path, errors.length ? errors : null, (e) => e.join("\n"));
-		if (errChanged && errors.length) new Notice(`Improved Bases: ${path}: ${errors[0]}`);
+		if (errChanged && errors.length) new Notice(t("notice.schemaError", { plugin: "Improved Bases", path, error: errors[0] ?? "" }));
 		if (!silent && (schemaChanged || errChanged)) this.trigger("changed");
 	}
 }

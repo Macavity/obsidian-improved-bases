@@ -106,6 +106,10 @@ If the `improved-bases:` section of a base is invalid, the dialog shows the pars
 
 - **Enable widgets:** turns the plugin widgets on or off without disabling the plugin. Off means everything renders natively.
 
+## Languages
+
+The plugin's own texts follow Obsidian's interface language (Settings → General → Language). English and German are included; Obsidian's property type names (Text, List, Number, …) come from Obsidian in every language. Other languages: see [CONTRIBUTING](CONTRIBUTING.md#add-a-language).
+
 ## Unsupported Obsidian versions
 
 The plugin patches an undocumented Obsidian API (`metadataTypeManager.getTypeInfo`) and reads Bases results through an internal view and `app.cli`. These can change without notice. If the expected internals are missing, the plugin shows one notice per load, installs no patch (everything stays native) and keeps the schema commands working. Your data is plain YAML and is never converted.

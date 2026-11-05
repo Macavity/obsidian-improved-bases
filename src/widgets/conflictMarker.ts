@@ -1,17 +1,16 @@
 import { setIcon, setTooltip } from "obsidian";
 import type { Resolution } from "../schema/Membership";
 import type { FieldSchema } from "../schema/types";
+import { t } from "../i18n";
 
 const typeLabel = (field: FieldSchema): string => field.type;
 
 /** Explains which definition applies and which others exist; `context` is the base of the surrounding view, if any. */
 export function conflictText(propName: string, res: Resolution, context: string | null): string {
 	const count = res.others.length + 1;
-	const winner = res.basePath === context
-		? `Showing ${res.basePath} (${typeLabel(res.field)})`
-		: `Using ${res.basePath} (${typeLabel(res.field)}, first by path)`;
-	const rest = res.others.map((o) => `${o.basePath} defines it as ${typeLabel(o.field)}`).join(", ");
-	return `${propName} is defined in ${count} bases. ${winner}; ${rest}.`;
+	const winner = t(res.basePath === context ? "conflict.showing" : "conflict.using", { base: res.basePath, type: typeLabel(res.field) });
+	const rest = res.others.map((o) => t("conflict.definesAs", { base: o.basePath, type: typeLabel(o.field) })).join(", ");
+	return t("conflict.text", { name: propName, n: count, winner, rest });
 }
 
 /** Appends an info icon with the explanation to `el`; clicks stay inside the icon (no picker, no cell edit). */
@@ -21,7 +20,7 @@ export function renderConflictMarker(el: HTMLElement, res: Resolution, propName:
 
 /** Explains why a native override shows a value with another widget. */
 export function mismatchText(value: unknown, overrideName: string, shownName: string): string {
-	return `${JSON.stringify(value)} is not a valid ${overrideName}; shown as ${shownName} until edited`;
+	return t("mismatch.text", { value: JSON.stringify(value), type: overrideName, shown: shownName });
 }
 
 /** Appends an info icon with `text` as tooltip; `cls` keeps markers apart so each can be replaced on its own. */

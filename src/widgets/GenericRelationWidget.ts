@@ -7,6 +7,7 @@ import { bindOpenTrigger } from "./openTrigger";
 import { EntryPicker, type PickerItem } from "./pickers";
 import type { PropertyRenderContext, WidgetEnv } from "./types";
 import { linkTarget, relationOutput, toList } from "./values";
+import { t } from "../i18n";
 
 /** Relation for a globally typed field without a base definition: link chips, the picker lists every markdown note. */
 export function createGenericRelationWidget(env: WidgetEnv): TypeWidget {
@@ -14,7 +15,7 @@ export function createGenericRelationWidget(env: WidgetEnv): TypeWidget {
 	return {
 		type: "relation",
 		icon: "lucide-link",
-		name: () => "Relation",
+		name: () => t("type.relation"),
 		validate: validateGeneric,
 		render(el, initial, rawCtx) {
 			const ctx = rawCtx as PropertyRenderContext;
