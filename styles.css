@@ -905,7 +905,6 @@
 	min-width: var(--ib-touch);
 	min-height: var(--ib-touch);
 	margin-inline: calc(var(--size-4-3) * -1);
-	margin-block: calc(var(--size-4-2) * -1);
 }
 /* The widened hit area would highlight across the label, so touch layouts show no hover fill. */
 .is-mobile .improved-bases-option-picker .improved-bases-chip-remove:hover {
