@@ -10,7 +10,7 @@ tags:
 
 ## Summary
 
-Startup has two halves. `onload()` in [main.ts](../../src/main.ts) wires objects and installs the patch synchronously; nothing renders as a plugin widget yet because [Membership](../concepts/membership.md) is not latched. Readiness is reached asynchronously once the registry scan, every base query and the metadata cache have all settled for a quiet period; only then does the patch refresh and cells swap from native to plugin widgets. Until then every surface (tables, embeds, properties panel, sidebar) renders natively; measured in the test vault with a table open after toggling the plugin: about 370 ms (ready +306 ms, widgets +366 ms), the README limit. Cold start is not measurable via the CLI.
+Startup has two halves. `onload()` in [main.ts](../../src/main.ts) wires objects and installs the patch synchronously; nothing renders as a plugin widget yet because [Membership](../concepts/membership.md) is not latched. Readiness is reached asynchronously once the registry scan, every base query and the metadata cache have all settled for a quiet period; only then does the patch refresh and cells swap from native to plugin widgets. Until then every surface (tables, embeds, properties panel, sidebar) renders natively; this is expected behaviour, not a known problem: the layout switches from native to plugin widgets. Measured in the test vault with a table open after toggling the plugin: about 370 ms (ready +306 ms, widgets +366 ms). Cold start is not measurable via the CLI.
 
 ## Trigger
 
@@ -64,7 +64,7 @@ sequenceDiagram
 
 - Internals missing: `installTypeInfoPatch()` returns `null`; `widgetsSupported` becomes `false`, the settings toggle is disabled, commands keep working ([Obsidian internals](../architecture/obsidian-internals.md)).
 - No schema bases in the vault: `scanned` stays `false` (requires `schemas.length > 0`), the latch never flips, nothing is patched in practice.
-- Between `registry.load()` and the latch `getTypeInfo` already returns hulls (field names are known), but `resolveWithBase` returns `null` while not latched, so the hull falls back to the original widget. The patch is installed at `onload`; the latch, not the install, is the gate.
+- Between `registry.load()` and the latch `getTypeInfo` already returns hulls (field names are known), but `resolveWithBase` returns `null` while not latched, so the hull falls back to the original widget. The patch is installed at `onload`; the latch, not the install, is the gate. Expected, not a defect.
 - Hidden window: the collector can stall, so the CLI result (desktop) carries the first scan; on mobile the latch waits for the collector. See the performance notes in the [README](../../README.md#performance).
 
 ## Related
