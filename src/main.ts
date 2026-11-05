@@ -15,6 +15,7 @@ import { SelectWidget } from "./widgets/SelectWidget";
 import { registerSchemaSettings } from "./schema-settings/schemaSettings";
 import { assignedTypes, getMetadataTypeManager, type MetadataTypeManager } from "./internals/detect";
 import { ImprovedBasesSettings, ImprovedBasesSettingTab, mergeSettings } from "./settings";
+import { t } from "./i18n";
 
 /** Rebuilds the widgets of every property whose global type is one of `types`. */
 function refreshAssigned(mtm: MetadataTypeManager, types: ReadonlySet<string>): void {
@@ -70,7 +71,7 @@ export default class ImprovedBasesPlugin extends Plugin {
 	private notifyUnsupported() {
 		if (this.notified) return;
 		this.notified = true;
-		new Notice(`${this.manifest.name}: this Obsidian version is not supported`);
+		new Notice(t("notice.unsupported", { plugin: this.manifest.name }));
 	}
 
 	/** Installs or removes property types, the getTypeInfo patch and the header hook according to `settings.widgetsEnabled`. */
@@ -89,7 +90,7 @@ export default class ImprovedBasesPlugin extends Plugin {
 		const registration = registerPluginTypes(mtm, { select: createGenericSelectWidget(this.env), relation: createGenericRelationWidget(this.env) });
 		if (!this.notifiedSkipped) {
 			this.notifiedSkipped = true;
-			for (const id of registration.skipped) new Notice(`${this.manifest.name}: property type "${id}" is already registered by another plugin`);
+			for (const id of registration.skipped) new Notice(t("notice.typeTaken", { plugin: this.manifest.name, type: id }));
 		}
 		this.registration = registration;
 		let header: HeaderTypeChange | null = null;

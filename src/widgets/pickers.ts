@@ -3,6 +3,7 @@ import { itemDom } from "../internals/menu";
 import { COLORS, type Color } from "../schema/types";
 import { renderIcon } from "./icons";
 import type { OverlayRegistry } from "./types";
+import { t } from "../i18n";
 
 export interface PickerItem {
 	raw: string;
@@ -25,8 +26,8 @@ export class EntryPicker extends FuzzySuggestModal<PickerItem> {
 	) {
 		super(app);
 		this.unregister = overlays?.add(() => this.close()) ?? null;
-		this.setPlaceholder("Filter entries");
-		this.emptyStateText = "No entries";
+		this.setPlaceholder(t("picker.filterEntries"));
+		this.emptyStateText = t("picker.noEntries");
 	}
 
 	getItems(): PickerItem[] {
@@ -51,7 +52,7 @@ export class EntryPicker extends FuzzySuggestModal<PickerItem> {
 		el.dataset.raw = item.raw;
 		if (item.foreign) {
 			el.addClass("is-foreign");
-			el.title = "Not in target base";
+			el.title = t("picker.notInTarget");
 		}
 		const check = el.createEl("input", { cls: "improved-bases-entry-check", attr: { type: "checkbox", tabindex: "-1" } });
 		check.checked = item.active;
@@ -77,10 +78,8 @@ export class EntryPicker extends FuzzySuggestModal<PickerItem> {
 	}
 }
 
-const COLOR_LABELS: Record<Color, string> = {
-	red: "Red", orange: "Orange", yellow: "Yellow", green: "Green", lime: "Lime", cyan: "Cyan", blue: "Blue",
-	violet: "Violet", pink: "Pink", brown: "Brown", grey: "Grey", black: "Black", white: "White",
-};
+/** Translated name of a palette color. */
+export const colorLabel = (color: Color): string => t(`color.${color}`);
 
 function colorItem(item: MenuItem, title: string, color: Color): void {
 	item.setTitle(title);
@@ -106,12 +105,12 @@ export function openOptionEditMenu(
 	const menu = new Menu();
 	menu.setUseNativeMenu(false);
 	track(menu, overlays);
-	menu.addItem((item) => item.setTitle("Rename").setIcon("lucide-pencil").onClick(handlers.onRename));
-	menu.addItem((item) => item.setTitle("Remove").setIcon("lucide-trash-2").onClick(handlers.onRemove));
+	menu.addItem((item) => item.setTitle(t("option.rename")).setIcon("lucide-pencil").onClick(handlers.onRename));
+	menu.addItem((item) => item.setTitle(t("option.remove")).setIcon("lucide-trash-2").onClick(handlers.onRemove));
 	menu.addSeparator();
 	for (const color of COLORS) {
 		menu.addItem((item) => {
-			colorItem(item, COLOR_LABELS[color], color);
+			colorItem(item, colorLabel(color), color);
 			item.setChecked(color === current);
 			item.onClick(() => handlers.onColor(color));
 		});

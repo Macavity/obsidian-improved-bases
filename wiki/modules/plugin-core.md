@@ -31,12 +31,13 @@ tags:
 
 - [main.ts](../../src/main.ts) — `ImprovedBasesPlugin`, `applyWidgetsEnabled()`, `notifyUnsupported()`.
 - [settings.ts](../../src/settings.ts) — `ImprovedBasesSettings`, `DEFAULT_SETTINGS`, `mergeSettings()`, `ImprovedBasesSettingTab`.
+- [i18n/index.ts](../../src/i18n/index.ts) — `t(key, params)` and `tn(key, count, params)`: every user-visible string of the plugin, resolved against Obsidian's `getLanguage()` (exact code, then its base such as `zh` for `zh-TW`, then English). [i18n/en.ts](../../src/i18n/en.ts) is the typed source of truth (`TranslationKey`); [i18n/de.ts](../../src/i18n/de.ts) must satisfy `Locale`. Placeholders are `{name}`; a `_one`/`_other` key pair is picked by `tn()`. Log output, schema keys, type ids and parse diagnostics stay English. `test/i18n.test.ts` checks key parity and placeholders, `test/i18nLiterals.test.ts` fails on a UI literal outside `src/i18n/`.
 - [manifest.json](../../manifest.json) — id `improved-bases`, `minAppVersion` 1.14.4, `isDesktopOnly: false`.
 
 ## Dependencies
 
 - Every other `src/` module (it is the only module allowed to import all of them).
-- `obsidian`: `Plugin`, `Notice`, `PluginSettingTab`, `SettingDefinitionItem`.
+- `obsidian`: `Plugin`, `Notice`, `PluginSettingTab`, `SettingDefinitionItem`, `getLanguage`.
 
 ## Participates in
 

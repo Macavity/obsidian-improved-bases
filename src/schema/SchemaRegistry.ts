@@ -2,6 +2,7 @@ import { App, Events, Notice, TAbstractFile, TFile, parseYaml } from "obsidian";
 import type { EventRef } from "obsidian";
 import { parseSchema } from "./parse";
 import type { BaseSchema } from "./types";
+import { t } from "../i18n";
 
 const sig = (s: BaseSchema): string => JSON.stringify([s.basePath, s.icon ?? null, s.unsupportedVersion ?? null, [...s.fields]]);
 
@@ -84,10 +85,10 @@ export class SchemaRegistry extends Events {
 		const wasUnsupported = this.byPath.get(path)?.unsupportedVersion;
 		const schemaChanged = replace(this.byPath, path, schema, sig);
 		if (schema?.unsupportedVersion !== undefined && schema.unsupportedVersion !== wasUnsupported) {
-			new Notice(`Improved Bases: ${path}: schema version ${schema.unsupportedVersion} is newer than this plugin supports; the schema is read-only`);
+			new Notice(t("notice.unsupportedVersion", { plugin: "Improved Bases", path, version: schema.unsupportedVersion }));
 		}
 		const errChanged = replace(this.errs, path, errors.length ? errors : null, (e) => e.join("\n"));
-		if (errChanged && errors.length) new Notice(`Improved Bases: ${path}: ${errors[0]}`);
+		if (errChanged && errors.length) new Notice(t("notice.schemaError", { plugin: "Improved Bases", path, error: errors[0] ?? "" }));
 		if (!silent && (schemaChanged || errChanged)) this.trigger("changed");
 	}
 }

@@ -5,6 +5,7 @@ import { bindOpenTrigger } from "./openTrigger";
 import { openOptionPicker, type OptionPickerHost } from "./OptionPicker";
 import type { PropertyRenderContext, WidgetEnv } from "./types";
 import { selectOutput, toList } from "./values";
+import { t } from "../i18n";
 
 /**
  * Select for a globally typed field without a base definition: neutral pills, options are the values found in the vault.
@@ -14,7 +15,7 @@ export function createGenericSelectWidget(env: WidgetEnv): TypeWidget {
 	return {
 		type: "select",
 		icon: "lucide-circle-dot",
-		name: () => "Select",
+		name: () => t("type.select"),
 		validate: validateGeneric,
 		render(el, initial, rawCtx) {
 			const ctx = rawCtx as PropertyRenderContext;

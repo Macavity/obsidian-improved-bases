@@ -1,6 +1,9 @@
 import { Notice, type TFile } from "obsidian";
 import { migrateOptionValues, optionValueEdit, renameInList } from "../schema/optionMigration";
-import { MEMBERS_LOADING } from "../schema/messages";
+import { t, tn } from "../i18n";
+
+const failedSuffix = (failed: number): string => (failed > 0 ? t("option.failedSuffix", { n: failed }) : "");
+const notesCount = (n: number): string => tn("option.notes", n);
 import type { Color, SelectField, SelectOption } from "../schema/types";
 import { findOwnKey, isUnsafeKey } from "../schema/keys";
 import { confirmOptionDelete } from "./OptionDeleteModal";
@@ -35,17 +38,17 @@ export const SelectWidget: PluginWidget<SelectField> = (el, value, ctx, field, e
 			return true;
 		} catch (e) {
 			if (e instanceof StaleOptionError) {
-				new Notice("Option changed elsewhere, reopen the picker");
+				new Notice(t("option.changedElsewhere"));
 				return false;
 			}
 			console.error("Improved Bases: schema write failed", e);
-			new Notice("Could not update the schema base");
+			new Notice(t("option.writeFailed"));
 			return false;
 		}
 	};
 
 	const reserved = (name: string): boolean => {
-		if (isUnsafeKey(name)) new Notice("Reserved name");
+		if (isUnsafeKey(name)) new Notice(t("option.reservedName"));
 		return isUnsafeKey(name);
 	};
 
@@ -60,14 +63,14 @@ export const SelectWidget: PluginWidget<SelectField> = (el, value, ctx, field, e
 	const removeOption = async (h: OptionPickerHost, value: string): Promise<boolean> => {
 		const src = sourceOf();
 		const files = src && membership.targetEntries(src.basePath);
-		if (src && !files) new Notice(MEMBERS_LOADING);
+		if (src && !files) new Notice(t("notice.membersLoading"));
 		if (!src || !files) return false;
 		const count = countNotesWithValue(files.map((f) => valueIn(f, src.name)), value);
 		const choice = count === 0 ? "schema" : await confirmOptionDelete(env.app, value, count, env.overlays);
 		if (!choice || !(await writeSchema(removeOptionMutation(src.name, value)))) return false;
 		if (choice === "notes") {
 			const { changed, failed } = await migrateOptionValues(env.app, files, src.name, optionValueEdit([], [value]));
-			new Notice(`Removed from ${changed} ${changed === 1 ? "note" : "notes"}${failed > 0 ? `, ${failed} failed` : ""}`);
+			new Notice(tn("option.removed", changed) + failedSuffix(failed));
 			values = values.filter((v) => v !== value);
 			h.values = h.values.filter((v) => v !== value);
 		}
@@ -107,15 +110,14 @@ export const SelectWidget: PluginWidget<SelectField> = (el, value, ctx, field, e
 				const src = sourceOf();
 				if (reserved(to)) return false;
 				if (options.some((o) => o.value === to)) {
-					new Notice("Option exists");
+					new Notice(t("option.exists"));
 					return false;
 				}
 				const files = src && membership.targetEntries(src.basePath);
-				if (src && !files) new Notice(MEMBERS_LOADING);
+				if (src && !files) new Notice(t("notice.membersLoading"));
 				if (!src || !files || !(await writeSchema(renameOptionMutation(src.name, from, to)))) return false;
 				const { changed, failed } = await migrateOptionValues(env.app, files, src.name, optionValueEdit([{ from, to }], []));
-				const count = `${changed} ${changed === 1 ? "note" : "notes"}`;
-				new Notice(`Renamed in ${count}${failed > 0 ? `, ${failed} failed` : ""}`);
+				new Notice(t("option.renamed", { n: notesCount(changed) }) + failedSuffix(failed));
 				for (const o of options) if (o.value === from) o.value = to;
 				values = renameInList(values, from, to);
 				draw();
@@ -150,7 +152,7 @@ export const SelectWidget: PluginWidget<SelectField> = (el, value, ctx, field, e
 				cls: "improved-bases-pill",
 				attr: { "data-color": colorOf(local, picked) },
 			});
-			if (!options.some((o) => o.value === picked)) pill.setAttribute("title", "Not in options");
+			if (!options.some((o) => o.value === picked)) pill.setAttribute("title", t("picker.notInOptions"));
 			pill.createSpan({ cls: "improved-bases-pill-body", text: picked });
 		}
 	};
