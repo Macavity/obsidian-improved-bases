@@ -64,7 +64,7 @@ views: ...
 - `options`: maps each value to a color: `red`, `orange`, `yellow`, `green`, `lime`, `cyan`, `blue`, `violet`, `pink`, `brown`, `grey`, `black`, `white`. Map order is display order. Unknown values show grey.
 - `base`: vault path of the target base. It needs no schema itself.
 - `view` (optional, relations only): the name of a view of the target base. The relation then offers only the entries of that view, in its sort order, with the view's filters, sort and limit applied. Without `view` all entries of the base are offered. Renaming the view in Obsidian breaks the link: the picker does not open until `view` is updated (or chosen again in the schema settings).
-- `icon` (optional, top level of the section): the default entry icon of this base. Every relation that targets this base shows it next to the entries whose note has no `icon` property of its own, so a base looks the same wherever it is referenced. A base may carry only an icon. Default `📄`.
+- `icon` (optional, top level of the section): the default entry icon of this base. Every relation that targets this base shows it next to the entries whose note has no `icon` property of its own, so a base looks the same wherever it is referenced. A base may carry only an icon. Without it the plugin's default entry icon (a setting, `📄`) is used.
 - Field names are the property names. Obsidian and Bases treat `Team` and `team` as one property, so the plugin resolves field names that way too; writes to notes (renames) always use the exact key.
 - A note belongs to a schema base when it is in the result of that base (its filters apply), regardless of folder.
 
@@ -76,7 +76,7 @@ A select shows its values as colored pills; a value without an option is grey ("
 
 ### Relations
 
-A relation shows its entries as plain links, each with an icon: the `icon` property of the linked note (an emoji, as written by icon plugins) if it has one, else the target base's `icon`, else `📄`. Entries sit side by side on one line; what does not fit is cut off at the edge. Clicking the field beside the entries opens a picker over all entries of the target base (or of its `view`, if set) with a filter box: active entries come first with a checked box, the rest below. Clicking a row toggles it and keeps the picker open; every toggle is saved immediately. With `multiple: false` the rows act like radio buttons, and unchecking the active one clears the field. With a `view` that no longer exists in the target base, a notice appears and the picker does not open. Values outside the view (or the base) stay as they are and are marked as not in the target. Clicking an entry opens the linked note as usual (hover for a preview); the field is also focusable and opens the picker with Enter or Space.
+A relation shows its entries as plain links, each with an icon: the `icon` property of the linked note (an emoji, as written by icon plugins) if it has one, else the target base's `icon`, else the default entry icon from the settings (`📄`). Entries sit side by side on one line; what does not fit is cut off at the edge. Clicking the field beside the entries opens a picker over all entries of the target base (or of its `view`, if set) with a filter box: active entries come first with a checked box, the rest below. Clicking a row toggles it and keeps the picker open; every toggle is saved immediately. With `multiple: false` the rows act like radio buttons, and unchecking the active one clears the field. With a `view` that no longer exists in the target base, a notice appears, the warning list gets an entry, and the picker does not open. Values outside the view (or the base) stay as they are and are marked as not in the target. Clicking an entry opens the linked note as usual (hover for a preview); the field is also focusable and opens the picker with Enter or Space.
 
 ## Schema settings
 
@@ -101,10 +101,27 @@ If the `improved-bases:` section of a base is invalid, the dialog shows the pars
 | Command | ID | Available |
 |---|---|---|
 | Open schema settings | `improved-bases:open-schema-settings` | on an active `.base` file |
+| Show warnings | `improved-bases:show-warnings` | always |
 
 ## Settings
 
-- **Enable widgets:** turns the plugin widgets on or off without disabling the plugin. Off means everything renders natively.
+- **Default entry icon** (default `📄`): shown for a relation entry whose note has no `icon` property and whose base has no `icon` in its schema.
+- **Schema button in the Bases toolbar** (default on): the **Schema** button in every Bases toolbar. Off hides it; the command, the file menu and the column type menu still open the schema settings.
+- **Conflict markers** (default on): the info icon on a field that several schema bases define for the same note. Off hides the icon; the conflict itself stays in the warning list.
+- **Current warnings**: the number of warnings and a button opening the list (see [Warnings](#warnings)).
+
+Widgets are always on when the plugin is enabled and the Obsidian internals it needs are present; there is no separate toggle.
+
+## Warnings
+
+Console warnings go unseen and notices disappear, so the plugin keeps a list of what currently needs attention. It is reachable from the status bar (desktop; an alert icon with the count, shown only while there are warnings), the command "Show warnings", the settings tab, and at the top of the schema settings dialog of the affected base. Each entry links the base it belongs to; the link opens that base's schema settings.
+
+Two kinds of entries:
+
+- **State warnings** describe a condition and disappear by themselves once it is gone: a `.base` whose `improved-bases:` section does not parse, a field that several schema bases define for the same notes, a relation whose target base or view does not exist (found when its picker is opened), an unsupported Obsidian version, and a property type id already taken by another plugin.
+- **Event warnings** record something that failed once and stay until you dismiss them with the ×: notes that could not be written when a schema save renamed or removed properties or migrated option values, or when an option was renamed or removed from the picker.
+
+The notices for these cases remain and end in "(see warnings)".
 
 ## Languages
 

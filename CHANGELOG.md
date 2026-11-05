@@ -9,6 +9,12 @@ The release workflow takes the section of the released version from this file as
 ### Added
 
 - The plugin's texts follow Obsidian's interface language. English and German are included; other languages can be added under `src/i18n/`.
+- Settings: default entry icon for relations, the Schema button in the Bases toolbar on or off, conflict markers on or off.
+- Warning list: schema parse errors, field conflicts between bases, missing relation targets, an unsupported Obsidian version and taken type ids are listed while they hold; failed note migrations stay until dismissed. Reachable from the status bar, the command "Show warnings", the settings tab and the schema settings dialog of the affected base. The related notices end in "(see warnings)".
+
+### Removed
+
+- The "Enable widgets" setting. Widgets are on whenever the plugin is enabled and the Obsidian internals are present.
 
 ### Fixed
 

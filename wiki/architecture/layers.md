@@ -1,6 +1,6 @@
 ---
 title: Layers
-description: The six layers of Improved Bases, from .base parsing to the schema settings dialog, and the dependency direction between them.
+description: The layers of Improved Bases, from .base parsing to the schema settings dialog and the warning registry, and the dependency direction between them.
 type: architecture
 tags:
   - wiki
@@ -45,7 +45,13 @@ flowchart LR
   subgraph toolbar["internals/toolbar.ts"]
     btn[installSchemaButton]
   end
+  subgraph warnings["warnings/"]
+    WR[WarningRegistry] --> WM[WarningsModal]
+  end
   ss --> btn
+  ss --> WR
+  RW --> WR
+  SW --> WR
   Registry --> M
   BQ --> M
   cli --> BQ
@@ -67,6 +73,7 @@ flowchart LR
 | Widgets | `RelationWidget`, `SelectWidget` in [widgets/](../modules/widgets.md) | Render chips/pills, pickers, and commit values via `ctx.onChange`. |
 | Writer | `SchemaWriter` in [SchemaWriter.ts](../../src/schema/SchemaWriter.ts) | The only code that modifies a `.base`; edits `improved-bases.fields` byte-preservingly through the `yaml` document API. |
 | Schema settings | [schema-settings/](../modules/schema-settings.md) | The schema settings dialog and its entry points (command, file menu, toolbar button); writes through `SchemaWriter`. |
+| Warnings | `WarningRegistry` in [warnings/](../modules/warnings.md) | In-memory list of state and event warnings; widgets, registry/membership (via main) and the dialog save report into it; main exposes it (status bar, command, settings row). |
 
 ## Design decisions
 
