@@ -3,7 +3,7 @@ import type { EventRef } from "obsidian";
 import { parseSchema } from "./parse";
 import type { BaseSchema } from "./types";
 
-const sig = (s: BaseSchema): string => JSON.stringify([s.basePath, s.icon ?? null, [...s.fields]]);
+const sig = (s: BaseSchema): string => JSON.stringify([s.basePath, s.icon ?? null, s.unsupportedVersion ?? null, [...s.fields]]);
 
 type Parsed = ReturnType<typeof parseSchema>;
 
@@ -81,7 +81,11 @@ export class SchemaRegistry extends Events {
 
 	/** Stores the result, notifies about new errors and emits "changed" when schema or errors differ. */
 	private apply(path: string, schema: BaseSchema | null, errors: string[], silent: boolean): void {
+		const wasUnsupported = this.byPath.get(path)?.unsupportedVersion;
 		const schemaChanged = replace(this.byPath, path, schema, sig);
+		if (schema?.unsupportedVersion !== undefined && schema.unsupportedVersion !== wasUnsupported) {
+			new Notice(`Improved Bases: ${path}: schema version ${schema.unsupportedVersion} is newer than this plugin supports; the schema is read-only`);
+		}
 		const errChanged = replace(this.errs, path, errors.length ? errors : null, (e) => e.join("\n"));
 		if (errChanged && errors.length) new Notice(`Improved Bases: ${path}: ${errors[0]}`);
 		if (!silent && (schemaChanged || errChanged)) this.trigger("changed");

@@ -38,6 +38,7 @@ Add an `improved-bases:` key to a `.base` file, or edit it with the schema setti
 
 ```yaml
 improved-bases:
+  version: 1
   icon: 👤
   fields:
     Team:
@@ -60,6 +61,7 @@ filters: ...
 views: ...
 ```
 
+- `version` (top level of the section): the format version, currently `1`. A section without it is version 1; the plugin writes it whenever it saves the section. A base with a higher version than the plugin knows is read as far as possible and shown read-only: the schema settings dialog explains that the plugin needs an update and does not save. Other keys in the section are preserved on every write.
 - `type`: `relation`, `select`, or one of Obsidian's property type ids (`text`, `multitext`, `number`, `checkbox`, `date`, `datetime`, or a type registered by another plugin). Such a native type overrides Obsidian's type for notes of this base: the registered widget of that type is used regardless of `types.json`. The dialog writes the override when you pick a native type other than the one Obsidian detected, and removes the entry when you pick the detected type again. An id that is not registered in the running Obsidian renders natively and is listed in the dialog as "<id> (not registered)". A stored value the override type rejects (e.g. `Aktiv` under `number`) is kept: it shows with Obsidian's own widget and an info icon ("\"Aktiv\" is not a valid Number; shown as Text until edited"). Empty values use the override widget.
 - `multiple` (default `false`): `false` stores a string (`"[[X]]"` or `Value`), `true` stores a YAML list.
 - `options`: maps each value to a color: `red`, `orange`, `yellow`, `green`, `lime`, `cyan`, `blue`, `violet`, `pink`, `brown`, `grey`, `black`, `white`. Map order is display order. Unknown values show grey.
@@ -68,6 +70,8 @@ views: ...
 - `icon` (optional, top level of the section): the default entry icon of this base. Every relation that targets this base shows it next to the entries whose note has no `icon` property of its own, so a base looks the same wherever it is referenced. A base may carry only an icon. Default `📄`.
 - Field names are the property names. Obsidian and Bases treat `Team` and `team` as one property, so the plugin resolves field names that way too; writes to notes (renames) always use the exact key.
 - A note belongs to a schema base when it is in the result of that base (its filters apply), regardless of folder.
+
+**Stability:** format version 1 is stable. Files written for it keep parsing in every later plugin release; any change that an older plugin could misread gets a new version number, and the plugin never rewrites a file to a higher version on its own.
 
 A link outside the target base or a select value that is not an option is kept and shown with a marker. A value in the other storage shape (a list where `multiple: false`, a single value where `multiple: true`) is a normal value: it is shown like any other and only rewritten into the schema shape when you edit it, as Obsidian does after you change a property type.
 

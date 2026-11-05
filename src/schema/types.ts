@@ -10,12 +10,16 @@ export interface NativeField { type: string }
 export type FieldSchema = RelationField | SelectField | NativeField;
 export interface BaseSchema {
 	basePath: string;
+	/** Set when the section declares a format version newer than SCHEMA_VERSION: fields were read as far as possible and must not be written back. */
+	unsupportedVersion?: number;
 	/** Default icon of this base's entries wherever a relation shows them; undefined = 📄. */
 	icon?: string;
 	/** key = lowercased property name */
 	fields: Map<string, { name: string; field: FieldSchema }>;
 }
 export const SCHEMA_KEY = "improved-bases";
+/** Format version this plugin reads and writes; a section without `version` is version 1. */
+export const SCHEMA_VERSION = 1;
 /** Narrowing helpers: a native type id is any other string, so `field.type === "relation"` alone does not narrow. */
 export const isRelation = (f: FieldSchema): f is RelationField => f.type === "relation";
 export const isSelect = (f: FieldSchema): f is SelectField => f.type === "select";

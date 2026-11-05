@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { TFile, type App } from "obsidian";
 import { SchemaWriter, resetSchemaSource, updateSchemaSource } from "../src/schema/SchemaWriter";
-import { EMPTY_EDITS } from "../src/schema/baseDoc";
+import { EMPTY_EDITS, updateBaseSource } from "../src/schema/baseDoc";
 
 const src = `# keep me
 filters:
@@ -18,7 +18,7 @@ describe("updateSchemaSource", () => {
   it("adds the schema node and leaves the rest untouched", () => {
     const out = updateSchemaSource(src, (f) => { f.Role = { type: "select", options: { A: "blue" } }; });
     expect(out.endsWith(src) || out.startsWith(src)).toBe(true);
-    expect(out).toMatch(/improved-bases:\n {2}fields:\n {4}Role:/);
+    expect(out).toMatch(/improved-bases:\n {2}version: 1\n {2}fields:\n {4}Role:/);
   });
   it("edits an existing field without reformatting others", () => {
     const first = updateSchemaSource(src, (f) => { f.Role = { type: "select", options: { A: "blue" } }; });
@@ -50,7 +50,7 @@ describe("updateSchemaSource", () => {
 describe("resetSchemaSource", () => {
   it("replaces an invalid schema value with an empty schema and keeps the rest", () => {
     const out = resetSchemaSource("improved-bases: 5\nviews: []\n");
-    expect(out).toMatch(/improved-bases:\n {2}fields: \{\}/);
+    expect(out).toMatch(/improved-bases:\n {2}version: 1\n {2}fields: \{\}/);
     expect(out).toContain("views: []");
     expect(out).not.toContain("5");
   });
@@ -75,5 +75,36 @@ describe("SchemaWriter.update", () => {
     expect(data).toContain("- Job\n");
     expect(data).toMatch(/fields:\n {4}Job:/);
     await expect(new SchemaWriter(app).update("X.base", () => {})).rejects.toThrow(/X.base/);
+  });
+});
+
+describe("schema version on write", () => {
+  it("writes version: 1 first when the section is created by a field", () => {
+    const out = updateSchemaSource(src, (f) => { f.Role = { type: "text" }; });
+    expect(out).toMatch(/improved-bases:\n {2}version: 1\n {2}fields:\n {4}Role:/);
+  });
+  it("writes version: 1 when the section is created by an icon alone", () => {
+    const out = updateBaseSource(src, EMPTY_EDITS, () => {}, "👥");
+    expect(out).toMatch(/improved-bases:\n {2}version: 1\n {2}icon: 👥\n/);
+  });
+  it("adds version: 1 to an existing section without one, keeping the rest in place", () => {
+    const withSection = `improved-bases:\n  icon: 👥\n  fields:\n    A:\n      type: text\n${src}`;
+    const out = updateSchemaSource(withSection, (f) => { f.B = { type: "text" }; });
+    expect(out).toMatch(/^improved-bases:\n {2}version: 1\n {2}icon: 👥\n {2}fields:\n {4}A:/);
+    expect(out).toContain("    B:\n      type: text\n");
+  });
+  it("never downgrades a higher version", () => {
+    const withV2 = `improved-bases:\n  version: 2\n  fields: {}\n${src}`;
+    const out = updateSchemaSource(withV2, (f) => { f.B = { type: "text" }; });
+    expect(out).toContain("version: 2");
+    expect(out).not.toContain("version: 1");
+  });
+  it("leaves the source untouched when nothing changes", () => {
+    const withSection = `improved-bases:\n  fields:\n    A:\n      type: text\n${src}`;
+    expect(updateSchemaSource(withSection, () => {})).toBe(withSection);
+  });
+  it("reset writes version: 1 with empty fields", () => {
+    const out = resetSchemaSource("improved-bases: 5\nviews: []\n");
+    expect(out).toMatch(/improved-bases:\n {2}version: 1\n {2}fields: \{\}/);
   });
 });

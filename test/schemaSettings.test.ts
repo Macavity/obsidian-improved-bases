@@ -18,7 +18,7 @@ const fmText = (f: TFile) => {
 };
 const d = (o: Partial<FieldDraft>): FieldDraft => ({ originalName: null, originalBase: null, name: "", type: "native", detected: null, override: null, removed: false, multiple: false, options: [], ...o });
 
-const registry = (schemas: { basePath: string; fields: Map<string, { name: string; field: { type: "text" } }> }[], errors: Record<string, string[]>) =>
+const registry = (schemas: { basePath: string; fields: Map<string, { name: string; field: { type: "text" } }>; unsupportedVersion?: number }[], errors: Record<string, string[]>) =>
   ({ schemas: () => schemas, errors: () => new Map(Object.entries(errors)) }) as unknown as SchemaRegistry;
 
 describe("migrateRenames", () => {
@@ -83,6 +83,14 @@ describe("schemaState", () => {
     const state = schemaState(registry([], {}), "A.base", columns, ["Status"], () => "text", 0);
     expect(state.kind === "fields" && state.drafts.map((x) => [x.name, x.detected])).toEqual([["Team", "text"], ["Status", "text"]]);
     expect(schemaState(registry([], { "A.base": ["bad", "worse"] }), "A.base", columns, [], () => null, 0)).toEqual({ kind: "error", message: "bad; worse", resettable: true });
+  });
+  it("is read-only for a schema with a newer format version", () => {
+    const state = schemaState(registry([{ basePath: "A.base", fields: new Map(), unsupportedVersion: 2 }], {}), "A.base", columns, [], () => null, 0);
+    expect(state.kind).toBe("error");
+    if (state.kind === "error") {
+      expect(state.message).toMatch(/version 2/);
+      expect(state.resettable).toBe(false);
+    }
   });
 });
 

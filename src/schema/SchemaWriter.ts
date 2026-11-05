@@ -1,7 +1,7 @@
 import { parseDocument } from "yaml";
 import type { App } from "obsidian";
 import { TFile } from "obsidian";
-import { SCHEMA_KEY } from "./types";
+import { SCHEMA_KEY, SCHEMA_VERSION } from "./types";
 import { EMPTY_EDITS, updateBaseSource, type ColumnEdits, type RawFields } from "./baseDoc";
 export type { RawFields } from "./baseDoc";
 
@@ -13,7 +13,7 @@ export function updateSchemaSource(source: string, mutate: (fields: RawFields) =
 /** Replaces the whole `improved-bases` value with an empty schema, even if it was invalid. */
 export function resetSchemaSource(source: string): string {
 	const doc = parseDocument(source);
-	doc.set(SCHEMA_KEY, { fields: {} });
+	doc.set(SCHEMA_KEY, { version: SCHEMA_VERSION, fields: {} });
 	return doc.toString();
 }
 

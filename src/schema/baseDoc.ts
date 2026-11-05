@@ -1,5 +1,5 @@
 import { type Document, isMap, isScalar, isSeq, parseDocument, type Pair, type YAMLMap } from "yaml";
-import { SCHEMA_KEY } from "./types";
+import { SCHEMA_KEY, SCHEMA_VERSION } from "./types";
 
 export type RawFields = Record<string, Record<string, unknown>>;
 
@@ -245,8 +245,15 @@ function applyIcon(doc: Document, icon: string): void {
 		else doc.set(SCHEMA_KEY, doc.createNode({ icon: value }));
 	} else if (isMap(section)) {
 		section.delete("icon");
-		if (section.items.length === 0) doc.delete(SCHEMA_KEY);
+		if (section.items.every((p: Pair) => scalarString(p.key) === "version")) doc.delete(SCHEMA_KEY);
 	}
+}
+
+/** Every written section declares its format version; an existing (possibly newer) version is kept. */
+function ensureVersion(doc: Document): void {
+	const section = doc.get(SCHEMA_KEY, true);
+	if (!isMap(section) || section.has("version")) return;
+	section.items.unshift(doc.createPair("version", SCHEMA_VERSION));
 }
 
 /**
@@ -260,5 +267,7 @@ export function updateBaseSource(source: string, edits: ColumnEdits, mutate: (fi
 	applyColumnEdits(doc, edits);
 	applySchemaMutation(doc, mutate);
 	if (icon !== undefined) applyIcon(doc, icon);
-	return same(before, doc.toJSON()) ? source : doc.toString();
+	if (same(before, doc.toJSON())) return source;
+	ensureVersion(doc);
+	return doc.toString();
 }
