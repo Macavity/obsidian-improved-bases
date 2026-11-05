@@ -57,4 +57,4 @@ tags:
 
 ## Phone
 
-Under `.is-phone` the header (title, then the default-icon field on its own line), the toolbar (search, "Add new fields to", "Add field") and the footer (status text, then full-width buttons) wrap into full-width rows; the footer never shrinks, so the field list scrolls above it, and the dialog may use the full dynamic viewport height. Buttons use `--ib-touch` height. The details column stays hidden below 700px as before; the expanded panel is single-column.
+Under `.is-phone` the dialog body scrolls as a whole (toolbar, column head and field rows together, so the fields get the screen); only the title with the default-icon line above it and a compact footer (status text clamped to two lines, `position: sticky; bottom: 0`, buttons at touch height) stay put. The toolbar wraps (search and "Add field" in one row, the "Add new fields to" dropdown below it) and the dialog may use the full dynamic viewport height. The details column stays hidden below 700px as before; the expanded panel is single-column.

@@ -14,7 +14,7 @@ The release workflow takes the section of the released version from this file as
 ### Fixed
 
 - Phone: the option picker and the option editor dock to the bottom edge at full width, above the keyboard, instead of opening at the cell; the edit pencil is always visible (no hover on touch) and rows, remove buttons and color swatches have touch size.
-- Phone: the schema dialog's header, toolbar and footer wrap into full-width rows instead of clipping controls, and the footer buttons stay reachable with an open field.
+- Phone: the schema dialog's toolbar and field list scroll together with only a compact footer fixed, controls wrap instead of clipping, and the fields get most of the screen.
 - Phone: relation and select chips in the properties panel wrap instead of running out of the value column.
 - Schema settings: the field disclosure chevron was invisible on tablets, where Obsidian pads plain buttons; it is an icon button now, keeps its icon under theme padding, tells assistive technology whether the row is open, and the row's icon buttons use touch size on mobile.
 - Schema settings: on narrow phones the field row could overflow the dialog and hide the remove button; the name column shrinks instead.
