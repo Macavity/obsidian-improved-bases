@@ -1,9 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
-import type { App } from "obsidian";
+import { TFile, type App } from "obsidian";
+import { parseSchema } from "../src/schema/parse";
 import { WarningRegistry } from "../src/warnings/WarningRegistry";
 import { WarningsModal } from "../src/warnings/WarningsModal";
 import { renderWarningRow } from "../src/warnings/render";
-import { conflictWarnings, schemaWarnings } from "../src/warnings/sources";
+import { conflictWarnings, relationWarnings, schemaWarnings } from "../src/warnings/sources";
 
 describe("renderWarningRow", () => {
 	it("renders icon, text, base links and a dismiss button for events only", () => {
@@ -54,6 +55,28 @@ describe("warning sources", () => {
 		expect(schemaWarnings(new Map([["A.base", ["x", "y"]]]))).toEqual([{ id: "A.base", text: "A.base: x; y", bases: ["A.base"] }]);
 		expect(conflictWarnings([{ name: "Team", bases: ["A.base", "B.base"], files: 2 }])).toEqual([
 			{ id: "Team\0A.base\0B.base", text: '"Team" is defined in A.base, B.base; 2 notes are in all of them', bases: ["A.base", "B.base"] },
+		]);
+	});
+});
+
+describe("relationWarnings", () => {
+	const schema = (basePath: string, fields: Record<string, unknown>) => parseSchema(basePath, { "improved-bases": { fields } }).schema!;
+	const app = (bases: Record<string, string>) =>
+		({
+			vault: {
+				getAbstractFileByPath: (p: string) => (p in bases ? Object.assign(new TFile(), { path: p, extension: "base" }) : null),
+				cachedRead: (f: TFile) => Promise.resolve(bases[f.path] ?? ""),
+			},
+		}) as unknown as App;
+	it("reports a missing target base and a missing view, nothing for a valid target", async () => {
+		const schemas = [
+			schema("A.base", { Team: { type: "relation", base: "Teams.base" }, Lead: { type: "relation", base: "People.base", view: "Leads" }, Gone: { type: "relation", base: "Nowhere.base" } }),
+			schema("B.base", { Boss: { type: "relation", base: "People.base", view: "Bosses" } }),
+		];
+		const out = await relationWarnings(app({ "Teams.base": "views: []", "People.base": "views:\n  - type: table\n    name: Leads\n" }), schemas);
+		expect(out).toEqual([
+			{ id: "A.base:gone", text: "Target base not found: Nowhere.base", bases: ["A.base"] },
+			{ id: "B.base:boss", text: 'View "Bosses" not found in People.base', bases: ["B.base"] },
 		]);
 	});
 });

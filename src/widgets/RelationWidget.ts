@@ -11,7 +11,7 @@ import { linkTarget, relationOutput, toList } from "./values";
 import { t } from "../i18n";
 
 /** Link chips; clicking the field opens a checkbox picker over the target base entries. */
-export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, field, env, source) => {
+export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, field, env) => {
 	const { app, membership } = env;
 	const key = targetKey({ base: field.base, view: field.view });
 	let links = toList(value);
@@ -70,12 +70,8 @@ export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, fiel
 		commit(wasActive ? [] : [item.raw]);
 	};
 
-	// A missing target is a state warning of the defining base (when known); it heals once the picker opens again.
-	const warningId = `relation:${source?.basePath ?? ""}:${ctx.key.toLowerCase()}`;
-	const warn = (text: string): void => {
-		new Notice(text + t("notice.seeWarnings"));
-		env.warnings.report(warningId, { text, bases: source ? [source.basePath] : [] });
-	};
+	// The warning list carries the same condition as a state warning, derived from the schemas (see warnings/sources.ts).
+	const warn = (text: string): void => void new Notice(text + t("notice.seeWarnings"));
 
 	let opening = false;
 	const openPicker = async (): Promise<void> => {
@@ -93,7 +89,6 @@ export const RelationWidget: PluginWidget<RelationField> = (el, value, ctx, fiel
 				return;
 			}
 		}
-		env.warnings.resolve(warningId);
 		const items = buildItems();
 		new EntryPicker(app, items, (i) => entryIcon(app, i.file, membership.baseIcon(field.base), env.prefs().defaultIcon), (i) => toggle(items, i), env.overlays).open();
 	};

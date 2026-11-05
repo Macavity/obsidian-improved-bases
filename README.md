@@ -118,7 +118,7 @@ Console warnings go unseen and notices disappear, so the plugin keeps a list of 
 
 Two kinds of entries:
 
-- **State warnings** describe a condition and disappear by themselves once it is gone: a `.base` whose `improved-bases:` section does not parse, a field that several schema bases define for the same notes, a relation whose target base or view does not exist (found when its picker is opened), an unsupported Obsidian version, and a property type id already taken by another plugin.
+- **State warnings** describe a condition and disappear by themselves once it is gone: a `.base` whose `improved-bases:` section does not parse, a field that several schema bases define for the same notes, a relation whose target base or view does not exist (checked whenever a schema or a `.base` file changes), an unsupported Obsidian version, and a property type id already taken by another plugin.
 - **Event warnings** record something that failed once and stay until you dismiss them with the ×: notes that could not be written when a schema save renamed or removed properties or migrated option values, or when an option was renamed or removed from the picker.
 
 The notices for these cases remain and end in "(see warnings)".

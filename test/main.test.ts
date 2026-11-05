@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { Notice, type App, type PluginManifest } from "obsidian";
+import { Events, Notice, Platform, TFile, type App, type PluginManifest } from "obsidian";
 import { installTypeInfoPatch, type TypeInfoPatch } from "../src/internals/typeInfoPatch";
 import { installHeaderTypeChange } from "../src/internals/headerTypeChange";
 import ImprovedBasesPlugin from "../src/main";
@@ -114,5 +114,95 @@ describe("enableWidgets / disableWidgets", () => {
 		expect(mtm.registeredTypeWidgets.select).toBe(foreign);
 		p.enableWidgets();
 		expect(Notice).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("warning access points", () => {
+	function wired() {
+		const { p, mtm, workspace } = plugin();
+		const commands: Record<string, { callback?: () => void }> = {};
+		const statusItems: HTMLElement[] = [];
+		const vaultHandlers = new Map<string, (f: unknown) => void>();
+		Object.assign(p, {
+			addCommand: (cmd: { id: string; callback?: () => void }) => (commands[cmd.id] = cmd),
+			addStatusBarItem: () => {
+				const el = document.body.createDiv();
+				statusItems.push(el);
+				return el;
+			},
+			registerEvent: vi.fn(),
+		});
+		const registry = new Events() as Events & { errors: () => Map<string, string[]>; schemas: () => unknown[] };
+		registry.errors = () => new Map();
+		registry.schemas = () => [];
+		const membership = new Events() as Events & { conflicts: () => unknown[]; knownFieldNames: () => Set<string> };
+		membership.conflicts = () => [];
+		membership.knownFieldNames = () => new Set(["team"]);
+		const app = { ...(p.app as object), metadataTypeManager: mtm, workspace, vault: { on: vi.fn((name: string, cb: (f: unknown) => void) => (vaultHandlers.set(name, cb), { name })), getAbstractFileByPath: () => null } } as unknown as App;
+		Object.assign(p, { app, registry, membership });
+		return { p, commands, statusItems, registry, membership, vaultHandlers };
+	}
+	it("registers the command and a status bar item that follows the count and opens the list", () => {
+		const { p, commands, statusItems } = wired();
+		p.registerWarningAccess();
+		const item = statusItems[0]!;
+		expect(item.classList.contains("is-hidden")).toBe(true);
+		p.warnings.report("x", { text: "boom" });
+		expect(item.classList.contains("is-hidden")).toBe(false);
+		expect(item.querySelector(".improved-bases-status-count")?.textContent).toBe("1");
+		expect(item.getAttribute("aria-label")).toBe("1 warning");
+		item.click();
+		expect(document.querySelector(".improved-bases-warnings-modal")).not.toBeNull();
+		expect(document.querySelectorAll(".improved-bases-warning")).toHaveLength(1);
+		expect(commands["show-warnings"]?.callback).toBeTypeOf("function");
+		p.unload();
+		expect(document.querySelector(".improved-bases-warnings-modal")).toBeNull();
+		p.warnings.resolve("x");
+		expect(item.classList.contains("is-hidden")).toBe(false);
+	});
+	it("adds no status bar item on mobile", () => {
+		const { p, statusItems, commands } = wired();
+		Platform.isDesktop = false;
+		try {
+			p.registerWarningAccess();
+		} finally {
+			Platform.isDesktop = true;
+		}
+		expect(statusItems).toHaveLength(0);
+		expect(commands["show-warnings"]).toBeDefined();
+	});
+	it("derives schema, conflict and relation warnings from registry, membership and base file events", async () => {
+		vi.useFakeTimers();
+		const { p, registry, membership, vaultHandlers } = wired();
+		p.watchWarningSources();
+		registry.errors = () => new Map([["A.base", ["bad"]]]);
+		registry.schemas = () => [{ basePath: "A.base", fields: new Map([["team", { name: "Team", field: { type: "relation", base: "Gone.base", multiple: true } }]]) }];
+		registry.trigger("changed");
+		expect(p.warnings.list().map((w) => w.id)).toEqual(["schema:A.base"]);
+		await vi.advanceTimersByTimeAsync(300);
+		expect(p.warnings.list().map((w) => w.id).sort()).toEqual(["relation:A.base:team", "schema:A.base"]);
+		membership.conflicts = () => [{ name: "Team", bases: ["A.base", "B.base"], files: 2 }];
+		membership.trigger("changed", ["team"]);
+		expect(p.warnings.list().some((w) => w.id.startsWith("conflict:"))).toBe(true);
+		registry.schemas = () => [];
+		const base = Object.assign(new TFile(), { extension: "base", path: "Gone.base" });
+		vaultHandlers.get("create")!(base);
+		vaultHandlers.get("modify")!(Object.assign(new TFile(), { extension: "md", path: "n.md" }));
+		await vi.advanceTimersByTimeAsync(300);
+		expect(p.warnings.list().some((w) => w.id.startsWith("relation:"))).toBe(false);
+		vi.useRealTimers();
+	});
+	it("re-renders plugin fields when the conflict marker toggle flips", () => {
+		const { p, membership } = wired();
+		const refresh = vi.fn();
+		p.typeInfoPatch = { refresh, uninstall: vi.fn() };
+		Object.assign(p, { schemaSettings: { setToolbarButton: vi.fn(), open: vi.fn() } });
+		p.applySettings();
+		expect(refresh).not.toHaveBeenCalled();
+		p.settings = { ...p.settings, showConflictMarkers: false };
+		p.applySettings();
+		expect(refresh).toHaveBeenCalledWith([...membership.knownFieldNames()]);
+		p.applySettings();
+		expect(refresh).toHaveBeenCalledTimes(1);
 	});
 });

@@ -1,4 +1,4 @@
-import { Notice, Platform, Plugin, setIcon, setTooltip, type EventRef } from "obsidian";
+import { Notice, Platform, Plugin, setIcon, setTooltip, TFile, type EventRef, type TAbstractFile } from "obsidian";
 import { installTypeInfoPatch, TypeInfoPatch } from "./internals/typeInfoPatch";
 import { installHeaderTypeChange, type HeaderBase, type HeaderTypeChange } from "./internals/headerTypeChange";
 import { registerPluginTypes, type PluginTypeRegistration } from "./internals/typeRegistration";
@@ -17,8 +17,11 @@ import { assignedTypes, getMetadataTypeManager, type MetadataTypeManager } from 
 import { ImprovedBasesSettings, ImprovedBasesSettingTab, mergeSettings } from "./settings";
 import { WarningRegistry } from "./warnings/WarningRegistry";
 import { WarningsModal } from "./warnings/WarningsModal";
-import { conflictWarnings, schemaWarnings } from "./warnings/sources";
+import { conflictWarnings, relationWarnings, schemaWarnings } from "./warnings/sources";
 import { t, tn } from "./i18n";
+
+/** Quiet period after a `.base` file event before relation targets are re-checked. */
+const RELATION_CHECK_MS = 300;
 
 /** Rebuilds the widgets of every property whose global type is one of `types`. */
 function refreshAssigned(mtm: MetadataTypeManager, types: ReadonlySet<string>): void {
@@ -50,6 +53,7 @@ export default class ImprovedBasesPlugin extends Plugin {
 	private notified = false;
 	private notifiedSkipped = false;
 	private warningsModal: WarningsModal | null = null;
+	private markersShown = true;
 
 	async onload() {
 		await this.loadSettings();
@@ -84,20 +88,50 @@ export default class ImprovedBasesPlugin extends Plugin {
 		this.addSettingTab(new ImprovedBasesSettingTab(this.app, this));
 	}
 
-	/** Schema errors and field conflicts are state warnings, re-derived whenever the registry or the membership changes. */
-	private watchWarningSources(): void {
+	/**
+	 * Schema errors, field conflicts and missing relation targets are state warnings, re-derived whenever the registry
+	 * or the membership changes; relation targets also follow `.base` file events, since creating or editing the target
+	 * base changes no schema. The relation check reads files, so it is debounced and only its latest run counts.
+	 */
+	watchWarningSources(): void {
 		const schema = () => this.warnings.replace("schema", schemaWarnings(this.registry.errors()));
 		const conflict = () => this.warnings.replace("conflict", conflictWarnings(this.membership.conflicts()));
-		this.registry.on("changed", schema);
+		let seq = 0;
+		let timer: number | null = null;
+		const relation = (): void => {
+			if (timer !== null) window.clearTimeout(timer);
+			timer = window.setTimeout(() => {
+				timer = null;
+				const run = ++seq;
+				void relationWarnings(this.app, this.registry.schemas()).then((entries) => {
+					if (run === seq) this.warnings.replace("relation", entries);
+				});
+			}, RELATION_CHECK_MS);
+		};
+		const onBase = (f: TAbstractFile): void => {
+			if (f instanceof TFile && f.extension === "base") relation();
+		};
+		const onRegistry = () => {
+			schema();
+			relation();
+		};
+		this.registry.on("changed", onRegistry);
 		this.membership.on("changed", conflict);
+		const { vault } = this.app;
+		this.registerEvent(vault.on("create", onBase));
+		this.registerEvent(vault.on("modify", onBase));
+		this.registerEvent(vault.on("delete", onBase));
+		this.registerEvent(vault.on("rename", onBase));
 		this.register(() => {
-			this.registry.off("changed", schema);
+			this.registry.off("changed", onRegistry);
 			this.membership.off("changed", conflict);
+			if (timer !== null) window.clearTimeout(timer);
+			seq++;
 		});
 	}
 
 	/** Command, status bar item (desktop; hidden without warnings) and the list modal. */
-	private registerWarningAccess(): void {
+	registerWarningAccess(): void {
 		this.addCommand({ id: "show-warnings", name: t("command.showWarnings"), callback: () => this.showWarnings() });
 		this.register(() => this.warningsModal?.close());
 		if (!Platform.isDesktop) return;
@@ -111,7 +145,7 @@ export default class ImprovedBasesPlugin extends Plugin {
 			count.setText(String(n));
 			const label = tn("warnings.status", n);
 			item.setAttribute("aria-label", label);
-			if (typeof setTooltip === "function") setTooltip(item, label);
+			setTooltip(item, label);
 		};
 		update();
 		item.addEventListener("click", () => this.showWarnings());
@@ -125,9 +159,12 @@ export default class ImprovedBasesPlugin extends Plugin {
 		this.warningsModal.open();
 	}
 
-	/** Pushes the settings that are not read lazily (the toolbar button) to their owners. */
+	/** Pushes the settings that are not read lazily: the toolbar button, and a re-render of every plugin field when the marker toggle flips. */
 	applySettings(): void {
 		this.schemaSettings?.setToolbarButton(this.settings.showToolbarButton);
+		const markers = this.settings.showConflictMarkers;
+		if (markers !== this.markersShown) this.typeInfoPatch?.refresh([...this.membership.knownFieldNames()]);
+		this.markersShown = markers;
 	}
 
 	private notifyUnsupported() {
