@@ -900,7 +900,7 @@
 .improved-bases-warning:last-child {
 	border-bottom: none;
 }
-.improved-bases-warning-icon {
+.improved-bases-warning > .improved-bases-warning-icon {
 	display: inline-flex;
 	flex: 0 0 auto;
 	margin-top: 2px;
