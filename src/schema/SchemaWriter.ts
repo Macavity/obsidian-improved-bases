@@ -1,8 +1,8 @@
 import { parseDocument } from "yaml";
 import type { App } from "obsidian";
 import { TFile } from "obsidian";
-import { SCHEMA_KEY } from "./types";
-import { EMPTY_EDITS, updateBaseSource, type ColumnEdits, type RawFields } from "./baseDoc";
+import { SCHEMA_KEY, SCHEMA_VERSION } from "./types";
+import { assertWritable, EMPTY_EDITS, updateBaseSource, type ColumnEdits, type RawFields } from "./baseDoc";
 export type { RawFields } from "./baseDoc";
 
 /** Edits only `improved-bases.fields`; everything else is preserved byte-for-byte. */
@@ -10,10 +10,11 @@ export function updateSchemaSource(source: string, mutate: (fields: RawFields) =
 	return updateBaseSource(source, EMPTY_EDITS, mutate);
 }
 
-/** Replaces the whole `improved-bases` value with an empty schema, even if it was invalid. */
+/** Replaces the whole `improved-bases` value with an empty schema, even if it was invalid; a section with a newer version is refused. */
 export function resetSchemaSource(source: string): string {
 	const doc = parseDocument(source);
-	doc.set(SCHEMA_KEY, { fields: {} });
+	assertWritable(doc);
+	doc.set(SCHEMA_KEY, { version: SCHEMA_VERSION, fields: {} });
 	return doc.toString();
 }
 

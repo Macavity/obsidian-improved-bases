@@ -11,6 +11,8 @@ export const de: Locale = {
 	"notice.schemaError": "{plugin}: {path}: {error}",
 	"notice.membersLoading": "Die Einträge der Base werden noch geladen, bitte gleich noch einmal versuchen",
 	"notice.baseUnknown": "Die Base-Datei konnte nicht ermittelt werden",
+	"notice.unsupportedVersion": "{plugin}: {path}: Schema-Version {version} ist neuer, als dieses Plugin unterstützt; das Schema ist schreibgeschützt",
+	"error.unsupportedVersion": "Schema-Version {version} ist neuer, als dieses Plugin unterstützt; die Base wurde nicht geändert",
 
 	"type.relation": "Relation",
 	"type.select": "Auswahl",
@@ -28,6 +30,7 @@ export const de: Locale = {
 	"dialog.iconHelp": "Emoji, das in Relationen für die Einträge dieser Base angezeigt wird, sofern eine Notiz keine eigene icon-Eigenschaft hat. Die Emoji-Auswahl des Systems öffnet sich mit ctrl+cmd+Leertaste auf macOS und mit Windows-Taste + Punkt auf Windows.",
 	"dialog.resetSchema": "Schema zurücksetzen",
 	"dialog.confirmReset": "Zurücksetzen bestätigen",
+	"dialog.unsupportedVersion": "Dieses Schema verwendet Formatversion {version}, die diese Plugin-Version nicht bearbeiten kann. Aktualisiere das Plugin, um es zu ändern.",
 	"dialog.column.name": "Feldname",
 	"dialog.column.type": "Typ",
 	"dialog.column.details": "Details",

@@ -8,6 +8,7 @@ The release workflow takes the section of the released version from this file as
 
 ### Added
 
+- Schema format version: the `improved-bases:` section carries `version: 1`, written on every save and assumed when missing. Format 1 is stable. A base with a newer version is read as far as possible and is read-only in the schema settings dialog; unknown keys in the section survive every write.
 - The plugin's texts follow Obsidian's interface language. English and German are included; other languages can be added under `src/i18n/`.
 
 ### Fixed

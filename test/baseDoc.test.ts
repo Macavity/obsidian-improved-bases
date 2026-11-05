@@ -87,14 +87,16 @@ describe("updateBaseSource", () => {
 	it("sets, keeps and deletes the base icon", () => {
 		const bare = "views:\n  - type: table\n";
 		const set = updateBaseSource(bare, EMPTY_EDITS, noop, " 👥 ");
-		expect(set).toBe("views:\n  - type: table\nimproved-bases:\n  icon: 👥\n");
+		expect(set).toBe("views:\n  - type: table\nimproved-bases:\n  version: 1\n  icon: 👥\n");
 		expect(updateBaseSource(set, EMPTY_EDITS, noop)).toBe(set);
 		expect(updateBaseSource(set, EMPTY_EDITS, noop, "👥")).toBe(set);
 		expect(updateBaseSource(set, EMPTY_EDITS, noop, "")).toBe(bare);
 		expect(updateBaseSource(bare, EMPTY_EDITS, noop, "")).toBe(bare);
 		const withFields = "improved-bases:\n  fields:\n    Team:\n      type: text\nviews:\n  - type: table\n";
-		expect(updateBaseSource(withFields, EMPTY_EDITS, noop, "🏢")).toBe("improved-bases:\n  fields:\n    Team:\n      type: text\n  icon: 🏢\nviews:\n  - type: table\n");
-		expect(updateBaseSource(updateBaseSource(withFields, EMPTY_EDITS, noop, "🏢"), EMPTY_EDITS, noop, "")).toBe(withFields);
+		const withIcon = updateBaseSource(withFields, EMPTY_EDITS, noop, "🏢");
+		expect(withIcon).toBe("improved-bases:\n  version: 1\n  fields:\n    Team:\n      type: text\n  icon: 🏢\nviews:\n  - type: table\n");
+		// Removing the icon keeps the section while fields remain; the version stays once written.
+		expect(updateBaseSource(withIcon, EMPTY_EDITS, noop, "")).toBe("improved-bases:\n  version: 1\n  fields:\n    Team:\n      type: text\nviews:\n  - type: table\n");
 	});
 	it("skips names already in the order and rejects invalid views", () => {
 		expect(updateBaseSource(src, { ...EMPTY_EDITS, add: [{ view: 1, names: ["status"] }] }, noop)).toBe(src);
@@ -146,7 +148,31 @@ views:
 		const out = updateBaseSource(src, { ...EMPTY_EDITS, rename: [{ from: "Status", to: "Stand" }] }, (f) => {
 			f.Stand = { type: "select", multiple: false, options: { A: "red" } };
 		});
-		expect(out).toMatch(/improved-bases:\n {2}fields:\n {4}Stand:\n {6}type: select/);
+		expect(out).toMatch(/improved-bases:\n {2}version: 1\n {2}fields:\n {4}Stand:\n {6}type: select/);
 		expect(out).toContain("- note.Stand\n");
+	});
+});
+
+describe("updateBaseSource keeps unknown section keys", () => {
+	it("round-trips unknown keys and comments in improved-bases", () => {
+		const withExtras = `improved-bases:
+  version: 1
+  # future key
+  future-thing:
+    nested:
+      - 1
+      - 2
+  fields:
+    A:
+      type: text
+  trailing: yes
+${src}`;
+		const out = updateBaseSource(withExtras, EMPTY_EDITS, (f) => { f.B = { type: "text" }; f.A = { type: "number" }; }, "🧪");
+		expect(out).toContain("  # future key\n  future-thing:\n    nested:\n      - 1\n      - 2\n");
+		expect(out).toContain("  trailing: yes\n");
+		expect(out).toContain("  version: 1\n");
+		expect(out).toContain("  icon: 🧪\n");
+		expect(out).toMatch(/A:\n {6}type: number\n {4}B:\n {6}type: text/);
+		expect(out.slice(out.indexOf("filters:"))).toBe(src);
 	});
 });

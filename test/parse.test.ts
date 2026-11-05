@@ -106,3 +106,39 @@ describe("parseSchema unsafe names", () => {
     expect(none.schema?.fields.get("lead")?.field).not.toHaveProperty("view");
   });
 });
+
+describe("parseSchema version", () => {
+  const fields = { Team: { type: "relation", base: "T.base" } };
+  it("defaults a missing version to 1 and accepts version 1", () => {
+    for (const section of [{ fields }, { version: 1, fields }]) {
+      const { schema, errors } = parseSchema("A.base", { "improved-bases": section });
+      expect(errors).toEqual([]);
+      expect(schema?.fields.size).toBe(1);
+      expect(schema).not.toHaveProperty("unsupportedVersion");
+    }
+  });
+  it("flags a higher version and still reads what it can", () => {
+    const raw = { "improved-bases": { version: 2, fields: { ...fields, Weird: { type: "hologram", shape: 3 }, Bad: "x" } } };
+    const { schema, errors } = parseSchema("A.base", raw);
+    expect(errors).toEqual([]);
+    expect(schema?.unsupportedVersion).toBe(2);
+    expect(schema?.fields.get("team")?.field).toEqual({ type: "relation", base: "T.base", multiple: false });
+    expect(schema?.fields.get("weird")?.field).toEqual({ type: "hologram" });
+    expect(schema?.fields.has("bad")).toBe(false);
+  });
+  it("keeps the unsupported flag when a newer format stores fields differently", () => {
+    for (const fields of [["Team"], "Team", 5]) {
+      const { schema, errors } = parseSchema("A.base", { "improved-bases": { version: 2, icon: "👥", fields } });
+      expect(errors).toEqual([]);
+      expect(schema?.unsupportedVersion).toBe(2);
+      expect(schema?.icon).toBe("👥");
+      expect(schema?.fields.size).toBe(0);
+    }
+    expect(parseSchema("A.base", { "improved-bases": { version: 1, fields: ["Team"] } }).schema).toBeNull();
+  });
+  it.each([0, -1, 1.5, "1", null, true, {}])("rejects version %j", (version) => {
+    const r = parseSchema("A.base", { "improved-bases": { version, fields } });
+    expect(r.schema).toBeNull();
+    expect(r.errors.join(" ")).toMatch(/version/i);
+  });
+});

@@ -1,6 +1,7 @@
 import { type Document, isMap, isScalar, isSeq, parseDocument, type Pair, type YAMLMap } from "yaml";
-import { SCHEMA_KEY } from "./types";
+import { SCHEMA_KEY, SCHEMA_VERSION } from "./types";
 import { t } from "../i18n";
+import { parseVersion } from "./parse";
 
 export type RawFields = Record<string, Record<string, unknown>>;
 
@@ -246,8 +247,33 @@ function applyIcon(doc: Document, icon: string): void {
 		else doc.set(SCHEMA_KEY, doc.createNode({ icon: value }));
 	} else if (isMap(section)) {
 		section.delete("icon");
-		if (section.items.length === 0) doc.delete(SCHEMA_KEY);
+		if (section.items.every((p: Pair) => scalarString(p.key) === "version")) doc.delete(SCHEMA_KEY);
 	}
+}
+
+const sectionJson = (doc: Document): unknown => (doc.toJSON() as Record<string, unknown> | null)?.[SCHEMA_KEY] ?? null;
+
+/**
+ * The section's declared format version, read from the resolved document so aliases count; an
+ * invalid value is treated as 1, because the parser rejects such a base and the dialog offers a reset.
+ */
+function sectionVersion(doc: Document): number {
+	const section = sectionJson(doc);
+	const raw = typeof section === "object" && section !== null ? (section as Record<string, unknown>).version : undefined;
+	return parseVersion(raw) ?? SCHEMA_VERSION;
+}
+
+/** Every written section declares its format version; an existing version is kept. */
+function ensureVersion(doc: Document): void {
+	const section = doc.get(SCHEMA_KEY, true);
+	if (!isMap(section) || section.has("version")) return;
+	section.items.unshift(doc.createPair("version", SCHEMA_VERSION));
+}
+
+/** A base whose section was written for a newer plugin is never written here, not even a no-op: a stale dialog save would migrate notes afterwards. */
+export function assertWritable(doc: Document): void {
+	const version = sectionVersion(doc);
+	if (version > SCHEMA_VERSION) throw new Error(t("error.unsupportedVersion", { version }));
 }
 
 /**
@@ -257,9 +283,12 @@ function applyIcon(doc: Document, icon: string): void {
  */
 export function updateBaseSource(source: string, edits: ColumnEdits, mutate: (fields: RawFields) => void, icon?: string): string {
 	const doc = parseDocument(source);
+	assertWritable(doc);
 	const before = doc.toJSON() as unknown;
 	applyColumnEdits(doc, edits);
 	applySchemaMutation(doc, mutate);
 	if (icon !== undefined) applyIcon(doc, icon);
-	return same(before, doc.toJSON()) ? source : doc.toString();
+	if (same(before, doc.toJSON())) return source;
+	ensureVersion(doc);
+	return doc.toString();
 }

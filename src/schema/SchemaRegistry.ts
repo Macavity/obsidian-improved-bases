@@ -4,7 +4,7 @@ import { parseSchema } from "./parse";
 import type { BaseSchema } from "./types";
 import { t } from "../i18n";
 
-const sig = (s: BaseSchema): string => JSON.stringify([s.basePath, s.icon ?? null, [...s.fields]]);
+const sig = (s: BaseSchema): string => JSON.stringify([s.basePath, s.icon ?? null, s.unsupportedVersion ?? null, [...s.fields]]);
 
 type Parsed = ReturnType<typeof parseSchema>;
 
@@ -82,7 +82,11 @@ export class SchemaRegistry extends Events {
 
 	/** Stores the result, notifies about new errors and emits "changed" when schema or errors differ. */
 	private apply(path: string, schema: BaseSchema | null, errors: string[], silent: boolean): void {
+		const wasUnsupported = this.byPath.get(path)?.unsupportedVersion;
 		const schemaChanged = replace(this.byPath, path, schema, sig);
+		if (schema?.unsupportedVersion !== undefined && schema.unsupportedVersion !== wasUnsupported) {
+			new Notice(t("notice.unsupportedVersion", { plugin: "Improved Bases", path, version: schema.unsupportedVersion }));
+		}
 		const errChanged = replace(this.errs, path, errors.length ? errors : null, (e) => e.join("\n"));
 		if (errChanged && errors.length) new Notice(t("notice.schemaError", { plugin: "Improved Bases", path, error: errors[0] ?? "" }));
 		if (!silent && (schemaChanged || errChanged)) this.trigger("changed");
