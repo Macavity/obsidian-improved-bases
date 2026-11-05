@@ -884,8 +884,12 @@
 	border-radius: var(--radius-l) var(--radius-l) 0 0;
 	padding-bottom: env(safe-area-inset-bottom);
 }
-.improved-bases-option-picker.is-docked {
+.improved-bases-option-picker.is-docked,
+.improved-bases-option-editor.is-docked {
 	max-height: var(--ib-dock-max-height);
+}
+.improved-bases-option-editor.is-docked {
+	overflow-y: auto;
 }
 .is-mobile .improved-bases-picker-row,
 .is-mobile .improved-bases-picker-create {
@@ -899,7 +903,9 @@
 /* The hit area stays touch-wide, the negative margins pull the × back next to the label. */
 .is-mobile .improved-bases-option-picker .improved-bases-chip-remove {
 	min-width: var(--ib-touch);
+	min-height: var(--ib-touch);
 	margin-inline: calc(var(--size-4-3) * -1);
+	margin-block: calc(var(--size-4-2) * -1);
 }
 /* The widened hit area would highlight across the label, so touch layouts show no hover fill. */
 .is-mobile .improved-bases-option-picker .improved-bases-chip-remove:hover {
@@ -908,6 +914,8 @@
 .is-mobile .improved-bases-option-editor-colors {
 	grid-template-columns: repeat(auto-fill, minmax(var(--ib-touch), 1fr));
 	justify-items: center;
+	/* 32px swatches on 44px pitch: the spacing makes up the touch target. */
+	gap: var(--size-4-3);
 }
 .is-mobile .improved-bases-option-editor-colors button[data-color] {
 	width: 32px;

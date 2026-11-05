@@ -423,6 +423,18 @@ describe("option picker on a phone", () => {
 		expect(popover()).toBeNull();
 	});
 
+	it("removes its visualViewport listeners on close", () => {
+		const vv = { height: 700, offsetTop: 0, addEventListener: vi.fn(), removeEventListener: vi.fn() };
+		vi.stubGlobal("visualViewport", vv);
+		document.body.classList.add("is-phone");
+		const { picker } = setup();
+		const added = vv.addEventListener.mock.calls.map(([type, fn]) => [type, fn]);
+		expect(added.map(([type]) => type)).toEqual(["resize", "scroll"]);
+		picker.close();
+		expect(vv.removeEventListener.mock.calls).toEqual(added);
+		vi.unstubAllGlobals();
+	});
+
 	it("stays at the field on wider layouts", () => {
 		const { popover } = setup();
 		expect(popover()?.classList.contains("is-docked")).toBe(false);
