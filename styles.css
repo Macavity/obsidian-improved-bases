@@ -966,3 +966,9 @@
 .is-phone .improved-bases-schema-modal {
 	--dialog-max-height: calc(100dvh - var(--size-4-12));
 }
+
+/* Phone properties panel: many chips wrap onto further lines instead of running out of the narrow value column. */
+.is-phone .metadata-property-value .improved-bases-relation,
+.is-phone .metadata-property-value .improved-bases-select {
+	flex-wrap: wrap;
+}
