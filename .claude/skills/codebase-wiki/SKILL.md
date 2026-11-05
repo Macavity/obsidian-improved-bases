@@ -55,7 +55,7 @@ The full rules — the GitHub-URL / relative fallback, the `#Lxx` caveat, and th
 
 ## Freshness discipline (MUST)
 
-The freshness anchor is derived from git, not stored in a page: the last commit that touched `wiki/` (`git log -1 --format=%H -- wiki/`) is the state the wiki was last refreshed against, and refresh mode diffs it against HEAD to update only the affected pages. This holds because every code change lands with its wiki refresh in the same PR (CLAUDE.md); a wiki-only commit moves the anchor, so never commit wiki edits for code that has not been refreshed. A stamp in `OVERVIEW.md` was dropped: parallel branches collided on it in every merge.
+The freshness anchor is derived from git, not stored in a page: the last commit that touched `wiki/` (`git log -1 --format=%H -- wiki/`) is the state the wiki was last refreshed against, and refresh mode diffs it against the working tree (the refresh runs before the final commit) to update only the affected pages. This holds because every code change lands with its wiki refresh in the same PR (CLAUDE.md); a wiki-only commit moves the anchor, so never commit wiki edits for code that has not been refreshed. A stamp in `OVERVIEW.md` was dropped: parallel branches collided on it in every merge.
 
 ## Page skeleton
 
