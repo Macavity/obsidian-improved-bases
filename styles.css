@@ -924,6 +924,11 @@
 	min-height: var(--ib-touch);
 }
 
+/* The footer's resting text; a block above the toolbar on phones only. */
+.improved-bases-schema .improved-bases-hint {
+	display: none;
+}
+
 /* Phone schema dialog: the whole body scrolls (toolbar, column head and fields together) and only a compact footer stays put,
    so the field list gets the screen instead of a small window between two fixed blocks. */
 .is-phone .improved-bases-schema-modal {
@@ -977,11 +982,16 @@
 	min-height: 0;
 	background-color: var(--background-primary);
 }
-.is-phone .improved-bases-schema .improved-bases-rename-status > span:last-child {
-	display: -webkit-box;
-	-webkit-box-orient: vertical;
-	-webkit-line-clamp: 2;
-	overflow: hidden;
+.is-phone .improved-bases-schema .improved-bases-footer:not(.is-dirty):not(.is-error) {
+	display: none;
+}
+.is-phone .improved-bases-schema .improved-bases-hint {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--size-2-3);
+	padding: var(--size-4-2) var(--size-4-4);
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
 }
 .is-phone .improved-bases-schema .improved-bases-footer-buttons button {
 	min-height: var(--ib-touch);
