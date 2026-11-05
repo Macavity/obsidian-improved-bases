@@ -896,8 +896,10 @@
 	min-width: var(--ib-touch);
 	min-height: var(--ib-touch);
 }
+/* The hit area stays touch-wide, the negative margins pull the × back next to the label. */
 .is-mobile .improved-bases-option-picker .improved-bases-chip-remove {
 	min-width: var(--ib-touch);
+	margin-inline: calc(var(--size-4-3) * -1);
 }
 .is-mobile .improved-bases-option-editor-colors {
 	grid-template-columns: repeat(auto-fill, minmax(var(--ib-touch), 1fr));
