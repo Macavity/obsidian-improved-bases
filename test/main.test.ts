@@ -192,6 +192,30 @@ describe("warning access points", () => {
 		expect(p.warnings.list().some((w) => w.id.startsWith("relation:"))).toBe(false);
 		vi.useRealTimers();
 	});
+	it("drops the result of a relation check that was still running when a newer one was scheduled", async () => {
+		vi.useFakeTimers();
+		const { p, registry, vaultHandlers } = wired();
+		const target = Object.assign(new TFile(), { extension: "base", path: "T.base" });
+		let release: (text: string) => void = () => {};
+		const vault = p.app.vault as unknown as Record<string, unknown>;
+		vault.getAbstractFileByPath = (path: string) => (path === "T.base" ? target : null);
+		vault.cachedRead = () => new Promise<string>((resolve) => (release = resolve));
+		p.watchWarningSources();
+		registry.schemas = () => [{ basePath: "A.base", fields: new Map([["team", { name: "Team", field: { type: "relation", base: "T.base", multiple: true, view: "V" } }]]) }];
+		registry.trigger("changed");
+		await vi.advanceTimersByTimeAsync(300);
+		const releaseFirst = release;
+		// A base event schedules a newer check while the first is still reading the target base.
+		vaultHandlers.get("modify")!(target);
+		releaseFirst("views:\n  - name: Other\n");
+		await vi.advanceTimersByTimeAsync(0);
+		expect(p.warnings.list().some((w) => w.id.startsWith("relation:"))).toBe(false);
+		await vi.advanceTimersByTimeAsync(300);
+		release("views:\n  - name: V\n");
+		await vi.advanceTimersByTimeAsync(0);
+		expect(p.warnings.list().some((w) => w.id.startsWith("relation:"))).toBe(false);
+		vi.useRealTimers();
+	});
 	it("re-renders plugin fields when the conflict marker toggle flips", () => {
 		const { p, membership } = wired();
 		const refresh = vi.fn();

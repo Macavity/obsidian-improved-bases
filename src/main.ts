@@ -100,9 +100,10 @@ export default class ImprovedBasesPlugin extends Plugin {
 		let timer: number | null = null;
 		const relation = (): void => {
 			if (timer !== null) window.clearTimeout(timer);
+			// Scheduling already outdates a run that is still awaiting the vault, so its result never overwrites a newer one.
+			const run = ++seq;
 			timer = window.setTimeout(() => {
 				timer = null;
-				const run = ++seq;
 				void relationWarnings(this.app, this.registry.schemas()).then((entries) => {
 					if (run === seq) this.warnings.replace("relation", entries);
 				});
