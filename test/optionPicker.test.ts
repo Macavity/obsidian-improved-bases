@@ -424,7 +424,7 @@ describe("option picker on a phone", () => {
 	});
 
 	it("removes its visualViewport listeners on close", () => {
-		const vv = { height: 700, offsetTop: 0, addEventListener: vi.fn(), removeEventListener: vi.fn() };
+		const vv = { height: 700, offsetTop: 0, addEventListener: vi.fn<(type: string, fn: () => void) => void>(), removeEventListener: vi.fn<(type: string, fn: () => void) => void>() };
 		vi.stubGlobal("visualViewport", vv);
 		document.body.classList.add("is-phone");
 		const { picker } = setup();
