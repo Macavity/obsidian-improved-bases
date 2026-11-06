@@ -6,6 +6,8 @@ The release workflow takes the section of the released version from this file as
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-06
+
 ### Added
 
 - Schema format version: the `improved-bases:` section carries `version: 1`, written on every save and assumed when missing. Format 1 is stable. A base with a newer version is read as far as possible and is read-only in the schema settings dialog; unknown keys in the section survive every write.
@@ -24,6 +26,7 @@ The release workflow takes the section of the released version from this file as
 - Phone: relation and select chips in the properties panel wrap instead of running out of the value column.
 - Schema settings: the field disclosure chevron was invisible on tablets, where Obsidian pads plain buttons; it is an icon button now, keeps its icon under theme padding, tells assistive technology whether the row is open, and the row's icon buttons use touch size on mobile.
 - Schema settings: on narrow phones the field row could overflow the dialog and hide the remove button; the name column shrinks instead.
+- Option editor: a slow rename or recolor no longer closes an editor opened for another option in the meantime.
 
 ## [0.2.0] - 2026-11-03
 
@@ -48,6 +51,7 @@ The release workflow takes the section of the released version from this file as
 - Schema settings dialog per base; definitions live in the `.base` file.
 - Widgets in the Bases table view, the properties panel and the sidebar file properties.
 
-[Unreleased]: https://github.com/Macavity/obsidian-improved-bases/compare/0.2.0...HEAD
+[Unreleased]: https://github.com/Macavity/obsidian-improved-bases/compare/0.3.0...HEAD
+[0.3.0]: https://github.com/Macavity/obsidian-improved-bases/compare/0.2.0...0.3.0
 [0.2.0]: https://github.com/Macavity/obsidian-improved-bases/compare/0.1.0...0.2.0
 [0.1.0]: https://github.com/Macavity/obsidian-improved-bases/commits/0.1.0
